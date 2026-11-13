@@ -52,30 +52,28 @@ function Showcase({ items }) {
 function Menu({ menu }) {
   return (
     <section className="menu page">
-      {menu.map((cat) => {
-        return (
-          <Reveal className="menu-cat" key={cat.slug} id={cat.slug}>
-            <div className="menu-head">
-              <h2><Link to={`/shop?category=${cat.slug}`}>{cat.name}</Link></h2>
-              <span>{cat.count} items</span>
-            </div>
-            <ul className="menu-items">
-              {cat.items.map((p) => (
-                <li key={p.id}>
-                  <Link to={`/p/${p.slug}`} className="menu-item">
-                    <img src={img(p.image, 200)} alt="" width="64" height="64" loading="lazy" />
-                    <span className="menu-text">
-                      <span className="menu-line"><b>{p.name}</b><span>{taka(p.price)}</span></span>
-                      <span className="menu-desc">{p.summary}</span>
-                      {p.discount > 0 && <span className="menu-note">{p.discount}% below the usual {taka(p.original_price)}</span>}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </Reveal>
-        )
-      })}
+      {menu.map((cat) => (
+        <Reveal className="menu-cat" key={cat.slug} id={cat.slug}>
+          <div className="menu-head">
+            <h2><Link to={`/shop?category=${cat.slug}`}>{cat.name}</Link></h2>
+            <span>{cat.count} items</span>
+          </div>
+          <ul className="menu-items">
+            {cat.items.map((p) => (
+              <li key={p.id}>
+                <Link to={`/p/${p.slug}`} className="menu-item">
+                  <img src={img(p.image, 200)} alt="" width="64" height="64" loading="lazy" />
+                  <span className="menu-text">
+                    <span className="menu-line"><b>{p.name}</b><span>{taka(p.price)}</span></span>
+                    <span className="menu-desc">{p.summary}</span>
+                    {p.discount > 0 && <span className="menu-note">{p.discount}% below the usual {taka(p.original_price)}</span>}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Reveal>
+      ))}
     </section>
   )
 }
@@ -108,7 +106,7 @@ export default function Home() {
           <h2>Today's best deals</h2>
           <Link to="/shop?sort=price" className="arrow">See all →</Link>
         </Reveal>
-        <TileGrid products={deals} />
+        <TileGrid products={deals} feature />
       </section>
 
       {best.length === 2 && <Showcase items={best} />}

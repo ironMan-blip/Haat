@@ -15,6 +15,7 @@ class Cart:
     def __init__(self, request):
         self.session = request.session
         self.items = self.session.get(KEY, {})  # {"<product pk>": qty}; session JSON keys are strings
+        self.notes = []  # what the cart changed on its own, shown to the buyer
 
     def _save(self):
         self.session[KEY] = self.items
@@ -23,6 +24,8 @@ class Cart:
     def set(self, product, qty):
         if product.max_qty < 1:
             raise serializers.ValidationError({"product": f"{product.name} is sold out."})
+        if qty > product.max_qty:
+            self.notes.append(f"Only {product.max_qty} of {product.name} can be in your cart.")
         self.items[str(product.pk)] = max(1, min(qty, product.max_qty))
         self._save()
 
@@ -38,9 +41,25 @@ class Cart:
         self._save()
 
     def lines(self, products=Product.objects):
-        """(product, qty) pairs, skipping products deleted since they were added."""
+        """(product, qty) pairs. Stock may have dropped since the buyer added things, so this drops
+        deleted or sold-out products and lowers quantities to what is left, noting each change."""
         found = products.in_bulk([int(pk) for pk in self.items])
-        return [(found[int(pk)], qty) for pk, qty in self.items.items() if int(pk) in found]
+        lines, before = [], dict(self.items)
+        for pk, qty in before.items():
+            p = found.get(int(pk))
+            if p is None:  # deleted product
+                del self.items[pk]
+            elif p.max_qty < 1:
+                del self.items[pk]
+                self.notes.append(f"{p.name} sold out and was taken out of your cart.")
+            else:
+                if qty > p.max_qty:
+                    qty = self.items[pk] = p.max_qty
+                    self.notes.append(f"Only {qty} of {p.name} left, so your cart now has {qty}.")
+                lines.append((p, qty))
+        if self.items != before:
+            self._save()
+        return lines
 
     def data(self):
         lines = self.lines()
@@ -55,5 +74,6 @@ class Cart:
             "delivery_fee": fee,
             "total": subtotal + fee,
             "free_delivery_left": max(0, free_min - subtotal),
-            "free_delivery_progress": min(100, round(subtotal * 100 / free_min)),
+            "free_delivery_progress": min(100, round(subtotal * 100 / free_min)) if free_min else 100,
+            "notice": " ".join(self.notes) or None,
         }

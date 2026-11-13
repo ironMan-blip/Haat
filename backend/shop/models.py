@@ -1,7 +1,10 @@
 import math
 
 from django.conf import settings
-from django.db import models
+from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
+from django.db import models, transaction
+from django.db.models import F
 
 MAX_QTY = 20  # most of one product per cart line or order
 LOW_STOCK = 10  # below this the shop says "only N left"
@@ -27,7 +30,8 @@ class Product(models.Model):
     price = models.PositiveIntegerField(help_text="Taka")
     original_price = models.PositiveIntegerField(null=True, blank=True, help_text="Before discount")
     image = models.URLField(max_length=500)
-    rating = models.DecimalField(max_digits=2, decimal_places=1, default=0)
+    rating = models.DecimalField(max_digits=2, decimal_places=1, default=0,
+                                 validators=[MinValueValidator(0), MaxValueValidator(5)])
     reviews = models.PositiveIntegerField(default=0)
     stock = models.PositiveIntegerField(default=0)
     created = models.DateTimeField(auto_now_add=True)
@@ -52,6 +56,10 @@ class Product(models.Model):
     @property
     def stock_level(self):
         return "out" if not self.stock else "low" if self.stock < LOW_STOCK else "in"
+
+    @property
+    def stock_label(self):
+        return {"out": "Sold out", "low": f"Only {self.stock} left", "in": "In stock"}[self.stock_level]
 
     @property
     def specs(self):
@@ -90,6 +98,25 @@ class Order(models.Model):
 
     def __str__(self):
         return f"Order #{self.pk}"
+
+    REOPEN_ERROR = {"status": "A cancelled order can't be reopened: its stock is already back on sale."}
+
+    def clean(self):  # friendly form error; save() enforces the same rule under the row lock
+        was = Order.objects.filter(pk=self.pk).values_list("status", flat=True).first() if self.pk else None
+        if was == "cancelled" and self.status != "cancelled":
+            raise ValidationError(self.REOPEN_ERROR)
+
+    def save(self, *args, **kwargs):
+        # Cancelling puts the items back in stock, once.
+        with transaction.atomic():
+            was = Order.objects.select_for_update().filter(pk=self.pk).values_list("status", flat=True).first() \
+                if self.pk else None
+            if was == "cancelled" and self.status != "cancelled":  # e.g. two admins racing
+                raise ValidationError(self.REOPEN_ERROR)
+            super().save(*args, **kwargs)
+            if self.status == "cancelled" and was not in (None, "cancelled"):
+                for item in self.items.all():
+                    Product.objects.filter(pk=item.product_id).update(stock=F("stock") + item.quantity)
 
 
 class OrderItem(models.Model):

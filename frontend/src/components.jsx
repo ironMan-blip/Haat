@@ -4,7 +4,6 @@ import { img, taka } from './api'
 import { useStore } from './store'
 
 // Adds .in when the element scrolls into view; CSS staggers its children. Content stays visible without JS.
-// eslint-disable-next-line no-unused-vars -- Tag is used as JSX
 export function Reveal({ as: Tag = 'div', className = '', children, ...rest }) {
   const ref = useRef(null)
   useEffect(() => {
@@ -27,6 +26,7 @@ const svg = (d) => (
 const Icon = {
   cart: svg(<><path d="M3 4h2l2.4 11.2a1 1 0 0 0 1 .8h8.9a1 1 0 0 0 1-.8L20 8H6" /><circle cx="9" cy="20" r="1.3" /><circle cx="17" cy="20" r="1.3" /></>),
   user: svg(<><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></>),
+  plus: svg(<path d="M12 5v14M5 12h14" />),
 }
 
 export function Header() {
@@ -66,21 +66,31 @@ export function Header() {
   )
 }
 
-export function Tile({ p, big }) {
+// The name link stretches over the whole tile (CSS ::after); the add button sits above it.
+function Tile({ p, big }) {
+  const { add } = useStore()
   const d = p.discount
+  const out = p.stock === 0
   return (
-    <Link to={`/p/${p.slug}`} className={big ? 'tile tile--big' : 'tile'}>
+    <article className={`tile${big ? ' tile--big' : ''}${out ? ' tile--out' : ''}`}>
       <span className="tile-pic">
         <img src={img(p.image, big ? 600 : 400)} alt="" loading="lazy" width="400" height="400" />
-        {d > 0 && <span className="badge">−{d}%</span>}
+        {out ? <span className="badge badge--out">Sold out</span> : d > 0 && <span className="badge">−{d}%</span>}
       </span>
-      <span className="tile-name">{p.name}</span>
+      <Link to={`/p/${p.slug}`} className="tile-name">{p.name}</Link>
       {p.reviews > 0 && <Rating p={p} />}
-      <span className="tile-price">
-        {taka(p.price)}
-        {d > 0 && <> <s>{taka(p.original_price)}</s></>}
+      <span className="tile-foot">
+        <span className="tile-price">
+          {taka(p.price)}
+          {d > 0 && <> <s>{taka(p.original_price)}</s></>}
+        </span>
+        {!out && (
+          <button type="button" className="tile-add" onClick={() => add(p)} aria-label={`Add ${p.name} to cart`}>
+            {Icon.plus}
+          </button>
+        )}
       </span>
-    </Link>
+    </article>
   )
 }
 
@@ -92,16 +102,17 @@ export function Rating({ p }) {
   )
 }
 
-export function TileGrid({ products }) {
+// `feature` enlarges every 7th tile: for short curated rows, not for long lists people scan.
+export function TileGrid({ products, feature }) {
   return (
     <Reveal className="tiles">
-      {products.map((p, i) => <Tile key={p.id} p={p} big={i % 7 === 0} />)}
+      {products.map((p, i) => <Tile key={p.id} p={p} big={feature && i % 7 === 0} />)}
     </Reveal>
   )
 }
 
 // The live thing: how far the cart is from free delivery.
-export function DeliveryMeter() {
+function DeliveryMeter() {
   const { cart } = useStore()
   if (!cart?.subtotal) return null
   const left = cart.free_delivery_left
@@ -167,7 +178,7 @@ export function Footer() {
   )
 }
 
-export function Skeleton({ n = 8 }) {
+function Skeleton({ n = 8 }) {
   return (
     <div className="tiles" aria-busy="true" aria-label="Loading">
       {Array.from({ length: n }, (_, i) => (

@@ -1,4 +1,7 @@
 asgiref==3.13.0
 django==5.2.19
+django-otp==1.7.5
 djangorestframework==3.18.3
+psycopg[binary]==3.3.9
+redis==8.1.0
 sqlparse==0.6.1

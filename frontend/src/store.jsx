@@ -22,8 +22,8 @@ export function StoreProvider({ children }) {
   useEffect(() => { write('haat-auth', auth) }, [auth])
   useEffect(() => {
     api('/config/').then(setConfig).catch(() => {})
-    api('/cart/').then(setCart).catch(() => {})
-  }, [])
+    api('/cart/').then(take).catch(() => {})
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps -- load once; take only uses setters
   useEffect(() => {
     if (!notice) return
     const t = setTimeout(() => setNotice(null), 3500)
@@ -31,22 +31,26 @@ export function StoreProvider({ children }) {
   }, [notice])
 
   const say = (text, link) => setNotice({ text, link, at: Date.now() })
-  const call = (path, opts) => api(path, opts).then(setCart).catch((err) => say(err.message))
+  // The server says when it changed the cart itself (sold out, less stock, quantity cap).
+  const take = (c) => { setCart(c); if (c.notice) say(c.notice); return c }
+  const call = (path, opts) => api(path, opts).then(take).catch((err) => say(err.message))
 
   const value = {
     auth, config, cart, notice,
     count: cart?.count ?? 0,
+    // Resolves true once the item is in the cart, false if the server refused it.
     add: (p, quantity = 1) =>
       api('/cart/', { method: 'POST', body: { product: p.id, quantity } })
-        .then((c) => { setCart(c); say(`Added to cart: ${p.name}`, true) })
-        .catch((err) => say(err.message)),
+        .then((c) => { setCart(c); say(c.notice, true); return true })
+        .catch((err) => { say(err.message); return false }),
     setQty: (id, quantity) => call(`/cart/${id}/`, { method: 'PATCH', body: { quantity } }),
     remove: (id) => call(`/cart/${id}/`, { method: 'DELETE' }),
     reloadCart: () => call('/cart/'),
     login: setAuth,
+    expire: () => setAuth(null), // stale token: forget it but keep the cart, they'll log back in
     logout: () => {
-      // Revoke the token server side too; a failed call (already stale) still signs out locally.
-      if (auth) api('/auth/logout/', { method: 'POST', token: auth.token }).catch(() => {})
+      // Revokes the token and empties this device's cart server side; signing out locally never waits on it.
+      api('/auth/logout/', { method: 'POST', token: auth?.token }).catch(() => {}).finally(() => call('/cart/'))
       setAuth(null)
     },
   }

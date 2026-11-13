@@ -4,12 +4,18 @@ import { img, taka, useFetch } from '../api'
 import { Qty, Rating, Status, TileGrid } from '../components'
 import { useStore } from '../store'
 
+// Keyed by slug so moving to a related product starts fresh (quantity back to 1).
 export default function Product() {
   const { slug } = useParams()
+  return <ProductPage key={slug} slug={slug} />
+}
+
+function ProductPage({ slug }) {
   const { data: p, loading, error } = useFetch(`/products/${slug}/`)
   const { add, config } = useStore()
   const navigate = useNavigate()
-  const [qty, setQty] = useState(1)
+  const [pick, setQty] = useState(1)
+  const qty = Math.max(1, Math.min(pick, p?.max_qty ?? 1))
 
   return (
     <Status loading={loading} error={error}>
@@ -33,11 +39,11 @@ export default function Product() {
               </p>
               {p.stock_level !== 'out' ? (
                 <>
-                  <p className={p.stock_level === 'low' ? 'stock stock--low' : 'stock'}>{p.stock_level === 'low' ? `Only ${p.stock} left` : 'In stock'}</p>
+                  <p className={p.stock_level === 'low' ? 'stock stock--low' : 'stock'}>{p.stock_label}</p>
                   <div className="pdp-buy">
                     <Qty value={qty} max={p.max_qty} onChange={setQty} label="Quantity" />
                     <button className="btn" onClick={() => add(p, qty)}>Add to cart</button>
-                    <button className="btn btn--line" onClick={() => { add(p, qty); navigate('/cart') }}>Buy now</button>
+                    <button className="btn btn--line" onClick={() => add(p, qty).then((ok) => ok && navigate('/cart'))}>Buy now</button>
                   </div>
                   <ul className="perks">
                     <li>Cash on delivery, pay when it arrives</li>
@@ -45,7 +51,7 @@ export default function Product() {
                   </ul>
                 </>
               ) : (
-                <p className="stock stock--out">Sold out</p>
+                <p className="stock stock--out">{p.stock_label}</p>
               )}
               {p.specs.length > 0 && (
                 <ul className="pdp-spec">
