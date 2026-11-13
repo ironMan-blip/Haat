@@ -13,18 +13,30 @@ A simple general store for Bangladesh. React (Vite) frontend, Django + DRF backe
 - Guest session cart with totals and a free-delivery meter (free at ৳299+, else ৳60)
 - Register / login with password visibility toggle; tokens expire after 30 days
 - Checkout with cash on delivery, Bangladeshi phone and city validation
-- Order history (own orders only)
+- Order history (own orders only) with status badges
+- Toast messages, empty states, scroll-reveal animations, star rating labels
+- Responsive product images (200/400/800px copies from the Daraz CDN)
+- Every price, date, badge and label comes pre-formatted from the API (taka, Indian digit grouping)
+- Safe `next` redirect after login/register
 
 **Sellers**
-- Django admin for products and order status
+- Admin dashboard: pending orders, sales today / last 30 days, recent orders, low stock
+- Manage products (inline price/stock edits, stock filter, image preview), categories, orders
+  (search by id/name/phone, bulk mark shipped/delivered/cancelled), users with their orders, API tokens, 2FA devices
 - Admin 2FA (authenticator app) with lockout after 5 failures
-- Cancelling an order restores stock
+- Cancelling a pending order restores stock once; cancelled orders can't be reopened; orders can't be deleted
+- Live image preview when editing a product
+- `seed` command loads 47 cleaned Daraz products; `scripts/fetch_daraz.py` re-pulls them
+- `admin_totp` command sets up or resets a seller's authenticator
 
 **Safety**
-- Prices from the database, stock locked per order
+- Prices from the database, stock locked and decremented in one transaction
 - Max 5 pending orders per buyer and per phone
-- Login/register throttling, CSRF on cart changes
-- Production hardening: HTTPS, HSTS, secure cookies, CSP
+- Login/register throttling (5/min per IP), sign-ups capped at 50/day per IP
+- Tokens revoked on logout and password change
+- CSRF on cart changes
+- Every error returns one readable `message`
+- Production hardening: HTTPS, HSTS, secure cookies, CSP, custom admin path, Redis-shared throttle counts
 
 ## Run it
 
@@ -87,22 +99,26 @@ flowchart LR
 
 ```
 frontend/  React 19 + react-router 7, no state library
-  src/api.js         fetch wrapper, useFetch hook, taka formatting, Daraz image resize
-  src/store.jsx      auth token; holds the server's cart and config responses
-  src/components.jsx header, footer, product tile, delivery meter, order summary, qty stepper
+  src/api.js         fetch wrapper, useFetch hook
+  src/store.jsx      StoreProvider: auth token, the server's cart and config responses (hook: useStore.js)
+  src/components/    one file per shared component (Header, TileGrid, Summary, Qty, Footer, Status, Toast, ...)
   src/pages/         Home, Shop (category/search/sort), Product, Cart, Checkout, Login, Orders
 backend/   Django 5.2 LTS + DRF, one app: shop
   shop/models.py      Category, Product (discount, stock level, specs, rank), Order, OrderItem
+  shop/display.py     taka, Indian digit grouping, dates, image sizes: the API sends every string ready to print
   shop/cart.py        session cart: quantities, totals, delivery fee, free-delivery meter
+  shop/auth.py        token expiry, CSRF check, client IP, login lockout
   shop/serializers.py order creation from the cart: DB prices, stock lock
-  shop/views.py       REST endpoints
+  shop/api/           REST layer: catalog.py (config, home, products), checkout.py (cart, orders),
+                      accounts.py (register, login, logout), errors.py (one `message` per error), urls.py
+  shop/admin.py       dashboard, 2FA admin site, product/order/user admin
   shop/management/commands/seed.py  loads + cleans shop/fixtures/daraz_products.json
   scripts/fetch_daraz.py            re-pulls that fixture from Daraz search
 ```
 
 | Endpoint | Method | Auth | Notes |
 | --- | --- | --- | --- |
-| `/api/config/` | GET | - | free-delivery threshold, fee, cities, sort options, password rules, footer photo |
+| `/api/config/` | GET | - | cities, sort options, password rules, footer copy and photo |
 | `/api/home/` | GET | - | wall, deals, best rated, category menu |
 | `/api/products/?category=&q=&sort=` | GET | - | `{title, count_label, empty, categories, results}`; sort: `price`, `-price`, `-rating` |
 | `/api/products/<slug>/` | GET | - | adds specs, stock level and label, max qty, related |
@@ -113,7 +129,8 @@ backend/   Django 5.2 LTS + DRF, one app: shop
 | `/api/auth/logout/` | POST | Token | revokes the token |
 | `/api/orders/` | GET, POST | Token | own orders only; POST takes the address and orders the session cart |
 
-Every error response carries `message`: the one line the app shows.
+Every error response carries `message`: the one line the app shows. The frontend only renders: prices (`*_display`),
+badges, rating labels, image sizes (`thumb`/`image`/`image_large`), dates, totals lines and copy all come from the API.
 
 Order rules (server side, tested): price comes from the database, never the client; stock is locked
 and decremented in one transaction; delivery is free at ৳299 and above, otherwise ৳60; payment is
@@ -155,13 +172,6 @@ Also:
 - Logs (errors, admin login failures and lockouts) go to stdout.
 - Not done yet: phone OTP at checkout. The per-phone cap slows hoarding with fake orders, but anyone can
   type a made-up number; add an SMS gateway before scaling.
-
-## Research that shaped it
-
-- **Cartup**: header with search, flash deals, category grid; free delivery over a threshold; COD + bKash/Nagad.
-- **Daraz**: product card = image, name, sale price, struck original, discount %.
-- **Chaldal**: delivery fee rules shown up front, "pay after receiving". Became the cart's delivery meter.
-- **Pickaboo**: COD as a first-class payment option.
 
 ## Not in the MVP
 

@@ -1,0 +1,8 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'shop/admin.css' %}">{% endblock %}
+
+{% block branding %}
+<h1 id="site-name"><a href="{% url 'admin:index' %}"><span class="haat-logo">Haat</span> admin</a></h1>
+{% endblock %}

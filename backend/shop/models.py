@@ -100,21 +100,31 @@ class Order(models.Model):
         return f"Order #{self.pk}"
 
     REOPEN_ERROR = {"status": "A cancelled order can't be reopened: its stock is already back on sale."}
+    UNSHIP_ERROR = {"status": "A shipped order can't go back to pending: its goods have left the shelf."}
+
+    def refusal(self, was):
+        """Why the status can't change from `was`, or None. Only pending -> cancelled restocks, so an order
+        must never re-enter pending: shipped -> pending -> cancelled would restock goods already sent."""
+        if was == "cancelled" and self.status != "cancelled":
+            return self.REOPEN_ERROR
+        if was in ("shipped", "delivered") and self.status == "pending":
+            return self.UNSHIP_ERROR
+        return None
 
     def clean(self):  # friendly form error; save() enforces the same rule under the row lock
         was = Order.objects.filter(pk=self.pk).values_list("status", flat=True).first() if self.pk else None
-        if was == "cancelled" and self.status != "cancelled":
-            raise ValidationError(self.REOPEN_ERROR)
+        if error := self.refusal(was):
+            raise ValidationError(error)
 
     def save(self, *args, **kwargs):
-        # Cancelling puts the items back in stock, once.
+        # Cancelling a pending order puts its items back in stock, once; shipped goods are not on the shelf.
         with transaction.atomic():
             was = Order.objects.select_for_update().filter(pk=self.pk).values_list("status", flat=True).first() \
                 if self.pk else None
-            if was == "cancelled" and self.status != "cancelled":  # e.g. two admins racing
-                raise ValidationError(self.REOPEN_ERROR)
+            if error := self.refusal(was):  # e.g. two admins racing
+                raise ValidationError(error)
             super().save(*args, **kwargs)
-            if self.status == "cancelled" and was not in (None, "cancelled"):
+            if self.status == "cancelled" and was == "pending":
                 for item in self.items.all():
                     Product.objects.filter(pk=item.product_id).update(stock=F("stock") + item.quantity)
 

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
-import { useStore } from '../store'
+import { useStore } from '../useStore'
 
 export default function Login() {
   const [mode, setMode] = useState('login')

@@ -1,8 +1,9 @@
 import { useEffect } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
-import { img, taka, useFetch } from '../api'
-import { EmptyState, Status } from '../components'
-import { useStore } from '../store'
+import { useFetch } from '../api'
+import EmptyState from '../components/EmptyState'
+import Status from '../components/Status'
+import { useStore } from '../useStore'
 
 export default function Orders() {
   const { auth, expire } = useStore()
@@ -32,17 +33,17 @@ export default function Orders() {
               <span className={`status status--${o.status}`}>{o.status_display}</span>
             </div>
             <p className="soft">
-              {new Date(o.created).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} · {o.city} · {o.payment_display}
+              {o.created_display} · {o.city} · {o.payment_display}
             </p>
             <ul className="lines">
               {o.items.map((it) => (
                 <li key={it.slug} className="line line--small">
-                  <img src={img(it.image, 200)} alt="" width="52" height="52" loading="lazy" />
-                  <div className="line-text"><Link to={`/p/${it.slug}`}>{it.name}</Link><span className="soft">{it.quantity} × {taka(it.price)}</span></div>
+                  <img src={it.thumb} alt="" width="52" height="52" loading="lazy" />
+                  <div className="line-text"><Link to={`/p/${it.slug}`}>{it.name}</Link><span className="soft">{it.quantity} × {it.price_display}</span></div>
                 </li>
               ))}
             </ul>
-            <p className="order-total">Total {taka(o.total)} {o.delivery_fee ? `(incl. ${taka(o.delivery_fee)} delivery)` : '(free delivery)'}</p>
+            <p className="order-total">{o.total_line}</p>
           </article>
         ))}
       </Status>

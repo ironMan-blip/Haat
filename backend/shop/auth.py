@@ -1,16 +1,67 @@
-"""API token lifetime, and CSRF for the views that act on the session cookie."""
+"""API token lifetime, CSRF for the views that act on the session cookie, client IPs and login lockout."""
+import ipaddress
 from collections.abc import Mapping
 from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.db.models.signals import pre_save
 from django.dispatch import receiver
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
-from rest_framework import exceptions, permissions
+from rest_framework import exceptions, permissions, throttling
 from rest_framework.authentication import CSRFCheck, TokenAuthentication
 from rest_framework.authtoken.models import Token
+
+
+def client_ident(request):
+    """The client's IP (honouring NUM_PROXIES), with IPv6 cut to its /64: one home or phone gets a whole
+    /64, so counting single IPv6 addresses would let anyone dodge every per-IP limit."""
+    ident = throttling.BaseThrottle().get_ident(request)
+    try:
+        addr = ipaddress.ip_address(ident)
+    except ValueError:
+        return ident
+    if addr.version == 4:
+        return ident
+    if addr.ipv4_mapped:  # ::ffff:1.2.3.4 is the IPv4 client 1.2.3.4
+        return str(addr.ipv4_mapped)
+    return str(ipaddress.ip_network(f"{addr}/64", strict=False))
+
+
+class ClientIdent:
+    def get_ident(self, request):
+        return client_ident(request)
+
+
+class AnonThrottle(ClientIdent, throttling.AnonRateThrottle):
+    pass
+
+
+class UserThrottle(ClientIdent, throttling.UserRateThrottle):
+    pass
+
+
+class ScopedThrottle(ClientIdent, throttling.ScopedRateThrottle):
+    pass
+
+
+def login_fail_keys(username, request=None):
+    """Failure counters shared by the API and admin logins, so neither is a way round the other's lockout.
+    Usernames can't differ only by case (see RegisterSerializer), so one counter per lowercased name."""
+    keys = [f"login-fails:user:{username[:150].lower()}"] if isinstance(username, str) and username else []
+    return keys + ([f"login-fails:ip:{client_ident(request)}"] if request else [])
+
+
+def locked_out(keys):
+    return any(cache.get(k, 0) >= settings.LOGIN_MAX_FAILS for k in keys)
+
+
+def record_login_failure(keys):
+    for k in keys:
+        cache.add(k, 0, settings.LOGIN_LOCKOUT_SECONDS)
+        cache.incr(k)
 
 
 def expired(token):
@@ -32,8 +83,8 @@ def issue_token(user):
     """The user's token, replaced by a fresh one if it has expired."""
     token, created = Token.objects.get_or_create(user=user)
     if not created and expired(token):
-        token.delete()
-        token = Token.objects.create(user=user)
+        Token.objects.filter(pk=token.pk).delete()
+        token, _ = Token.objects.get_or_create(user=user)  # a parallel login may have made it already
     return token
 
 

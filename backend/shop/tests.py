@@ -15,9 +15,10 @@ from rest_framework.authtoken.models import Token
 from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIClient, APITestCase
 
+from .display import cdn, day, num, taka
 from .models import Category, Order, Product
 from .serializers import RegisterSerializer
-from .views import SignupThrottle
+from .api.accounts import SignupThrottle
 
 ADDR = {"full_name": "Rahim", "phone": "01712345678", "address": "House 1, Road 2", "city": "Dhaka"}
 
@@ -103,6 +104,58 @@ class ShopApiTests(APITestCase):
         with self.assertRaises(ValidationError):
             o.full_clean()
 
+    def test_cancelling_shipped_order_does_not_restock(self):
+        self.order((self.case, 4))
+        o = Order.objects.get()
+        o.status = "delivered"
+        o.save()
+        o.status = "cancelled"
+        o.save()
+        self.case.refresh_from_db()
+        self.assertEqual(self.case.stock, 6)  # the goods are with the buyer, not on the shelf
+
+    def test_shipped_order_cannot_go_back_to_pending_and_restock(self):
+        self.order((self.case, 4))
+        o = Order.objects.get()
+        o.status = "shipped"
+        o.save()
+        o.status = "pending"
+        with self.assertRaises(DjangoValidationError):
+            o.full_clean()
+        with self.assertRaises(DjangoValidationError):
+            o.save()  # enforced without clean() too, e.g. the bulk actions
+        o.status = "cancelled"
+        o.save()
+        self.case.refresh_from_db()
+        self.assertEqual(self.case.stock, 6)
+
+    def test_patch_on_removed_line_does_not_bring_it_back(self):
+        self.add(self.case, 1)
+        self.client.delete(f"/api/cart/{self.case.pk}/")
+        r = self.client.patch(f"/api/cart/{self.case.pk}/", {"quantity": 2}, format="json")
+        self.assertEqual(r.status_code, 404)
+        self.assertEqual(self.client.get("/api/cart/").data["lines"], [])
+
+    def test_blank_search_is_no_search(self):
+        r = self.client.get("/api/products/", {"q": "   "})
+        self.assertEqual((r.data["title"], len(r.data["results"])), ("Every product", 2))
+
+    def test_checkout_mismatch_says_what_changed(self):
+        self.add(self.phone, 3)
+        shown = self.client.get("/api/cart/").data["total"]
+        Product.objects.filter(pk=self.phone.pk).update(stock=2)
+        r = self.client.post("/api/orders/", {**ADDR, "expected_total": shown}, format="json")
+        self.assertIn("Only 2 of Phone left", r.data["message"])
+
+    def test_issue_token_survives_parallel_refresh(self):
+        from .auth import issue_token
+        stale = Token(key="stale", user=self.user, created=timezone.now() - timedelta(days=365))
+        fresh = Token.objects.create(user=self.user)  # the other login already replaced it
+        real = Token.objects.get_or_create
+        calls = iter([lambda **kw: (stale, False), real])
+        with mock.patch("shop.auth.Token.objects.get_or_create", side_effect=lambda **kw: next(calls)(**kw)):
+            self.assertEqual(issue_token(self.user), fresh)
+
     def test_logout_with_stale_token_still_empties_cart(self):
         self.client.force_authenticate(None)
         self.add(self.case, 1)
@@ -133,8 +186,8 @@ class ShopApiTests(APITestCase):
         self.client.force_authenticate(None)  # guests can use the cart
         c = self.add(self.case, 2).data
         self.assertEqual((c["subtotal"], c["delivery_fee"], c["total"], c["count"]), (200, 60, 260, 2))
-        self.assertEqual((c["free_delivery_left"], c["free_delivery_progress"]), (99, 67))
-        self.assertEqual(c["lines"][0]["line_total"], 200)
+        self.assertEqual(c["free_delivery_progress"], 67)
+        self.assertEqual(c["lines"][0]["line_total_display"], "৳200")
         c = self.add(self.phone, 5).data  # only 3 in stock
         self.assertEqual(c["lines"][1]["quantity"], 3)
         self.assertIn("Only 3", c["notice"])
@@ -245,7 +298,24 @@ class ShopApiTests(APITestCase):
         h = self.client.get("/api/home/").data
         self.assertEqual(h["deals"][0]["slug"], "rice")  # the sold-out 99% deal is skipped
         self.assertEqual([p["slug"] for p in h["best"]], ["rice", "case"])  # one per category
-        self.assertEqual({m["slug"]: m["count"] for m in h["menu"]}, {"mobiles": 2, "rice": 2})
+        self.assertEqual({m["slug"]: m["count_label"] for m in h["menu"]}, {"mobiles": "2 items", "rice": "2 items"})
+
+    def test_server_writes_every_display_string(self):
+        self.assertEqual((num(999), num(1234), num(1234567), taka(0), taka(None)), ("999", "1,234", "12,34,567", "৳0", "৳0"))
+        self.assertEqual(cdn("https://x.slatic.net/a.jpg", 200), "https://x.slatic.net/a.jpg_200x200q75.jpg")
+        self.assertEqual(cdn("https://x.y/a.jpg", 200), "https://x.y/a.jpg")
+        Product.objects.filter(pk=self.phone.pk).update(original_price=20000, reviews=12345, rating=4.5)
+        p = self.client.get("/api/products/phone/").data
+        self.assertEqual((p["price_display"], p["original_price_display"], p["badge"]), ("৳15,000", "৳20,000", "−25%"))
+        self.assertEqual((p["reviews_display"], p["rating_label"]), ("12,345", "Rated 4.5 out of 5 by 12,345 buyers"))
+        self.assertIsNone(self.client.get("/api/products/case/").data["rating_label"])  # no reviews, no rating line
+        c = self.add(self.case, 2).data
+        self.assertEqual((c["total_display"], c["delivery_display"], c["meter"]),
+                         ("৳260", "৳60", "Add ৳99 more for free delivery."))
+        o = self.checkout().data
+        self.assertEqual(o["total_line"], "Total ৳260 (incl. ৳60 delivery)")
+        self.assertEqual(o["created_display"], day(Order.objects.get(pk=o["id"]).created))
+        self.assertEqual(self.client.get("/api/home/").data["wall"][0][0].keys(), {"tag", "field"})
 
     def test_config_lists_cities_and_sorts(self):
         c = self.client.get("/api/config/").data
@@ -266,6 +336,27 @@ class SecurityTests(APITestCase):
         c = APIClient()
         c.credentials(HTTP_AUTHORIZATION=f"Token {key}")
         return c
+
+    def login(self, password, ip, username="rahim"):
+        return self.client.post("/api/auth/login/", {"username": username, "password": password}, REMOTE_ADDR=ip)
+
+    def test_login_locks_the_account_whatever_ip_guesses(self):
+        codes = [self.login("wrong", f"10.0.0.{i}").status_code for i in range(5)]
+        self.assertEqual(codes, [400] * 5)  # each IP is under its own per-minute throttle
+        self.assertEqual(self.login("pass-1234-word", "10.0.1.1").status_code, 429)  # even the right password waits
+        self.assertEqual(self.login("pass-1234-word", "10.0.1.2", username="RAHIM").status_code, 429)
+
+    def test_successful_login_resets_the_failure_count(self):
+        for i in range(4):
+            self.login("wrong", f"10.0.0.{i}")
+        self.assertEqual(self.login("pass-1234-word", "10.0.1.1").status_code, 200)
+        self.assertEqual(self.login("wrong", "10.0.1.2").status_code, 400)  # counting starts again
+
+    def test_ipv6_clients_are_counted_by_their_64(self):
+        # Fresh usernames, so only the per-IP throttle can trip.
+        codes = [self.login("wrong", f"2001:db8:1:2::{i}", username=f"u{i}").status_code for i in range(1, 7)]
+        self.assertEqual(codes[-1], 429)
+        self.assertEqual(self.login("wrong", "2001:db8:1:3::1", username="u9").status_code, 400)  # next /64
 
     def test_cart_changes_need_csrf_token(self):
         c = APIClient(enforce_csrf_checks=True)
@@ -368,6 +459,14 @@ class AdminSecurityTests(TestCase):
         self.assertEqual(codes, [200] * 5 + [429])
         self.assertEqual(self.login(code=self.code()).status_code, 429)  # even the right password waits
 
+    def test_api_login_cannot_guess_admin_passwords_past_the_lockout(self):
+        api = APIClient()
+        for i in range(5):
+            api.post("/api/auth/login/", {"username": "boss", "password": "wrong"}, REMOTE_ADDR=f"10.0.0.{i}")
+        self.assertEqual(self.login(code=self.code()).status_code, 429)  # admin login shares the count
+        r = api.post("/api/auth/login/", {"username": "boss", "password": "pass-1234-word"}, REMOTE_ADDR="10.0.1.1")
+        self.assertEqual(r.status_code, 429)  # no oracle: the right password isn't confirmed either
+
     def test_orders_cannot_be_deleted_in_admin(self):
         self.login(code=self.code())
         o = Order.objects.create(user=self.admin, full_name="X", phone="01712345678", address="A", city="Dhaka",
@@ -380,3 +479,54 @@ class AdminSecurityTests(TestCase):
             call_command("admin_totp", "boss", stdout=io.StringIO())
         call_command("admin_totp", "boss", "--reset", stdout=io.StringIO())
         self.assertNotEqual(TOTPDevice.objects.get(user=self.admin).key, self.device.key)
+
+
+class AdminPanelTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_superuser("boss", password="pass-1234-word")
+        cache.clear()
+        call_command("admin_totp", "boss", stdout=io.StringIO())
+        d = TOTPDevice.objects.get(user=self.admin)
+        code = format(TOTP(d.bin_key, d.step, d.t0, d.digits).token(), f"0{d.digits}d")
+        self.client.post("/admin/login/", {"username": "boss", "password": "pass-1234-word", "otp_token": code,
+                                           "otp_device": d.persistent_id})
+        self.get, self.post = self.client.get, self.client.post
+        cat = Category.objects.create(name="Mobiles", slug="mobiles")
+        self.phone = Product.objects.create(category=cat, name="Phone", slug="phone", price=100,
+                                            image="https://x.y/a.jpg", stock=2)
+        self.order = Order.objects.create(user=self.admin, subtotal=200, delivery_fee=60, total=260, **ADDR)
+        self.order.items.create(product=self.phone, name="Phone", price=100, quantity=2)
+
+    def test_dashboard_shows_sales_and_low_stock(self):
+        r = self.get("/admin/")
+        self.assertContains(r, "Pending orders")
+        self.assertContains(r, "৳260")
+        self.assertContains(r, "2 left")
+
+    def test_lists_show_status_pills_and_theme(self):
+        self.assertContains(self.get("/admin/shop/order/"), 'haat-badge haat-pending')
+        r = self.get("/admin/shop/product/")
+        self.assertContains(r, "Only 2 left")
+        self.assertContains(r, "shop/admin.css")
+
+    def test_every_admin_list_loads(self):
+        for model in ["shop/product", "shop/category", "shop/order", "auth/user", f"auth/user/{self.admin.pk}/change"]:
+            self.assertEqual(self.get(f"/admin/{model}/").status_code, 200, model)
+
+    def test_bulk_cancel_restocks_once_and_never_reopens(self):
+        act = lambda a: self.post("/admin/shop/order/", {"action": a, "_selected_action": [self.order.pk]})
+        act("mark_cancelled")
+        self.phone.refresh_from_db()
+        self.assertEqual(self.phone.stock, 4)
+        act("mark_cancelled")
+        act("mark_shipped")
+        self.order.refresh_from_db()
+        self.phone.refresh_from_db()
+        self.assertEqual((self.order.status, self.phone.stock), ("cancelled", 4))
+
+    def test_order_money_is_read_only(self):
+        self.post(f"/admin/shop/order/{self.order.pk}/change/",
+                  {**ADDR, "status": "shipped", "total": 1, "items-TOTAL_FORMS": 1, "items-INITIAL_FORMS": 1,
+                   "items-0-id": self.order.items.get().pk, "items-0-order": self.order.pk})
+        self.order.refresh_from_db()
+        self.assertEqual((self.order.status, self.order.total), ("shipped", 260))

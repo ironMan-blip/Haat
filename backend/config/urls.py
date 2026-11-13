@@ -8,5 +8,5 @@ admin.site.__class__ = HaatAdminSite  # 2FA + lockout on the one admin site, as 
 
 urlpatterns = [
     path(settings.ADMIN_PATH, admin.site.urls),
-    path('api/', include('shop.urls')),
+    path('api/', include('shop.api.urls')),
 ]

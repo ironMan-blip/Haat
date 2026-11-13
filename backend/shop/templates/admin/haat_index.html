@@ -1,0 +1,55 @@
+{% extends "admin/index.html" %}
+
+{% block content %}
+<h2 class="haat-hello">Welcome back, {% firstof user.get_short_name user.get_username %}</h2>
+<p class="haat-sub">Here is what needs your attention today.</p>
+{% if stats %}
+<div class="haat-stats">
+  {% url 'admin:shop_order_changelist' as orders_url %}
+  {% for label, value, query, hint in stats %}
+    {% if query %}<a class="haat-stat" href="{{ orders_url }}{{ query }}">{% else %}<div class="haat-stat">{% endif %}
+      <span>{{ label }}</span><strong>{{ value }}</strong><small>{{ hint }}</small>
+    {% if query %}</a>{% else %}</div>{% endif %}
+  {% endfor %}
+</div>
+<div class="haat-actions">
+  {% if perms.shop.add_product %}<a class="primary" href="{% url 'admin:shop_product_add' %}">+ Add product</a>{% endif %}
+  <a href="{{ orders_url }}?status__exact=pending">Process pending orders</a>
+  {% if perms.shop.view_product %}<a href="{% url 'admin:shop_product_changelist' %}?stock=out">Sold-out products ({{ sold_out }})</a>{% endif %}
+</div>
+<div class="haat-panels">
+  <div class="module">
+    <table>
+      <caption><a href="{{ orders_url }}" class="section">Recent orders</a></caption>
+      <tbody>
+      {% for o in recent_orders %}
+        <tr>
+          <th scope="row"><a href="{% url 'admin:shop_order_change' o.pk %}">#{{ o.pk }}</a></th>
+          <td>{{ o.full_name }}</td>
+          <td class="haat-num">৳{{ o.total }}</td>
+          <td><span class="haat-badge haat-{{ o.status }}">{{ o.get_status_display }}</span></td>
+          <td class="haat-num">{{ o.created|timesince }} ago</td>
+        </tr>
+      {% empty %}<tr><td class="haat-empty">No orders yet.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if perms.shop.view_product %}
+  <div class="module">
+    <table>
+      <caption><a href="{% url 'admin:shop_product_changelist' %}?o=6" class="section">Low stock (under {{ low_stock_limit }})</a></caption>
+      <tbody>
+      {% for p in low_stock %}
+        <tr>
+          <th scope="row"><a href="{% url 'admin:shop_product_change' p.pk %}">{{ p.name|truncatechars:50 }}</a></th>
+          <td class="haat-num">{% if p.stock %}<span class="haat-badge haat-low">{{ p.stock }} left</span>{% else %}<span class="haat-badge haat-out">Sold out</span>{% endif %}</td>
+        </tr>
+      {% empty %}<tr><td class="haat-empty">Everything is well stocked.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+{{ block.super }}
+{% endblock %}

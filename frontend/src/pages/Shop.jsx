@@ -1,7 +1,9 @@
 import { Link, useSearchParams } from 'react-router-dom'
 import { useFetch } from '../api'
-import { EmptyState, Status, TileGrid } from '../components'
-import { useStore } from '../store'
+import EmptyState from '../components/EmptyState'
+import Status from '../components/Status'
+import TileGrid from '../components/TileGrid'
+import { useStore } from '../useStore'
 
 export default function Shop() {
   const [params, setParams] = useSearchParams()

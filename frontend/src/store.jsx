@@ -1,8 +1,6 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api } from './api'
-
-const Store = createContext(null)
-export const useStore = () => useContext(Store)
+import { Store } from './useStore'
 
 // localStorage can throw (private mode, blocked storage): never let it break the page.
 const read = (k, fallback) => {
@@ -33,7 +31,9 @@ export function StoreProvider({ children }) {
   const say = (text, link) => setNotice({ text, link, at: Date.now() })
   // The server says when it changed the cart itself (sold out, less stock, quantity cap).
   const take = (c) => { setCart(c); if (c.notice) say(c.notice); return c }
-  const call = (path, opts) => api(path, opts).then(take).catch((err) => say(err.message))
+  // On a refused change, show the cart the server has now (e.g. a line removed in another tab).
+  const call = (path, opts) => api(path, opts).then(take)
+    .catch((err) => { say(err.message); api('/cart/').then(setCart).catch(() => {}) })
 
   const value = {
     auth, config, cart, notice,

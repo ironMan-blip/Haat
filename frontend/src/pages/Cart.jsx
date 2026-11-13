@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom'
-import { img, taka } from '../api'
-import { EmptyState, Qty, Status, Summary } from '../components'
-import { useStore } from '../store'
+import EmptyState from '../components/EmptyState'
+import Qty from '../components/Qty'
+import Status from '../components/Status'
+import Summary from '../components/Summary'
+import { useStore } from '../useStore'
 
 export default function Cart() {
   const { cart, setQty, remove } = useStore()
@@ -19,13 +21,13 @@ export default function Cart() {
         <ul className="lines">
           {cart.lines.map((l) => (
             <li key={l.id} className="line">
-              <img src={img(l.image, 200)} alt="" width="64" height="64" />
+              <img src={l.thumb} alt="" width="64" height="64" />
               <div className="line-text">
                 <Link to={`/p/${l.slug}`}>{l.name}</Link>
-                <span className="soft">{taka(l.price)} each</span>
+                <span className="soft">{l.price_display} each</span>
               </div>
               <Qty value={l.quantity} max={l.max_qty} onChange={(q) => setQty(l.id, q)} label={`Quantity of ${l.name}`} />
-              <span className="line-total">{taka(l.line_total)}</span>
+              <span className="line-total">{l.line_total_display}</span>
               <button className="link link--danger" onClick={() => remove(l.id)} aria-label={`Remove ${l.name}`}>Remove</button>
             </li>
           ))}

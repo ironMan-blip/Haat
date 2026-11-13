@@ -8,6 +8,7 @@ from django.db import IntegrityError, connection, transaction
 from rest_framework import serializers
 
 from .cart import Cart, delivery_fee
+from .display import cdn, day, images, num, taka
 from .models import MAX_QTY, Category, Order, OrderItem, Product
 
 
@@ -18,12 +19,23 @@ class CategorySerializer(serializers.ModelSerializer):
 
 
 class ProductSerializer(serializers.ModelSerializer):
-    """What a product tile shows; lists send many, so keep it small."""
+    """What a product tile shows, ready to print; lists send many, so keep it small."""
 
     class Meta:
         model = Product
         fields = ["id", "name", "slug", "summary", "price", "original_price", "discount",
-                  "image", "rating", "reviews", "stock"]
+                  "image", "rating", "reviews", "stock", "stock_level"]
+
+    def to_representation(self, p):
+        return {
+            **super().to_representation(p),
+            **images(p.image),
+            "price_display": taka(p.price),
+            "original_price_display": taka(p.original_price) if p.discount else None,  # struck-through price
+            "badge": "Sold out" if p.stock_level == "out" else f"−{p.discount}%" if p.discount else None,
+            "reviews_display": num(p.reviews),
+            "rating_label": f"Rated {p.rating} out of 5 by {num(p.reviews)} buyers" if p.reviews else None,
+        }
 
 
 class ProductDetailSerializer(ProductSerializer):
@@ -31,8 +43,7 @@ class ProductDetailSerializer(ProductSerializer):
     related = serializers.SerializerMethodField()
 
     class Meta(ProductSerializer.Meta):
-        fields = ProductSerializer.Meta.fields + ["category", "specs", "stock_level", "stock_label", "max_qty",
-                                                  "related"]
+        fields = ProductSerializer.Meta.fields + ["category", "specs", "stock_label", "max_qty", "related"]
 
     def get_related(self, p):
         others = Product.objects.select_related("category").filter(category=p.category_id).exclude(pk=p.pk)[:7]
@@ -68,12 +79,15 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
-    image = serializers.URLField(source="product.image", read_only=True)
     slug = serializers.SlugField(source="product.slug", read_only=True)
 
     class Meta:
         model = OrderItem
-        fields = ["name", "slug", "image", "price", "quantity"]
+        fields = ["name", "slug", "price", "quantity"]
+
+    def to_representation(self, it):
+        return {**super().to_representation(it), "thumb": cdn(it.product.image, 200),
+                "price_display": taka(it.price)}
 
 
 class CartLineSerializer(serializers.Serializer):
@@ -93,6 +107,11 @@ class OrderSerializer(serializers.ModelSerializer):
         fields = ["id", "full_name", "phone", "address", "city", "subtotal", "delivery_fee", "total",
                   "payment", "payment_display", "status", "status_display", "created", "items", "expected_total"]
         read_only_fields = ["subtotal", "delivery_fee", "total", "payment", "status", "created"]
+
+    def to_representation(self, o):
+        fee = f"incl. {taka(o.delivery_fee)} delivery" if o.delivery_fee else "free delivery"
+        return {**super().to_representation(o), "created_display": day(o.created),
+                "total_line": f"Total {taka(o.total)} ({fee})"}
 
     def validate_phone(self, value):
         value = value.replace(" ", "").replace("-", "")
@@ -116,7 +135,8 @@ class OrderSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"phone": f"This number already has {settings.MAX_PENDING_ORDERS} orders waiting for delivery."})
         # The order is built from the buyer's session cart. Lock rows so two orders can't oversell.
-        lines = Cart(self.context["request"]).lines(Product.objects.select_for_update())
+        cart = Cart(self.context["request"])
+        lines = cart.lines(Product.objects.select_for_update())
         if not lines:
             raise serializers.ValidationError({"cart": "Your cart is empty."})
         subtotal = 0
@@ -126,8 +146,8 @@ class OrderSerializer(serializers.ModelSerializer):
             subtotal += p.price * qty  # price from DB, never from client
         fee = delivery_fee(subtotal)
         if subtotal + fee != expected:  # another tab, a price edit or a stock drop changed the cart
-            raise serializers.ValidationError(
-                {"cart": "Your cart changed since you opened checkout. Check the new total and place the order again."})
+            raise serializers.ValidationError({"cart": " ".join(
+                [*cart.notes, "Your cart changed since you opened checkout. Check the new total and place the order again."])})
         order = Order.objects.create(subtotal=subtotal, delivery_fee=fee, total=subtotal + fee, **data)
         for p, qty in lines:
             OrderItem.objects.create(order=order, product=p, name=p.name, price=p.price, quantity=qty)
