@@ -40,7 +40,7 @@ flowchart LR
   FE -- "/api (Vite proxy)" --> API
 
   subgraph BE["Backend · Django 5.2 + DRF :8000"]
-    API["shop app REST API<br/>config · home · categories · products · cart<br/>auth register/login/logout/me · orders"]
+    API["shop app REST API<br/>config · home · categories · products · cart<br/>auth register/login/logout · orders"]
     Rules["Cart + order rules (session cart)<br/>DB prices · stock lock · free delivery ≥ ৳299 else ৳60<br/>COD only · BD phone · listed city · max 5 pending<br/>auth throttle 5/min"]
     Admin["Django admin<br/>products · order status"]
     API --> Rules
@@ -61,9 +61,9 @@ flowchart LR
 
 ```
 frontend/  React 19 + react-router 7, no state library
-  src/api.js         fetch wrapper, taka formatting, Daraz image resize
+  src/api.js         fetch wrapper, useFetch hook, taka formatting, Daraz image resize
   src/store.jsx      auth token; holds the server's cart and config responses
-  src/components.jsx header, footer, product tile, delivery meter, qty stepper
+  src/components.jsx header, footer, product tile, delivery meter, order summary, qty stepper
   src/pages/         Home, Shop (category/search/sort), Product, Cart, Checkout, Login, Orders
 backend/   Django 5.2 LTS + DRF, one app: shop
   shop/models.py      Category, Product (discount, stock level, specs, rank), Order, OrderItem
@@ -76,7 +76,7 @@ backend/   Django 5.2 LTS + DRF, one app: shop
 
 | Endpoint | Method | Auth | Notes |
 | --- | --- | --- | --- |
-| `/api/config/` | GET | - | free-delivery threshold, fee, cities, sort options |
+| `/api/config/` | GET | - | free-delivery threshold, fee, cities, sort options, footer photo |
 | `/api/home/` | GET | - | wall, deals, best rated, category menu |
 | `/api/categories/` | GET | - | |
 | `/api/products/?category=&q=&sort=` | GET | - | sort: `price`, `-price`, `-rating` |
@@ -86,7 +86,6 @@ backend/   Django 5.2 LTS + DRF, one app: shop
 | `/api/auth/register/` | POST | - | returns token |
 | `/api/auth/login/` | POST | - | returns token, username |
 | `/api/auth/logout/` | POST | Token | revokes the token |
-| `/api/auth/me/` | GET | Token | |
 | `/api/orders/` | GET, POST | Token | own orders only; POST takes the address and orders the session cart |
 
 Order rules (server side, tested): price comes from the database, never the client; stock is locked

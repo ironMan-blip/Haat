@@ -1,24 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
-import { api, img, taka } from '../api'
+import { img, taka, useFetch } from '../api'
 import { EmptyState, Status } from '../components'
 import { useStore } from '../store'
 
 export default function Orders() {
   const { auth, logout } = useStore()
   const [params] = useSearchParams()
-  const [state, setState] = useState({ data: null, error: null, loading: true })
+  const state = useFetch(auth && '/orders/', auth?.token)
 
-  const token = auth?.token
   useEffect(() => {
-    if (!token) return
-    api('/orders/', { token })
-      .then((data) => setState({ data, error: null, loading: false }))
-      .catch((error) => {
-        if (error.status === 401) logout() // stale token
-        setState({ data: null, error, loading: false })
-      })
-  }, [token]) // eslint-disable-line react-hooks/exhaustive-deps -- logout is recreated every render
+    if (state.error?.status === 401) logout() // stale token
+  }, [state.error]) // eslint-disable-line react-hooks/exhaustive-deps -- logout is recreated every render
 
   if (!auth) return <Navigate to="/login?next=/orders" replace />
 

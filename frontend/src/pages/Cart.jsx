@@ -1,23 +1,7 @@
 import { Link } from 'react-router-dom'
 import { img, taka } from '../api'
-import { DeliveryMeter, EmptyState, Qty, Status } from '../components'
+import { EmptyState, Qty, Status, Summary } from '../components'
 import { useStore } from '../store'
-
-export function Summary({ children }) {
-  const { cart } = useStore()
-  return (
-    <aside className="summary" aria-label="Order summary">
-      <h2>Order summary</h2>
-      <DeliveryMeter />
-      <dl>
-        <dt>Subtotal</dt><dd>{taka(cart.subtotal)}</dd>
-        <dt>Delivery</dt><dd>{cart.delivery_fee ? taka(cart.delivery_fee) : 'Free'}</dd>
-        <dt className="total">Total</dt><dd className="total">{taka(cart.total)}</dd>
-      </dl>
-      {children}
-    </aside>
-  )
-}
 
 export default function Cart() {
   const { cart, setQty, remove } = useStore()

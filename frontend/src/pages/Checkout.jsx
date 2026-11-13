@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { api } from '../api'
-import { Status } from '../components'
+import { Status, Summary } from '../components'
 import { useStore } from '../store'
-import { Summary } from './Cart'
 
 export default function Checkout() {
   const { auth, cart, config, reloadCart } = useStore()

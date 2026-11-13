@@ -1,5 +1,6 @@
 import { Link, useSearchParams } from 'react-router-dom'
-import { EmptyState, Status, TileGrid, useFetch } from '../components'
+import { useFetch } from '../api'
+import { EmptyState, Status, TileGrid } from '../components'
 import { useStore } from '../store'
 
 export default function Shop() {

@@ -115,9 +115,9 @@ class ShopApiTests(APITestCase):
         self.assertEqual(r.data["username"], "rahim")
         token = r.data["token"]
         self.client.credentials(HTTP_AUTHORIZATION=f"Token {token}")
-        self.assertEqual(self.client.get("/api/auth/me/").status_code, 200)
+        self.assertEqual(self.client.get("/api/orders/").status_code, 200)
         self.assertEqual(self.client.post("/api/auth/logout/").status_code, 204)
-        self.assertEqual(self.client.get("/api/auth/me/").status_code, 401)
+        self.assertEqual(self.client.get("/api/orders/").status_code, 401)
 
     def test_login_is_throttled(self):
         self.client.force_authenticate(None)
@@ -158,3 +158,5 @@ class ShopApiTests(APITestCase):
         c = self.client.get("/api/config/").data
         self.assertIn("Dhaka", c["cities"])
         self.assertEqual(c["sorts"][0], {"value": "", "label": "Newest"})
+        Product.objects.filter(pk=self.case.pk).update(rating=4)
+        self.assertEqual(self.client.get("/api/config/").data["stamp"], self.case.image)  # best-rated photo

@@ -1,21 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { Link, NavLink, useNavigate, useSearchParams } from 'react-router-dom'
-import { api, img, taka } from './api'
+import { img, taka } from './api'
 import { useStore } from './store'
-
-export function useFetch(path) {
-  const [state, setState] = useState({ data: null, error: null, loading: true })
-  useEffect(() => {
-    if (!path) return
-    let live = true
-    setState((s) => ({ ...s, loading: true }))
-    api(path)
-      .then((data) => live && setState({ data, error: null, loading: false }))
-      .catch((error) => live && setState({ data: null, error, loading: false }))
-    return () => { live = false }
-  }, [path])
-  return state
-}
 
 // Adds .in when the element scrolls into view; CSS staggers its children. Content stays visible without JS.
 // eslint-disable-next-line no-unused-vars -- Tag is used as JSX
@@ -127,6 +113,23 @@ export function DeliveryMeter() {
   )
 }
 
+// Cart totals beside the cart and checkout pages; children hold the page's action.
+export function Summary({ children }) {
+  const { cart } = useStore()
+  return (
+    <aside className="summary" aria-label="Order summary">
+      <h2>Order summary</h2>
+      <DeliveryMeter />
+      <dl>
+        <dt>Subtotal</dt><dd>{taka(cart.subtotal)}</dd>
+        <dt>Delivery</dt><dd>{cart.delivery_fee ? taka(cart.delivery_fee) : 'Free'}</dd>
+        <dt className="total">Total</dt><dd className="total">{taka(cart.total)}</dd>
+      </dl>
+      {children}
+    </aside>
+  )
+}
+
 export function Qty({ value, max, onChange, label }) {
   return (
     <span className="qty" role="group" aria-label={label}>
@@ -137,8 +140,9 @@ export function Qty({ value, max, onChange, label }) {
   )
 }
 
-export function Footer({ stamp }) {
+export function Footer() {
   const { config } = useStore()
+  const stamp = config?.stamp
   return (
     <footer className="foot">
       <div className="card">
@@ -154,7 +158,8 @@ export function Footer({ stamp }) {
           <ul className="card-links">
             <li><Link to="/shop">Every product</Link></li>
             <li><Link to="/cart">Your cart</Link></li>
-            <li><Link to="/orders">Your orders</Link></li>          </ul>
+            <li><Link to="/orders">Your orders</Link></li>
+          </ul>
         </div>
         <p className="imprint">Haat MVP. Product photos and listings from daraz.com.bd, for demo only.</p>
       </div>

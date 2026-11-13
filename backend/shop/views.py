@@ -20,13 +20,11 @@ SORTS = {"": "Newest", "price": "Price, low to high", "-price": "Price, high to 
 class CategoryList(generics.ListAPIView):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
-    pagination_class = None
 
 
 class ProductList(generics.ListAPIView):
     # shortcut: no pagination, fine for a few hundred products; add PageNumberPagination beyond that.
     serializer_class = ProductSerializer
-    pagination_class = None
 
     def get_queryset(self):
         qs = Product.objects.select_related("category")
@@ -121,7 +119,6 @@ class Register(generics.CreateAPIView):
 class OrderListCreate(generics.ListCreateAPIView):
     serializer_class = OrderSerializer
     permission_classes = [permissions.IsAuthenticated]
-    pagination_class = None
 
     def get_queryset(self):
         return self.request.user.orders.prefetch_related("items__product")
@@ -129,12 +126,6 @@ class OrderListCreate(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
         Cart(self.request).clear()
-
-
-@api_view(["GET"])
-@permission_classes([permissions.IsAuthenticated])
-def me(request):
-    return Response({"username": request.user.username, "email": request.user.email})
 
 
 @api_view(["POST"])
@@ -152,4 +143,5 @@ def store_config(request):
         "delivery_fee": settings.DELIVERY_FEE,
         "cities": [c for c, _ in Order.CITIES],
         "sorts": [{"value": k, "label": v} for k, v in SORTS.items()],
+        "stamp": Product.objects.order_by("-rating", "id").values_list("image", flat=True).first(),  # footer photo
     })

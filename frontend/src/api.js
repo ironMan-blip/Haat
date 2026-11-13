@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react'
+
 // Thin fetch wrapper. Vite proxies /api to Django in dev.
 export async function api(path, { method = 'GET', body, token } = {}) {
   const headers = {}
@@ -21,7 +23,22 @@ function firstError(data) {
   return null
 }
 
-export const taka = (n) => `৳${Number(n).toLocaleString('en-IN')}`
+// GET `path` (skipped while null) and track {data, error, loading}; stale responses are dropped.
+export function useFetch(path, token) {
+  const [state, setState] = useState({ data: null, error: null, loading: true })
+  useEffect(() => {
+    if (!path) return
+    let live = true
+    setState((s) => ({ ...s, loading: true }))
+    api(path, { token })
+      .then((data) => live && setState({ data, error: null, loading: false }))
+      .catch((error) => live && setState({ data: null, error, loading: false }))
+    return () => { live = false }
+  }, [path, token])
+  return state
+}
+
+export const taka =(n) => `৳${Number(n).toLocaleString('en-IN')}`
 
 // Daraz CDN serves resized copies via a filename suffix.
 export const img = (url, size = 400) => `${url}_${size}x${size}q75.jpg`

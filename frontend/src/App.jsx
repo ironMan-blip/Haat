@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Link, Route, Routes, useLocation } from 'react-router-dom'
-import { EmptyState, Footer, Header, Toast, useFetch } from './components'
+import { EmptyState, Footer, Header, Toast } from './components'
 import Home from './pages/Home'
 import Shop from './pages/Shop'
 import Product from './pages/Product'
@@ -12,7 +12,6 @@ import Orders from './pages/Orders'
 export default function App() {
   const { pathname } = useLocation()
   useEffect(() => { window.scrollTo(0, 0) }, [pathname])
-  const { data } = useFetch('/products/?sort=-rating')
   return (
     <>
       <a href="#main" className="skip">Skip to content</a>
@@ -33,7 +32,7 @@ export default function App() {
           } />
         </Routes>
       </main>
-      <Footer stamp={data?.[0]?.image} />
+      <Footer />
       <Toast />
     </>
   )

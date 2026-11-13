@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
-import { img, taka } from '../api'
-import { Reveal, Status, TileGrid, useFetch } from '../components'
+import { img, taka, useFetch } from '../api'
+import { Reveal, Status, TileGrid } from '../components'
 import { useStore } from '../store'
 
 const FIELDS = ['f1', 'f2', 'f3']

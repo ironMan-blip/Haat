@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { img, taka } from '../api'
-import { Qty, Rating, Status, TileGrid, useFetch } from '../components'
+import { img, taka, useFetch } from '../api'
+import { Qty, Rating, Status, TileGrid } from '../components'
 import { useStore } from '../store'
 
 export default function Product() {
