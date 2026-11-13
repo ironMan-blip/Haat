@@ -18,10 +18,14 @@ GUEST_ORDERS_KEPT = 20  # bounds the session row
 
 
 def claim_guest_orders(request, user):
-    """On sign-in, this session's guest orders move to the account, so they don't vanish from its list."""
+    """On sign-in, this session's guest orders move to the account, so they don't vanish from its list.
+    Only orders to a phone the account has ordered to before: on a shared browser, another person's
+    guest orders (their name, phone, address) must not become this account's. A new account claims none."""
     ids = request.session.pop(GUEST_ORDERS, [])
     if ids:
-        Order.objects.filter(user=None, pk__in=ids).update(user=user)
+        phones = Order.objects.filter(user=user).values("phone")
+        Order.objects.filter(user=None, pk__in=ids, phone__in=phones).update(user=user)
+    request.session.cycle_key()  # a session cookie planted before sign-in no longer reads this cart
 
 
 @ensure_csrf_cookie  # the app loads the cart first, so this hands the frontend its CSRF token

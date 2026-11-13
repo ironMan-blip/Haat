@@ -361,6 +361,19 @@ class SecurityTests(APITestCase):
         self.assertEqual(self.login("pass-1234-word", "10.0.1.1").status_code, 200)
         self.assertEqual(self.login("wrong", "10.0.1.2").status_code, 400)  # counting starts again
 
+    def test_padded_or_unicode_spellings_share_the_lockout(self):
+        # Both logins strip spaces (and the admin applies NFKC) before checking, so these all guess "rahim".
+        for i, name in enumerate([" rahim", "rahim ", "\trahim", "ｒａｈｉｍ", "  rahim  "]):
+            self.login("wrong", f"10.0.0.{i}", username=name)
+        self.assertEqual(self.login("pass-1234-word", "10.0.1.1").status_code, 429)
+
+    def test_numeric_username_shares_the_lockout(self):
+        User.objects.create_user("12345", password="pass-1234-word")
+        for i in range(5):
+            self.client.post("/api/auth/login/", {"username": 12345, "password": "wrong"}, format="json",
+                             REMOTE_ADDR=f"10.0.0.{i}")
+        self.assertEqual(self.login("pass-1234-word", "10.0.1.1", username="12345").status_code, 429)
+
     def test_ipv6_clients_are_counted_by_their_64(self):
         # Fresh usernames, so only the per-IP throttle can trip.
         codes = [self.login("wrong", f"2001:db8:1:2::{i}", username=f"u{i}").status_code for i in range(1, 7)]
@@ -641,12 +654,34 @@ class GuestCheckoutTests(APITestCase):
             self.client.force_authenticate(self.user)
             self.assertEqual(self.order(phone="01812345678").status_code, 201)
 
-    def test_login_claims_this_sessions_guest_orders(self):
+    def login(self):
+        r = self.client.post("/api/auth/login/", {"username": "rahim", "password": "pass-1234-word"}, format="json")
+        self.assertEqual(r.status_code, 200, r.data)
+
+    def test_login_claims_guest_orders_to_the_accounts_phones(self):
+        Order.objects.create(user=self.user, full_name="Rahim", phone=ADDR["phone"], address="A", city="Dhaka",
+                             subtotal=100, delivery_fee=60, total=160, status="delivered")
         r = self.order()
-        login = self.client.post("/api/auth/login/", {"username": "rahim", "password": "pass-1234-word"}, format="json")
-        self.assertEqual(login.status_code, 200, login.data)
+        self.login()
         self.assertEqual(Order.objects.get(pk=r.data["id"]).user, self.user)
         self.assertNotIn("guest_orders", self.client.session)
+
+    def test_login_on_shared_browser_leaves_others_guest_orders(self):
+        r = self.order()  # someone else ordered as a guest on this browser
+        self.login()
+        self.assertEqual(Order.objects.get(pk=r.data["id"]).user, None)
+
+    def test_new_account_claims_no_guest_orders(self):
+        r = self.order()
+        reg = self.client.post("/api/auth/register/", {"username": "karim", "password": "pass-1234-word"}, format="json")
+        self.assertEqual(reg.status_code, 201, reg.data)
+        self.assertEqual(Order.objects.get(pk=r.data["id"]).user, None)  # no past phone to match yet
+
+    def test_login_rotates_session_key(self):
+        self.client.get("/api/cart/")
+        planted = self.client.session.session_key
+        self.login()
+        self.assertNotEqual(self.client.session.session_key, planted)
 
     def test_bengali_digit_phone_is_stored_ascii_and_capped(self):
         r = self.order(phone="০১৭১২৩৪৫৬৭৮")
