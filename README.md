@@ -13,20 +13,30 @@ A simple general store for Bangladesh. React (Vite) frontend, Django + DRF backe
 - Guest session cart with totals and a free-delivery meter (free at ৳299+, else ৳60)
 - Register / login with password visibility toggle; tokens expire after 30 days
 - Checkout with cash on delivery, Bangladeshi phone and city validation
-- Order history (own orders only)
+- Order history (own orders only) with status badges
+- Toast messages, empty states, scroll-reveal animations, star rating labels
+- Responsive product images (200/400/800px copies from the Daraz CDN)
+- Every price, date, badge and label comes pre-formatted from the API (taka, Indian digit grouping)
+- Safe `next` redirect after login/register
 
 **Sellers**
 - Admin dashboard: pending orders, sales today / last 30 days, recent orders, low stock
 - Manage products (inline price/stock edits, stock filter, image preview), categories, orders
   (search by id/name/phone, bulk mark shipped/delivered/cancelled), users with their orders, API tokens, 2FA devices
 - Admin 2FA (authenticator app) with lockout after 5 failures
-- Cancelling an order restores stock
+- Cancelling a pending order restores stock once; cancelled orders can't be reopened; orders can't be deleted
+- Live image preview when editing a product
+- `seed` command loads 47 cleaned Daraz products; `scripts/fetch_daraz.py` re-pulls them
+- `admin_totp` command sets up or resets a seller's authenticator
 
 **Safety**
-- Prices from the database, stock locked per order
+- Prices from the database, stock locked and decremented in one transaction
 - Max 5 pending orders per buyer and per phone
-- Login/register throttling, CSRF on cart changes
-- Production hardening: HTTPS, HSTS, secure cookies, CSP
+- Login/register throttling (5/min per IP), sign-ups capped at 50/day per IP
+- Tokens revoked on logout and password change
+- CSRF on cart changes
+- Every error returns one readable `message`
+- Production hardening: HTTPS, HSTS, secure cookies, CSP, custom admin path, Redis-shared throttle counts
 
 ## Run it
 
