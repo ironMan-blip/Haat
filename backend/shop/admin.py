@@ -54,13 +54,18 @@ class HaatAdminSite(OTPAdminSite):
             live = Order.objects.exclude(status="cancelled")
             extra_context = {
                 **(extra_context or {}),
-                "stats": [
-                    ("Pending orders", Order.objects.filter(status="pending").count(), "?status__exact=pending"),
-                    ("Orders today", Order.objects.filter(created__date=today).count(), ""),
-                    ("Sales today", taka(live.filter(created__date=today).aggregate(s=Sum("total"))["s"]), ""),
+                "stats": [  # label, value, order-list query string, hint
+                    ("Pending orders", Order.objects.filter(status="pending").count(), "?status__exact=pending",
+                     "Waiting to be shipped"),
+                    ("Orders today", Order.objects.filter(created__date=today).count(),
+                     f"?created__year={today.year}&created__month={today.month}&created__day={today.day}",
+                     "Placed since midnight"),
+                    ("Sales today", taka(live.filter(created__date=today).aggregate(s=Sum("total"))["s"]), "",
+                     "Excluding cancelled"),
                     ("Sales, last 30 days", taka(live.filter(created__date__gt=today - timedelta(days=30))
-                                                 .aggregate(s=Sum("total"))["s"]), ""),
+                                                 .aggregate(s=Sum("total"))["s"]), "", "Excluding cancelled"),
                 ],
+                "sold_out": Product.objects.filter(stock=0).count(),
                 "recent_orders": Order.objects.select_related("user")[:8],
                 "low_stock": Product.objects.filter(stock__lt=LOW_STOCK).order_by("stock", "name")[:8],
                 "low_stock_limit": LOW_STOCK,
@@ -70,6 +75,11 @@ class HaatAdminSite(OTPAdminSite):
 
 def taka(n):
     return f"৳{n or 0:,}"
+
+
+def badge(label, tone):
+    """Coloured pill; `tone` is an order status or a stock level, styled in shop/static/shop/admin.css."""
+    return format_html('<span class="haat-badge haat-{}">{}</span>', tone, label)
 
 
 @admin.register(Category)
@@ -99,9 +109,12 @@ class StockFilter(admin.SimpleListFilter):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ["thumb", "name", "category", "price", "original_price", "stock", "rating", "created"]
+    list_display = ["thumb", "name", "category", "price", "original_price", "discount_badge", "stock",
+                    "stock_status", "rating", "created"]
     list_display_links = ["thumb", "name"]
     list_editable = ["price", "original_price", "stock"]
+    list_per_page = 25
+    save_on_top = True
     list_filter = [StockFilter, "category"]
     list_select_related = ["category"]
     search_fields = ["name", "slug", "description"]
@@ -116,11 +129,19 @@ class ProductAdmin(admin.ModelAdmin):
 
     @admin.display(description="")
     def thumb(self, obj):
-        return format_html('<img src="{}" alt="" style="height:40px;width:40px;object-fit:cover">', obj.image)
+        return format_html('<img class="haat-thumb" src="{}" alt="" loading="lazy">', obj.image)
 
     @admin.display(description="Current image")
     def preview(self, obj):
-        return format_html('<img src="{}" alt="" style="max-height:200px">', obj.image) if obj.image else "-"
+        return format_html('<img class="haat-preview" src="{}" alt="">', obj.image) if obj.image else "-"
+
+    @admin.display(description="Discount", ordering="original_price")
+    def discount_badge(self, obj):
+        return badge(f"-{obj.discount}%", "sale") if obj.discount else "-"
+
+    @admin.display(description="Availability", ordering="stock")
+    def stock_status(self, obj):
+        return badge(obj.stock_label, obj.stock_level)
 
 
 class OrderItemInline(admin.TabularInline):
@@ -128,7 +149,12 @@ class OrderItemInline(admin.TabularInline):
     model = OrderItem
     extra = 0
     can_delete = False
-    readonly_fields = ["product", "name", "price", "quantity"]
+    fields = ["product", "name", "price", "quantity", "line_total"]
+    readonly_fields = fields
+
+    @admin.display(description="Line total")
+    def line_total(self, obj):
+        return taka(obj.price * obj.quantity)
 
     def has_add_permission(self, request, obj=None):
         return False
@@ -157,9 +183,12 @@ def set_status(status):
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ["id", "created", "full_name", "phone", "city", "item_count", "total", "status", "user"]
+    list_display = ["id", "created", "full_name", "phone", "city", "item_count", "total_taka", "status_badge",
+                    "user"]
+    list_display_links = ["id", "full_name"]
     list_filter = ["status", "city", "created"]
-    list_editable = ["status"]
+    list_per_page = 25
+    save_on_top = True
     list_select_related = ["user"]
     search_fields = ["=id", "full_name", "phone", "user__username", "user__email"]
     date_hierarchy = "created"
@@ -180,6 +209,14 @@ class OrderAdmin(admin.ModelAdmin):
     def item_count(self, obj):
         return obj.n
 
+    @admin.display(description="Total", ordering="total")
+    def total_taka(self, obj):
+        return taka(obj.total)
+
+    @admin.display(description="Status", ordering="status")
+    def status_badge(self, obj):
+        return badge(obj.get_status_display(), obj.status)
+
     def has_add_permission(self, request):
         return False  # orders come from checkout, which checks stock and prices
 
@@ -193,6 +230,7 @@ class OrderInline(admin.TabularInline):
     show_change_link = True
     fields = readonly_fields = ["created", "total", "status", "city"]
     can_delete = False
+    verbose_name_plural = "Orders placed by this customer"
 
     def has_add_permission(self, request, obj=None):
         return False
@@ -202,6 +240,7 @@ class HaatUserAdmin(UserAdmin):
     list_display = ["username", "email", "first_name", "last_name", "order_count", "is_staff", "is_active",
                     "date_joined", "last_login"]
     list_filter = UserAdmin.list_filter + ("date_joined",)
+    list_per_page = 25
     inlines = [OrderInline]
 
     def get_queryset(self, request):

@@ -404,6 +404,12 @@ class AdminPanelTests(TestCase):
         self.assertContains(r, "৳260")
         self.assertContains(r, "2 left")
 
+    def test_lists_show_status_pills_and_theme(self):
+        self.assertContains(self.get("/admin/shop/order/"), 'haat-badge haat-pending')
+        r = self.get("/admin/shop/product/")
+        self.assertContains(r, "Only 2 left")
+        self.assertContains(r, "shop/admin.css")
+
     def test_every_admin_list_loads(self):
         for model in ["shop/product", "shop/category", "shop/order", "auth/user", f"auth/user/{self.admin.pk}/change"]:
             self.assertEqual(self.get(f"/admin/{model}/").status_code, 200, model)

@@ -53,6 +53,7 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 TEMPLATES = [{  # admin only
     'BACKEND': 'django.template.backends.django.DjangoTemplates',
+    'DIRS': [BASE_DIR / 'templates'],  # admin/base_site.html: branding and styles on every admin page
     'APP_DIRS': True,
     'OPTIONS': {
         'context_processors': [
