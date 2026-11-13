@@ -13,8 +13,20 @@
   document.addEventListener("error", function (e) { if (e.target.tagName === "IMG") mark(e.target); }, true);
   document.addEventListener("load", function (e) { if (e.target.tagName === "IMG") mark(e.target); }, true);
 
+  // "/" jumps to the list search box, like most admin tools; Escape leaves it.
+  document.addEventListener("keydown", function (e) {
+    var search = document.getElementById("searchbar");
+    if (!search) return;
+    var typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName) || document.activeElement.isContentEditable;
+    if (e.key === "/" && !typing && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); search.focus(); search.select(); }
+    else if (e.key === "Escape" && document.activeElement === search) search.blur();
+  });
+
   document.addEventListener("DOMContentLoaded", function () {
     document.querySelectorAll(".haat-frame img").forEach(mark);  // images that settled before this ran
+
+    var search = document.getElementById("searchbar");
+    if (search && !search.placeholder) search.placeholder = "Search…  ( / )";
 
     var input = document.querySelector("input[data-haat-image]");
     var img = document.querySelector(".haat-preview img");

@@ -15,6 +15,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIClient, APITestCase
 
+from .admin import change
 from .display import cdn, day, num, taka
 from .models import Category, Order, Product
 from .serializers import RegisterSerializer
@@ -502,6 +503,22 @@ class AdminPanelTests(TestCase):
         self.assertContains(r, "Pending orders")
         self.assertContains(r, "৳260")
         self.assertContains(r, "2 left")
+        chart = r.context["chart"]
+        self.assertEqual(len(chart), 14)
+        self.assertEqual((chart[-1]["sales"], chart[-1]["pct"], chart[-1]["today"]), ("৳260", 100, True))
+        self.assertEqual([(t["product__name"], t["qty"]) for t in r.context["top_sellers"]], [("Phone", 2)])
+        self.assertEqual({m["key"]: m["n"] for m in r.context["status_mix"]}["pending"], 1)
+
+    def test_dashboard_compares_with_previous_period(self):
+        self.assertIsNone(change(100, 0, "yesterday"))
+        self.assertEqual(change(150, 100, "yesterday"), ("up", "+50% vs yesterday"))
+        self.assertEqual(change(50, 100, "yesterday"), ("down", "-50% vs yesterday"))
+
+    def test_order_page_shows_progress(self):
+        self.assertContains(self.get(f"/admin/shop/order/{self.order.pk}/change/"), 'class="is-now">Placed')
+        self.order.status = "cancelled"
+        self.order.save()
+        self.assertContains(self.get(f"/admin/shop/order/{self.order.pk}/change/"), 'class="is-now">Cancelled')
 
     def test_lists_show_status_pills_and_theme(self):
         self.assertContains(self.get("/admin/shop/order/"), 'haat-badge haat-pending')
