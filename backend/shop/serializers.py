@@ -43,9 +43,16 @@ class RegisterSerializer(serializers.ModelSerializer):
         model = User
         fields = ["username", "email", "password"]
 
-    def validate_password(self, value):
-        validate_password(value)
+    def validate_username(self, value):
+        # Usernames stay case-sensitive in Django; block "Rafi" when "rafi" exists so people can't mix them up.
+        if User.objects.filter(username__iexact=value).exists():
+            raise serializers.ValidationError("A user with that username already exists.")
         return value
+
+    def validate(self, attrs):
+        # Pass the would-be user so the "too similar to your username/email" check runs.
+        validate_password(attrs["password"], User(username=attrs["username"], email=attrs.get("email", "")))
+        return attrs
 
     def create(self, data):
         return User.objects.create_user(**data)
@@ -69,11 +76,13 @@ class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
     status_display = serializers.CharField(source="get_status_display", read_only=True)
     payment_display = serializers.CharField(source="get_payment_display", read_only=True)
+    # The total the buyer was shown; the order is refused if the cart has changed since.
+    expected_total = serializers.IntegerField(write_only=True, min_value=0)
 
     class Meta:
         model = Order
         fields = ["id", "full_name", "phone", "address", "city", "subtotal", "delivery_fee", "total",
-                  "payment", "payment_display", "status", "status_display", "created", "items"]
+                  "payment", "payment_display", "status", "status_display", "created", "items", "expected_total"]
         read_only_fields = ["subtotal", "delivery_fee", "total", "payment", "status", "created"]
 
     def validate_phone(self, value):
@@ -82,15 +91,15 @@ class OrderSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Enter a Bangladeshi mobile number, e.g. 01712345678.")
         return value
 
-    def validate(self, data):
-        user = self.context["request"].user
+    @transaction.atomic
+    def create(self, data):
+        expected = data.pop("expected_total")
+        user = data["user"]
+        # Lock the buyer so two parallel checkouts can't both slip under the pending-order cap.
+        User.objects.select_for_update().get(pk=user.pk)
         if user.orders.filter(status="pending").count() >= settings.MAX_PENDING_ORDERS:
             raise serializers.ValidationError(
                 f"You already have {settings.MAX_PENDING_ORDERS} orders waiting for delivery.")
-        return data
-
-    @transaction.atomic
-    def create(self, data):
         # The order is built from the buyer's session cart. Lock rows so two orders can't oversell.
         lines = Cart(self.context["request"]).lines(Product.objects.select_for_update())
         if not lines:
@@ -101,6 +110,9 @@ class OrderSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({"cart": f"Only {p.stock} left of {p.name}."})
             subtotal += p.price * qty  # price from DB, never from client
         fee = delivery_fee(subtotal)
+        if subtotal + fee != expected:  # another tab, a price edit or a stock drop changed the cart
+            raise serializers.ValidationError(
+                {"cart": "Your cart changed since you opened checkout. Check the new total and place the order again."})
         order = Order.objects.create(subtotal=subtotal, delivery_fee=fee, total=subtotal + fee, **data)
         for p, qty in lines:
             OrderItem.objects.create(order=order, product=p, name=p.name, price=p.price, quantity=qty)

@@ -5,13 +5,13 @@ import { EmptyState, Status } from '../components'
 import { useStore } from '../store'
 
 export default function Orders() {
-  const { auth, logout } = useStore()
+  const { auth, expire } = useStore()
   const [params] = useSearchParams()
   const state = useFetch(auth && '/orders/', auth?.token)
 
   useEffect(() => {
-    if (state.error?.status === 401) logout() // stale token
-  }, [state.error]) // eslint-disable-line react-hooks/exhaustive-deps -- logout is recreated every render
+    if (state.error?.status === 401) expire() // stale token
+  }, [state.error]) // eslint-disable-line react-hooks/exhaustive-deps -- expire is recreated every render
 
   if (!auth) return <Navigate to="/login?next=/orders" replace />
 

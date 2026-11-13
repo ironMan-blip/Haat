@@ -107,7 +107,10 @@ and HTTPS redirect, HSTS and secure cookies turn on.
 | `DJANGO_SECRET_KEY` | long random value, e.g. `python -c "import secrets; print(secrets.token_urlsafe(50))"` |
 | `DJANGO_ALLOWED_HOSTS` | comma-separated hostnames |
 | `DJANGO_ADMIN_PATH` | non-default admin path, e.g. `seller-x7k2/` |
-| `DJANGO_NUM_PROXIES` | number of reverse proxies in front of Django (throttling uses the real client IP) |
+| `DJANGO_NUM_PROXIES` | number of reverse proxies in front of Django (throttling uses the real client IP); above 0 also trusts the proxy's `X-Forwarded-Proto` for HTTPS |
+
+Run `manage.py collectstatic` (into `backend/staticfiles/`) so the admin has its CSS, and run
+`manage.py clearsessions` daily (cron): every guest who fills a cart leaves a session row.
 
 Also: serve the frontend and `/api` from one origin, send a Content-Security-Policy header from the web
 server, restrict the admin path by IP at the proxy, and use a shared cache (Redis) if you run more than

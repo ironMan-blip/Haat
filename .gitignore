@@ -11,3 +11,4 @@ dist/
 *.log
 .vscode/
 .idea/
+backend/staticfiles/

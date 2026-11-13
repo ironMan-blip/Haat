@@ -19,14 +19,19 @@ class ShopApiTests(APITestCase):
     def add(self, product, qty):
         return self.client.post("/api/cart/", {"product": product.pk, "quantity": qty}, format="json")
 
+    def checkout(self, **addr):
+        """Place an order for the total the cart shows right now, as the checkout page does."""
+        total = self.client.get("/api/cart/").data["total"]
+        return self.client.post("/api/orders/", {**ADDR, "expected_total": total, **addr}, format="json")
+
     def order(self, *lines, **addr):
         for p, q in lines:
             self.add(p, q)
-        return self.client.post("/api/orders/", {**ADDR, **addr}, format="json")
+        return self.checkout(**addr)
 
     def test_order_uses_db_prices_decrements_stock_and_empties_cart(self):
         self.client.post("/api/cart/", {"product": self.phone.pk, "quantity": 2, "price": 1}, format="json")
-        r = self.client.post("/api/orders/", ADDR, format="json")
+        r = self.checkout()
         self.assertEqual(r.status_code, 201, r.data)
         self.assertEqual((r.data["subtotal"], r.data["delivery_fee"], r.data["total"]), (30000, 0, 30000))
         self.assertEqual((r.data["status_display"], r.data["payment_display"]), ("Pending", "Cash on delivery"))
@@ -41,13 +46,63 @@ class ShopApiTests(APITestCase):
     def test_oversell_rejected_and_nothing_saved(self):
         self.add(self.case, 1)
         self.add(self.phone, 3)
+        shown = self.client.get("/api/cart/").data["total"]
         Product.objects.filter(pk=self.phone.pk).update(stock=2)  # someone else bought one meanwhile
-        r = self.client.post("/api/orders/", ADDR, format="json")
+        r = self.client.post("/api/orders/", {**ADDR, "expected_total": shown}, format="json")
         self.assertEqual(r.status_code, 400)
         self.assertIn("cart", r.data)
         self.assertEqual(Order.objects.count(), 0)
         self.case.refresh_from_db()
         self.assertEqual(self.case.stock, 10)
+        self.assertEqual(self.client.get("/api/cart/").data["lines"][1]["quantity"], 2)  # cart lowered to stock
+
+    def test_order_refused_when_cart_changed_after_checkout_opened(self):
+        self.add(self.case, 1)
+        shown = self.client.get("/api/cart/").data["total"]
+        self.add(self.phone, 1)  # another tab
+        r = self.client.post("/api/orders/", {**ADDR, "expected_total": shown}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("cart", r.data)
+        self.assertEqual(Order.objects.count(), 0)
+
+    def test_cart_drops_sold_out_and_lowers_to_stock_with_notice(self):
+        self.add(self.case, 5)
+        self.add(self.phone, 3)
+        Product.objects.filter(pk=self.case.pk).update(stock=0)
+        Product.objects.filter(pk=self.phone.pk).update(stock=1)
+        c = self.client.get("/api/cart/").data
+        self.assertEqual([(l["slug"], l["quantity"]) for l in c["lines"]], [("phone", 1)])
+        self.assertIn("Case sold out", c["notice"])
+        self.assertIsNone(self.client.get("/api/cart/").data["notice"])  # said once, then fixed
+
+    def test_cancelling_restores_stock_once_and_cannot_reopen(self):
+        from django.core.exceptions import ValidationError
+        self.order((self.case, 4))
+        o = Order.objects.get()
+        o.status = "cancelled"
+        o.save()
+        o.save()  # saving again must not add stock twice
+        self.case.refresh_from_db()
+        self.assertEqual(self.case.stock, 10)
+        o.status = "pending"
+        with self.assertRaises(ValidationError):
+            o.full_clean()
+
+    def test_logout_with_stale_token_still_empties_cart(self):
+        self.client.force_authenticate(None)
+        self.add(self.case, 1)
+        self.client.credentials(HTTP_AUTHORIZATION="Token stale")
+        self.assertEqual(self.client.post("/api/auth/logout/").status_code, 204)
+        self.client.credentials()
+        self.assertEqual(self.client.get("/api/cart/").data["count"], 0)
+
+    def test_register_blocks_case_twin_and_username_like_password(self):
+        self.client.force_authenticate(None)
+        r = self.client.post("/api/auth/register/", {"username": "Rahim", "password": "pass-1234-word"})
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("username", r.data)
+        r = self.client.post("/api/auth/register/", {"username": "shopkeeper77", "password": "shopkeeper77"})
+        self.assertEqual(r.status_code, 400)
 
     def test_bad_phone_rejected(self):
         r = self.order((self.case, 1), phone="12345")
@@ -55,7 +110,7 @@ class ShopApiTests(APITestCase):
         self.assertIn("phone", r.data)
 
     def test_empty_cart_rejected(self):
-        r = self.client.post("/api/orders/", ADDR, format="json")
+        r = self.checkout()
         self.assertEqual(r.status_code, 400)
         self.assertIn("cart", r.data)
 
@@ -67,6 +122,7 @@ class ShopApiTests(APITestCase):
         self.assertEqual(c["lines"][0]["line_total"], 200)
         c = self.add(self.phone, 5).data  # only 3 in stock
         self.assertEqual(c["lines"][1]["quantity"], 3)
+        self.assertIn("Only 3", c["notice"])
         c = self.client.patch(f"/api/cart/{self.case.pk}/", {"quantity": 1}, format="json").data
         self.assertEqual(c["lines"][0]["quantity"], 1)
         c = self.client.delete(f"/api/cart/{self.phone.pk}/").data
@@ -149,10 +205,12 @@ class ShopApiTests(APITestCase):
         Product.objects.create(category=other, name="Rice", slug="rice", price=500, original_price=1000,
                                image="https://x.y/c.jpg", rating=4.5, reviews=100, stock=5)
         Product.objects.filter(pk=self.case.pk).update(rating=5, reviews=10)
+        Product.objects.create(category=other, name="Gone", slug="gone", price=1, original_price=100,
+                               image="https://x.y/d.jpg", stock=0)
         h = self.client.get("/api/home/").data
-        self.assertEqual(h["deals"][0]["slug"], "rice")
+        self.assertEqual(h["deals"][0]["slug"], "rice")  # the sold-out 99% deal is skipped
         self.assertEqual([p["slug"] for p in h["best"]], ["rice", "case"])  # one per category
-        self.assertEqual({m["slug"]: m["count"] for m in h["menu"]}, {"mobiles": 2, "rice": 1})
+        self.assertEqual({m["slug"]: m["count"] for m in h["menu"]}, {"mobiles": 2, "rice": 2})
 
     def test_config_lists_cities_and_sorts(self):
         c = self.client.get("/api/config/").data

@@ -18,7 +18,10 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = 60 * 60 * 24 * 30  # raise to a year, add includeSubDomains, once HTTPS is proven
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-    # Behind a TLS-terminating proxy, also set SECURE_PROXY_SSL_HEADER, or SSL redirect loops.
+    # Behind a TLS-terminating proxy, trust its X-Forwarded-Proto, or SSL redirect loops.
+    # The proxy must overwrite that header from clients.
+    if os.environ.get('DJANGO_NUM_PROXIES', '0') != '0':
+        SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -81,6 +84,7 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'  # `manage.py collectstatic` target, for admin CSS in production
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Frontend talks to /api via the Vite dev proxy, so no CORS setup needed.

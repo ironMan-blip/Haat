@@ -5,7 +5,7 @@ import { Status, Summary } from '../components'
 import { useStore } from '../store'
 
 export default function Checkout() {
-  const { auth, cart, config, reloadCart } = useStore()
+  const { auth, cart, config, reloadCart, expire } = useStore()
   const navigate = useNavigate()
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -21,14 +21,17 @@ export default function Checkout() {
     setError('')
     const form = Object.fromEntries(new FormData(e.currentTarget))
     try {
-      // The server builds the order from the session cart and empties it.
-      const order = await api('/orders/', { method: 'POST', token: auth.token, body: form })
+      // The server builds the order from the session cart and empties it; it refuses if the
+      // cart no longer matches the total shown here.
+      const order = await api('/orders/', { method: 'POST', token: auth.token, body: { ...form, expected_total: cart.total } })
       setPlaced(true) // keeps the empty-cart guard from redirecting to /cart
       reloadCart()
       navigate(`/orders?placed=${order.id}`)
     } catch (err) {
+      if (err.status === 401) return expire() // stale token: the login redirect brings them back here
       setError(err.message)
       setBusy(false)
+      reloadCart() // show the cart the server has now
     }
   }
 

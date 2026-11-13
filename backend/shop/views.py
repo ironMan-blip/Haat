@@ -5,7 +5,7 @@ from django.db.models import Q
 from rest_framework import generics, permissions
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, authentication_classes
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
@@ -62,7 +62,7 @@ def home(request):
     ser = lambda items: ProductSerializer(items, many=True).data
     return Response({
         "wall": [{"image": p.image, "price": p.price} for p in products[:48]],
-        "deals": ser(sorted(products, key=lambda p: p.discount, reverse=True)[:14]),
+        "deals": ser(sorted((p for p in products if p.stock), key=lambda p: p.discount, reverse=True)[:14]),
         "best": ser(best),
         "menu": [{"name": c.name, "slug": c.slug, "count": len(by_cat[c.pk]), "items": ser(by_cat[c.pk][:6])}
                  for c in Category.objects.all()],
@@ -129,10 +129,14 @@ class OrderListCreate(generics.ListCreateAPIView):
 
 
 @api_view(["POST"])
-@permission_classes([permissions.IsAuthenticated])
+@authentication_classes([])  # a stale token must still sign out, not fail with 401
 def logout(request):
-    # DRF keeps one token per user, so this signs out every device.
-    Token.objects.filter(user=request.user).delete()
+    # Revoke the presented token (DRF keeps one per user, so every device signs out),
+    # and empty this device's cart so the next person doesn't see it.
+    key = request.headers.get("Authorization", "").removeprefix("Token ").strip()
+    if key:
+        Token.objects.filter(key=key).delete()
+    Cart(request).clear()
     return Response(status=204)
 
 

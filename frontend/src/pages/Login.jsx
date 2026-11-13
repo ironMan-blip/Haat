@@ -10,7 +10,9 @@ export default function Login() {
   const { login } = useStore()
   const navigate = useNavigate()
   const [params] = useSearchParams()
-  const next = params.get('next')?.startsWith('/') ? params.get('next') : '/' // no open redirect
+  const raw = params.get('next') || ''
+  // Same-site paths only: "//host" and "/\host" are read by browsers as another site.
+  const next = /^\/(?![/\\])/.test(raw) ? raw : '/'
 
   const submit = async (e) => {
     e.preventDefault()

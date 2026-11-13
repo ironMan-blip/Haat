@@ -13,7 +13,8 @@ export default function Shop() {
   const products = useFetch(`/products/?${qs}`)
   const cats = useFetch('/categories/')
   const catName = cats.data?.find((c) => c.slug === category)?.name
-  const title = q ? `Results for “${q}”` : catName || 'Every product'
+  const unknownCat = category && cats.data && !catName
+  const title = q ? `Results for “${q}”` : catName || (unknownCat ? 'Category not found' : 'Every product')
 
   const set = (key, value) => {
     const next = new URLSearchParams(params)
@@ -44,7 +45,8 @@ export default function Shop() {
       <Status loading={products.loading} error={products.error}>
         {products.data?.length ? <TileGrid products={products.data} key={qs} /> : (
           <EmptyState icon="⌕" title="No products found" action={<Link to="/shop" className="btn btn--paper">Clear filters</Link>}>
-            {q ? `Nothing matches “${q}”. Try a shorter or different word.` : 'This category has nothing in stock right now.'}
+            {q ? `Nothing matches “${q}”. Try a shorter or different word.`
+              : unknownCat ? 'That category does not exist. The link may be old.' : 'This category has nothing in stock right now.'}
           </EmptyState>
         )}
       </Status>
