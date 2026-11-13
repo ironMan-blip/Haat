@@ -13,14 +13,18 @@ A simple general store for Bangladesh. React (Vite) frontend, Django + DRF backe
 - Guest session cart with totals and a free-delivery meter (free at ৳299+, else ৳60)
 - Register / login with password visibility toggle; tokens expire after 30 days
 - Checkout with cash on delivery, Bangladeshi phone and city validation; guests can order without an account
-- Order history (own orders only) with status badges
+- Checkout sends the total the buyer saw; if the cart changed meanwhile (price, stock, other tab) the order is refused with what changed
+- Phone numbers typed in Bengali digits (০১৭…) are accepted and stored as ASCII
+- Cart auto-fixes itself (sold out, less stock, max qty) and tells the buyer why; header shows "Cart, N items"
+- Payment options and their hints come from `/api/config/` (cash on delivery for now)
+- Order history (own orders only) with status badges; guest orders from the same browser move to the account on login when the phone matches a past order
 - Toast messages, empty states, scroll-reveal animations, star rating labels
 - Responsive product images (200/400/800px copies from the Daraz CDN)
 - Every price, date, badge and label comes pre-formatted from the API (taka, Indian digit grouping)
 - Safe `next` redirect after login/register
 
 **Sellers**
-- Admin dashboard: pending orders, sales today / last 30 days, recent orders, low stock
+- Admin dashboard: pending orders, sales today / last 30 days with a sales chart, order progress, recent orders, low stock
 - Manage products (inline price/stock edits, stock filter, image preview), categories, orders
   (search by id/name/phone, bulk mark shipped/delivered/cancelled), users with their orders, API tokens, 2FA devices
 - Admin 2FA (authenticator app) with lockout after 5 failures
@@ -64,6 +68,9 @@ Vite proxies `/api` to Django, so no CORS setup is needed in dev.
 Demo buyer account on the dev database: `demo_buyer` / `haat-demo-2026`.
 
 Tests: `cd backend && DJANGO_DEBUG=1 .venv/bin/python manage.py test shop`
+
+CI (`.github/workflows/ci.yml`, every push/PR): backend tests on PostgreSQL, `pip-audit`, missing-migration check;
+frontend `npm audit`, lint and build.
 
 ## Architecture
 
@@ -118,16 +125,16 @@ backend/   Django 5.2 LTS + DRF, one app: shop
 
 | Endpoint | Method | Auth | Notes |
 | --- | --- | --- | --- |
-| `/api/config/` | GET | - | cities, sort options, password rules, footer copy and photo |
+| `/api/config/` | GET | - | cities, sort options, payment options, password rules, footer copy and photo |
 | `/api/home/` | GET | - | wall, deals, best rated, category menu |
 | `/api/products/?category=&q=&sort=` | GET | - | `{title, count_label, empty, categories, results}`; sort: `price`, `-price`, `-rating` |
 | `/api/products/<slug>/` | GET | - | adds specs, stock level and label, max qty, related |
 | `/api/cart/` | GET, POST | - | session cart with totals; POST `{product, quantity}` adds |
 | `/api/cart/<id>/` | PATCH, DELETE | - | set `{quantity}` or remove a line |
 | `/api/auth/register/` | POST | - | returns token, username, safe `next` path |
-| `/api/auth/login/` | POST | - | returns token, username, safe `next` path |
+| `/api/auth/login/` | POST | - | returns token, username, safe `next` path; claims matching guest orders |
 | `/api/auth/logout/` | POST | Token | revokes the token and wipes the session (cart, guest orders) |
-| `/api/orders/` | GET, POST | optional | account's orders, or a guest's orders from this session; POST (CSRF) takes the address and orders the session cart |
+| `/api/orders/` | GET, POST | optional | account's orders, or a guest's orders from this session; POST (CSRF) takes the address and `expected_total`, and orders the session cart |
 
 Every error response carries `message`: the one line the app shows. The frontend only renders: prices (`*_display`),
 badges, rating labels, image sizes (`thumb`/`image`/`image_large`), dates, totals lines and copy all come from the API.
@@ -137,7 +144,10 @@ and decremented in one transaction; delivery is free at ৳299 and above, otherw
 cash on delivery; phone must be a Bangladeshi mobile number; city must be a listed city; a buyer can
 have at most 5 pending orders, and so can a phone number across all accounts and guests. Guest orders
 are throttled to 30 per hour per IP, rotate the session key, and are listed only to the session that
-placed them (never merged into an account). Login and register are
+placed them. On login they move to the account only if it has ordered to the same phone before (so a shared
+browser never hands one person's address to another); a new account claims none, and the session key rotates.
+If checkout's `expected_total` no longer matches the server total, the order is refused. Product price is at
+least ৳1. Deleting a user keeps their orders (user set to null). Login and register are
 throttled to 5 per minute per IP, and sign-ups to 50 per day per IP. Login tokens expire after 30 days and
 are revoked on logout and on any password change. Cart changes need Django's CSRF token (the frontend
 reads it from the `csrftoken` cookie that `GET /api/cart/` sets).
