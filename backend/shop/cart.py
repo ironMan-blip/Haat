@@ -70,7 +70,7 @@ class Cart:
         left = max(0, free_min - subtotal)
         return {
             "lines": [{"id": p.pk, "slug": p.slug, "name": p.name, "thumb": cdn(p.image, 200),
-                       "price_display": taka(p.price), "quantity": q, "max_qty": p.max_qty,
+                       "price_display": taka(p.price), "each_line": f"{taka(p.price)} each", "quantity": q, "max_qty": p.max_qty,
                        "line_total_display": taka(p.price * q)} for p, q in lines],
             "count": sum(q for _, q in lines),
             "subtotal": subtotal,

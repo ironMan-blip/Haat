@@ -162,6 +162,7 @@ class ShopApiTests(APITestCase):
         self.client.force_authenticate(None)
         self.add(self.case, 1)
         self.client.credentials(HTTP_AUTHORIZATION="Token stale")
+        self.assertEqual(self.client.get("/api/orders/").data["message"], "You were signed out. Please log in again.")
         self.assertEqual(self.client.post("/api/auth/logout/").status_code, 204)
         self.client.credentials()
         self.assertEqual(self.client.get("/api/cart/").data["count"], 0)
@@ -314,14 +315,20 @@ class ShopApiTests(APITestCase):
         c = self.add(self.case, 2).data
         self.assertEqual((c["total_display"], c["delivery_display"], c["meter"]),
                          ("৳260", "৳60", "Add ৳99 more for free delivery."))
+        self.assertEqual(c["lines"][0]["each_line"], "৳100 each")
         o = self.checkout().data
         self.assertEqual(o["total_line"], "Total ৳260 (incl. ৳60 delivery)")
+        self.assertEqual((o["title"], o["items"][0]["qty_line"]), (f"Order #{o['id']}", "2 × ৳100"))
+        self.assertEqual(o["notice"], f"✓ Order #{o['id']} placed. Keep cash ready for the rider.")
+        self.assertTrue(o["meta_line"].endswith(" · Dhaka · Cash on delivery"))
+        self.assertEqual(p["discount_label"], "25% off")
         self.assertEqual(o["created_display"], day(Order.objects.get(pk=o["id"]).created))
         self.assertEqual(self.client.get("/api/home/").data["wall"][0][0].keys(), {"tag", "field"})
 
     def test_config_lists_cities_and_sorts(self):
         c = self.client.get("/api/config/").data
-        self.assertIn("Dhaka", c["cities"])
+        self.assertEqual(c["cities"][0], "Dhaka")  # the checkout's default
+        self.assertEqual(c["payments"], [{"value": "cod", "label": "Cash on delivery", "hint": "Pay the rider when it arrives"}])
         self.assertEqual(c["sorts"][0], {"value": "", "label": "Newest"})
         Product.objects.filter(pk=self.case.pk).update(rating=4)
         self.assertEqual(self.client.get("/api/config/").data["stamp"], self.case.image)  # best-rated photo

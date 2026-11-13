@@ -27,17 +27,14 @@ export default function Checkout() {
       const order = await api('/orders/', { method: 'POST', token: auth?.token, body: { ...form, expected_total: cart.total } })
       setPlaced(true) // keeps the empty-cart guard from redirecting to /cart
       reloadCart()
-      navigate(`/orders?placed=${order.id}`)
+      // Router state, not a URL param, so a crafted link can't show a fake confirmation.
+      navigate('/orders', { state: { notice: order.notice } })
     } catch (err) {
-      // Stale token: never retry as a guest on their behalf, or the order silently misses their account.
-      if (err.status === 401 && auth) {
-        expire()
-        setError('You were signed out. Log in again, or place the order as a guest.')
-        return setBusy(false)
-      }
       setError(err.message)
       setBusy(false)
-      reloadCart() // show the cart the server has now
+      // Stale token: forget it and let them choose; never retry as a guest, or the order misses their account.
+      if (err.status === 401) expire()
+      else reloadCart() // show the cart the server has now
     }
   }
 
@@ -52,14 +49,16 @@ export default function Checkout() {
           <span className="hint">The rider will call this number before delivery.</span>
         </label>
         <label>City
-          <select name="city" required defaultValue="Dhaka">
+          <select name="city" required>
             {config.cities.map((c) => <option key={c}>{c}</option>)}
           </select>
         </label>
         <label>Address<textarea name="address" required maxLength={300} rows={3} placeholder="House, road, area" autoComplete="street-address" /></label>
         <fieldset>
           <legend>Payment</legend>
-          <label className="radio"><input type="radio" defaultChecked readOnly /> Cash on delivery <span className="hint">Pay the rider when it arrives</span></label>
+          {config.payments.map((m, i) => (
+            <label className="radio" key={m.value}><input type="radio" name="payment" value={m.value} defaultChecked={!i} /> {m.label} {m.hint && <span className="hint">{m.hint}</span>}</label>
+          ))}
         </fieldset>
         {error && <p className="alert" role="alert">{error}</p>}
         <button className="btn btn--wide" disabled={busy}>{busy ? 'Placing order…' : 'Place order'}</button>

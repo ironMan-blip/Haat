@@ -60,6 +60,11 @@ class OrderListCreate(generics.ListCreateAPIView):
             orders = Order.objects.filter(user=None, pk__in=self.request.session.get(GUEST_ORDERS, []))
         return orders.prefetch_related("items__product")
 
+    def create(self, request, *args, **kwargs):
+        response = super().create(request, *args, **kwargs)
+        response.data["notice"] = f"✓ Order #{response.data['id']} placed. Keep cash ready for the rider."
+        return response
+
     def perform_create(self, serializer):
         user = self.request.user if self.request.user.is_authenticated else None
         order = serializer.save(user=user)

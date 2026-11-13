@@ -11,6 +11,7 @@ from ..display import cdn, num, taka
 from ..models import Category, Order, Product
 from ..serializers import CategorySerializer, ProductDetailSerializer, ProductSerializer
 
+PAYMENT_HINTS = {"cod": "Pay the rider when it arrives"}
 SORTS = {"": "Newest", "price": "Price, low to high", "-price": "Price, high to low", "-rating": "Best rated"}
 
 
@@ -110,7 +111,8 @@ def store_config(request):
     stamp = Product.objects.order_by("-rating", "id").values_list("image", flat=True).first()  # footer photo
     free = taka(settings.FREE_DELIVERY_MIN)
     return Response({
-        "cities": [c for c, _ in Order.CITIES],
+        "cities": [c for c, _ in Order.CITIES],  # the first is the checkout's default
+        "payments": [{"value": v, "label": label, "hint": PAYMENT_HINTS.get(v)} for v, label in Order.PAYMENTS],
         "sorts": [{"value": k, "label": v} for k, v in SORTS.items()],
         "password_rules": password_validators_help_texts(),  # the sign-up form's hint
         "stamp": cdn(stamp, 200) if stamp else None,

@@ -80,7 +80,10 @@ class ExpiringTokenAuthentication(TokenAuthentication):
     """DRF tokens never expire on their own; these die TOKEN_TTL_DAYS after they were issued."""
 
     def authenticate_credentials(self, key):
-        user, token = super().authenticate_credentials(key)
+        try:
+            user, token = super().authenticate_credentials(key)
+        except exceptions.AuthenticationFailed:  # DRF's "Invalid token." means nothing to a buyer
+            raise exceptions.AuthenticationFailed("You were signed out. Please log in again.") from None
         if expired(token):
             token.delete()
             raise exceptions.AuthenticationFailed("Your session expired. Please log in again.")

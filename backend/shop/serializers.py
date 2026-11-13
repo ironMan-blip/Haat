@@ -45,6 +45,9 @@ class ProductDetailSerializer(ProductSerializer):
     class Meta(ProductSerializer.Meta):
         fields = ProductSerializer.Meta.fields + ["category", "specs", "stock_label", "max_qty", "related"]
 
+    def to_representation(self, p):
+        return {**super().to_representation(p), "discount_label": f"{p.discount}% off" if p.discount else None}
+
     def get_related(self, p):
         others = Product.objects.select_related("category").filter(category=p.category_id).exclude(pk=p.pk)[:7]
         return ProductSerializer(others, many=True).data
@@ -87,7 +90,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
 
     def to_representation(self, it):
         return {**super().to_representation(it), "thumb": cdn(it.product.image, 200),
-                "price_display": taka(it.price)}
+                "price_display": taka(it.price), "qty_line": f"{it.quantity} × {taka(it.price)}"}
 
 
 class CartLineSerializer(serializers.Serializer):
@@ -111,6 +114,8 @@ class OrderSerializer(serializers.ModelSerializer):
     def to_representation(self, o):
         fee = f"incl. {taka(o.delivery_fee)} delivery" if o.delivery_fee else "free delivery"
         return {**super().to_representation(o), "created_display": day(o.created),
+                "title": f"Order #{o.id}",
+                "meta_line": f"{day(o.created)} · {o.city} · {o.get_payment_display()}",
                 "total_line": f"Total {taka(o.total)} ({fee})"}
 
     def validate_phone(self, value):

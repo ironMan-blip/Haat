@@ -24,7 +24,7 @@ export default function Cart() {
               <img src={l.thumb} alt="" width="64" height="64" />
               <div className="line-text">
                 <Link to={`/p/${l.slug}`}>{l.name}</Link>
-                <span className="soft">{l.price_display} each</span>
+                <span className="soft">{l.each_line}</span>
               </div>
               <Qty value={l.quantity} max={l.max_qty} onChange={(q) => setQty(l.id, q)} label={`Quantity of ${l.name}`} />
               <span className="line-total">{l.line_total_display}</span>
