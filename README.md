@@ -3,6 +3,29 @@
 A simple general store for Bangladesh. React (Vite) frontend, Django + DRF backend, PostgreSQL.
 "Haat" (হাট) is the open village market; the design lays products out like goods at a haat stall.
 
+## Features
+
+**Buyers**
+- Home page with deals, best rated products and a category menu
+- Shop by category, search, and sort by price or rating
+- Product pages with discount, specs, stock level, max quantity and related products
+- Quick-add buttons on product tiles; out-of-stock states
+- Guest session cart with totals and a free-delivery meter (free at ৳299+, else ৳60)
+- Register / login with password visibility toggle; tokens expire after 30 days
+- Checkout with cash on delivery, Bangladeshi phone and city validation
+- Order history (own orders only)
+
+**Sellers**
+- Django admin for products and order status
+- Admin 2FA (authenticator app) with lockout after 5 failures
+- Cancelling an order restores stock
+
+**Safety**
+- Prices from the database, stock locked per order
+- Max 5 pending orders per buyer and per phone
+- Login/register throttling, CSRF on cart changes
+- Production hardening: HTTPS, HSTS, secure cookies, CSP
+
 ## Run it
 
 ```bash
