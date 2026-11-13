@@ -3,7 +3,6 @@ import re
 from datetime import timedelta
 
 from django import forms
-from django.conf import settings
 from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import User
@@ -15,8 +14,8 @@ from django.http import HttpResponse
 from django.utils import timezone
 from django.utils.html import format_html
 from django_otp.admin import OTPAdminSite
-from rest_framework.throttling import BaseThrottle
 
+from .auth import client_ident, locked_out, login_fail_keys, record_login_failure
 from .models import LOW_STOCK, Category, Order, OrderItem, Product
 
 log = logging.getLogger("shop.security")
@@ -30,20 +29,18 @@ class HaatAdminSite(OTPAdminSite):
     def login(self, request, extra_context=None):
         if request.method != "POST":
             return super().login(request, extra_context)
-        username = request.POST.get("username", "")[:150].lower()
-        ip = BaseThrottle().get_ident(request)  # honours NUM_PROXIES like the API throttles
-        keys = [f"admin-fails:ip:{ip}", f"admin-fails:user:{username}"]
-        if any(cache.get(k, 0) >= settings.ADMIN_LOGIN_MAX_FAILS for k in keys):
+        username = request.POST.get("username", "")[:150]
+        ip = client_ident(request)
+        keys = login_fail_keys(username, request)  # user counter shared with the API login
+        if locked_out(keys):
             log.warning("admin login locked out: ip=%s username=%r", ip, username)
             return HttpResponse("Too many failed logins. Try again later.", status=429, content_type="text/plain")
         response = super().login(request, extra_context)
         if response.status_code == 302:  # logged in
-            cache.delete(keys[1])
+            cache.delete_many(login_fail_keys(username))
         else:
             log.warning("admin login failed: ip=%s username=%r", ip, username)
-            for k in keys:
-                cache.add(k, 0, settings.ADMIN_LOCKOUT_SECONDS)
-                cache.incr(k)
+            record_login_failure(keys)
         return response
 
 
@@ -193,11 +190,12 @@ def set_status(status):
             try:
                 order.save(update_fields=["status"])
                 done += 1
-            except ValidationError:  # cancelled orders can't be reopened
+            except ValidationError:  # cancelled orders can't reopen, shipped ones can't go back to pending
                 refused.append(str(order))
         modeladmin.message_user(request, f"{done} order(s) marked {status}.")
         if refused:
-            modeladmin.message_user(request, f"Skipped cancelled orders: {', '.join(refused)}.", messages.WARNING)
+            modeladmin.message_user(request, f"Skipped orders that can't be marked {status}: {', '.join(refused)}.",
+                                    messages.WARNING)
 
     action.__name__ = f"mark_{status}"
     return action

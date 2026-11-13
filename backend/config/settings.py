@@ -114,9 +114,10 @@ REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': ['rest_framework.renderers.JSONRenderer']
                                 + (['rest_framework.renderers.BrowsableAPIRenderer'] if DEBUG else []),
     'DEFAULT_THROTTLE_CLASSES': [
-        'rest_framework.throttling.AnonRateThrottle',
-        'rest_framework.throttling.UserRateThrottle',
-        'rest_framework.throttling.ScopedRateThrottle',  # only views with throttle_scope
+        # DRF's own, but counting an IPv6 client by its /64 (shop.auth.client_ident)
+        'shop.auth.AnonThrottle',
+        'shop.auth.UserThrottle',
+        'shop.auth.ScopedThrottle',  # only views with throttle_scope
     ],
     # signup: per IP per day, against bulk accounts that hoard stock with free COD orders.
     # Mobile carriers put many people behind one IP (CGNAT), so this stays loose.
@@ -130,7 +131,11 @@ FREE_DELIVERY_MIN = 299  # taka; Cartup-style free delivery threshold
 DELIVERY_FEE = 60
 MAX_PENDING_ORDERS = 5  # per buyer and per phone number; COD orders cost nothing, so this stops stock hoarding
 TOKEN_TTL_DAYS = 30  # API tokens die after this; logging in again issues a fresh one
-ADMIN_LOGIN_MAX_FAILS = 5  # per IP and per username, then locked out for ADMIN_LOCKOUT_SECONDS
-ADMIN_LOCKOUT_SECONDS = 15 * 60
+# Failed logins, then locked out for LOGIN_LOCKOUT_SECONDS. Per username on the API and admin logins
+# together (else the API is a password oracle for admin accounts), and also per IP on the admin login.
+# Tradeoff: anyone can lock a known username out for a while. Mobile carriers share IPs, so the API
+# login keeps only its per-minute IP throttle, not an IP lockout.
+LOGIN_MAX_FAILS = 5
+LOGIN_LOCKOUT_SECONDS = 15 * 60
 
 ADMIN_PATH = os.environ.get('DJANGO_ADMIN_PATH', 'admin/')  # use a non-default path in production

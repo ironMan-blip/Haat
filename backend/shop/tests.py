@@ -113,6 +113,21 @@ class ShopApiTests(APITestCase):
         self.case.refresh_from_db()
         self.assertEqual(self.case.stock, 6)  # the goods are with the buyer, not on the shelf
 
+    def test_shipped_order_cannot_go_back_to_pending_and_restock(self):
+        self.order((self.case, 4))
+        o = Order.objects.get()
+        o.status = "shipped"
+        o.save()
+        o.status = "pending"
+        with self.assertRaises(DjangoValidationError):
+            o.full_clean()
+        with self.assertRaises(DjangoValidationError):
+            o.save()  # enforced without clean() too, e.g. the bulk actions
+        o.status = "cancelled"
+        o.save()
+        self.case.refresh_from_db()
+        self.assertEqual(self.case.stock, 6)
+
     def test_patch_on_removed_line_does_not_bring_it_back(self):
         self.add(self.case, 1)
         self.client.delete(f"/api/cart/{self.case.pk}/")
@@ -304,6 +319,27 @@ class SecurityTests(APITestCase):
         c.credentials(HTTP_AUTHORIZATION=f"Token {key}")
         return c
 
+    def login(self, password, ip, username="rahim"):
+        return self.client.post("/api/auth/login/", {"username": username, "password": password}, REMOTE_ADDR=ip)
+
+    def test_login_locks_the_account_whatever_ip_guesses(self):
+        codes = [self.login("wrong", f"10.0.0.{i}").status_code for i in range(5)]
+        self.assertEqual(codes, [400] * 5)  # each IP is under its own per-minute throttle
+        self.assertEqual(self.login("pass-1234-word", "10.0.1.1").status_code, 429)  # even the right password waits
+        self.assertEqual(self.login("pass-1234-word", "10.0.1.2", username="RAHIM").status_code, 429)
+
+    def test_successful_login_resets_the_failure_count(self):
+        for i in range(4):
+            self.login("wrong", f"10.0.0.{i}")
+        self.assertEqual(self.login("pass-1234-word", "10.0.1.1").status_code, 200)
+        self.assertEqual(self.login("wrong", "10.0.1.2").status_code, 400)  # counting starts again
+
+    def test_ipv6_clients_are_counted_by_their_64(self):
+        # Fresh usernames, so only the per-IP throttle can trip.
+        codes = [self.login("wrong", f"2001:db8:1:2::{i}", username=f"u{i}").status_code for i in range(1, 7)]
+        self.assertEqual(codes[-1], 429)
+        self.assertEqual(self.login("wrong", "2001:db8:1:3::1", username="u9").status_code, 400)  # next /64
+
     def test_cart_changes_need_csrf_token(self):
         c = APIClient(enforce_csrf_checks=True)
         body = {"product": self.case.pk, "quantity": 1}
@@ -404,6 +440,14 @@ class AdminSecurityTests(TestCase):
         codes = [self.login(password="wrong").status_code for _ in range(6)]
         self.assertEqual(codes, [200] * 5 + [429])
         self.assertEqual(self.login(code=self.code()).status_code, 429)  # even the right password waits
+
+    def test_api_login_cannot_guess_admin_passwords_past_the_lockout(self):
+        api = APIClient()
+        for i in range(5):
+            api.post("/api/auth/login/", {"username": "boss", "password": "wrong"}, REMOTE_ADDR=f"10.0.0.{i}")
+        self.assertEqual(self.login(code=self.code()).status_code, 429)  # admin login shares the count
+        r = api.post("/api/auth/login/", {"username": "boss", "password": "pass-1234-word"}, REMOTE_ADDR="10.0.1.1")
+        self.assertEqual(r.status_code, 429)  # no oracle: the right password isn't confirmed either
 
     def test_orders_cannot_be_deleted_in_admin(self):
         self.login(code=self.code())

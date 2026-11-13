@@ -3,18 +3,19 @@ from collections.abc import Mapping
 
 from django.conf import settings
 from django.contrib.auth.password_validation import password_validators_help_texts
+from django.core.cache import cache
 from django.db.models import Q
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import generics, permissions
 from rest_framework.authtoken.models import Token
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import NotFound, Throttled, ValidationError
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.response import Response
-from rest_framework.throttling import AnonRateThrottle, ScopedRateThrottle, UserRateThrottle
 from rest_framework.views import exception_handler as drf_exception_handler
 
-from .auth import CsrfProtected, issue_token, safe_next
+from .auth import (AnonThrottle, CsrfProtected, ScopedThrottle, UserThrottle, issue_token, locked_out,
+                   login_fail_keys, record_login_failure, safe_next)
 from .cart import Cart
 from .models import Category, Order, Product
 from .serializers import (CartLineSerializer, CategorySerializer, OrderSerializer, ProductDetailSerializer,
@@ -141,24 +142,31 @@ def cart_line(request, pk):
 
 
 class Login(ObtainAuthToken):
-    throttle_classes = [ScopedRateThrottle]  # the parent sets none at all
-    throttle_scope = "auth"  # slows password guessing
+    throttle_classes = [ScopedThrottle]  # the parent sets none at all
+    throttle_scope = "auth"  # slows password guessing from one IP; the lockout below covers many IPs
 
     def post(self, request, *args, **kwargs):
+        username = request.data.get("username") if isinstance(request.data, Mapping) else None
+        keys = login_fail_keys(username)  # the admin login counts into the same per-user counter
+        if locked_out(keys):
+            raise Throttled(detail="Too many failed logins for this account. Try again in 15 minutes.")
         serializer = self.serializer_class(data=request.data, context={"request": request})
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            record_login_failure(keys)
+            raise ValidationError(serializer.errors)
+        cache.delete_many(keys)
         user = serializer.validated_data["user"]
         token = issue_token(user)
         return Response({"token": token.key, "username": user.username, "next": safe_next(request)})
 
 
-class SignupThrottle(AnonRateThrottle):
+class SignupThrottle(AnonThrottle):
     scope = "signup"  # daily cap per IP, on top of the per-minute "auth" one
 
 
 class Register(generics.CreateAPIView):
     serializer_class = RegisterSerializer
-    throttle_classes = [AnonRateThrottle, UserRateThrottle, ScopedRateThrottle, SignupThrottle]
+    throttle_classes = [AnonThrottle, UserThrottle, ScopedThrottle, SignupThrottle]
     throttle_scope = "auth"  # slows bulk sign-ups
 
     def perform_create(self, serializer):
