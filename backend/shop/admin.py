@@ -1,12 +1,15 @@
 import logging
+import re
 from datetime import timedelta
 
+from django import forms
 from django.conf import settings
 from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
+from django.db import models
 from django.db.models import Count, Sum
 from django.http import HttpResponse
 from django.utils import timezone
@@ -73,6 +76,14 @@ class HaatAdminSite(OTPAdminSite):
         return super().index(request, extra_context)
 
 
+DARAZ = re.compile(r"^https://[^/]+\.(slatic\.net|daraz\.com\.bd)/")
+
+
+def cdn(url, size):
+    """Daraz CDN serves resized copies via a filename suffix (same rule as frontend/src/api.js img())."""
+    return f"{url}_{size}x{size}q75.jpg" if DARAZ.match(url or "") else url
+
+
 def taka(n):
     return f"৳{n or 0:,}"
 
@@ -123,17 +134,28 @@ class ProductAdmin(admin.ModelAdmin):
     fieldsets = [
         (None, {"fields": ["name", "slug", "category", "description"]}),
         ("Price and stock", {"fields": ["price", "original_price", "stock"]}),
-        ("Image", {"fields": ["image", "preview"]}),
+        ("Image", {"fields": ["image", "preview"],
+                   "description": "Paste an image URL. The preview updates as you type."}),
         ("Reviews", {"fields": ["rating", "reviews", "created"]}),
     ]
 
-    @admin.display(description="")
-    def thumb(self, obj):
-        return format_html('<img class="haat-thumb" src="{}" alt="" loading="lazy">', obj.image)
+    formfield_overrides = {models.URLField: {"widget": forms.URLInput(attrs={
+        "class": "vURLField", "placeholder": "https://…", "data-haat-image": ""})}}  # no "Currently/Change" clutter
 
-    @admin.display(description="Current image")
+    class Media:
+        js = ["shop/admin.js"]  # live preview and broken-image fallback
+
+    @admin.display(description="Image")
+    def thumb(self, obj):
+        return format_html('<span class="haat-frame haat-thumb"><img src="{}" alt="" loading="lazy"></span>',
+                           cdn(obj.image, 120))
+
+    @admin.display(description="Preview")
     def preview(self, obj):
-        return format_html('<img class="haat-preview" src="{}" alt="">', obj.image) if obj.image else "-"
+        return format_html(
+            '<span class="haat-frame haat-preview"><img src="{}" alt="Product image preview"></span>'
+            '<a class="haat-original" href="{}" target="_blank" rel="noopener"{}>Open full size</a>',
+            cdn(obj.image, 600), obj.image, "" if obj.image else " hidden")
 
     @admin.display(description="Discount", ordering="original_price")
     def discount_badge(self, obj):
