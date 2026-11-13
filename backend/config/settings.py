@@ -109,7 +109,7 @@ OTP_TOTP_ISSUER = 'Haat admin'
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': ['shop.auth.ExpiringTokenAuthentication'],
     'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.AllowAny'],
-    'EXCEPTION_HANDLER': 'shop.views.exception_handler',  # adds `message` to every error
+    'EXCEPTION_HANDLER': 'shop.api.errors.exception_handler',  # adds `message` to every error
     # The browsable HTML API is a dev tool; production speaks JSON only.
     'DEFAULT_RENDERER_CLASSES': ['rest_framework.renderers.JSONRenderer']
                                 + (['rest_framework.renderers.BrowsableAPIRenderer'] if DEBUG else []),

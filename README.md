@@ -90,22 +90,25 @@ flowchart LR
 ```
 frontend/  React 19 + react-router 7, no state library
   src/api.js         fetch wrapper, useFetch hook
-  src/store.jsx      auth token; holds the server's cart and config responses
-  src/components.jsx header, footer, product tile, delivery meter, order summary, qty stepper
+  src/store.jsx      StoreProvider: auth token, the server's cart and config responses (hook: useStore.js)
+  src/components/    one file per shared component (Header, TileGrid, Summary, Qty, Footer, Status, Toast, ...)
   src/pages/         Home, Shop (category/search/sort), Product, Cart, Checkout, Login, Orders
 backend/   Django 5.2 LTS + DRF, one app: shop
   shop/models.py      Category, Product (discount, stock level, specs, rank), Order, OrderItem
   shop/display.py     taka, Indian digit grouping, dates, image sizes: the API sends every string ready to print
   shop/cart.py        session cart: quantities, totals, delivery fee, free-delivery meter
+  shop/auth.py        token expiry, CSRF check, client IP, login lockout
   shop/serializers.py order creation from the cart: DB prices, stock lock
-  shop/views.py       REST endpoints
+  shop/api/           REST layer: catalog.py (config, home, products), checkout.py (cart, orders),
+                      accounts.py (register, login, logout), errors.py (one `message` per error), urls.py
+  shop/admin.py       dashboard, 2FA admin site, product/order/user admin
   shop/management/commands/seed.py  loads + cleans shop/fixtures/daraz_products.json
   scripts/fetch_daraz.py            re-pulls that fixture from Daraz search
 ```
 
 | Endpoint | Method | Auth | Notes |
 | --- | --- | --- | --- |
-| `/api/config/` | GET | - | free-delivery threshold, fee, cities, sort options, password rules, footer photo |
+| `/api/config/` | GET | - | cities, sort options, password rules, footer copy and photo |
 | `/api/home/` | GET | - | wall, deals, best rated, category menu |
 | `/api/products/?category=&q=&sort=` | GET | - | `{title, count_label, empty, categories, results}`; sort: `price`, `-price`, `-rating` |
 | `/api/products/<slug>/` | GET | - | adds specs, stock level and label, max qty, related |
@@ -159,13 +162,6 @@ Also:
 - Logs (errors, admin login failures and lockouts) go to stdout.
 - Not done yet: phone OTP at checkout. The per-phone cap slows hoarding with fake orders, but anyone can
   type a made-up number; add an SMS gateway before scaling.
-
-## Research that shaped it
-
-- **Cartup**: header with search, flash deals, category grid; free delivery over a threshold; COD + bKash/Nagad.
-- **Daraz**: product card = image, name, sale price, struck original, discount %.
-- **Chaldal**: delivery fee rules shown up front, "pay after receiving". Became the cart's delivery meter.
-- **Pickaboo**: COD as a first-class payment option.
 
 ## Not in the MVP
 

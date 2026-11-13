@@ -1,8 +1,11 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useFetch } from '../api'
-import { Qty, Rating, Status, TileGrid } from '../components'
-import { useStore } from '../store'
+import Qty from '../components/Qty'
+import Rating from '../components/Rating'
+import Status from '../components/Status'
+import TileGrid from '../components/TileGrid'
+import { useStore } from '../useStore'
 
 // Keyed by slug so moving to a related product starts fresh (quantity back to 1).
 export default function Product() {

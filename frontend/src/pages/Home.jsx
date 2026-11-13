@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom'
 import { useFetch } from '../api'
-import { Reveal, Status, TileGrid } from '../components'
-import { useStore } from '../store'
+import Reveal from '../components/Reveal'
+import Status from '../components/Status'
+import TileGrid from '../components/TileGrid'
+import { useStore } from '../useStore'
 
 // Brickwork wall of goods and price tags, like a haat laid out on the ground.
 function Wall({ rows }) {

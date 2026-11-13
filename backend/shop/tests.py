@@ -18,7 +18,7 @@ from rest_framework.test import APIClient, APITestCase
 from .display import cdn, day, num, taka
 from .models import Category, Order, Product
 from .serializers import RegisterSerializer
-from .views import SignupThrottle
+from .api.accounts import SignupThrottle
 
 ADDR = {"full_name": "Rahim", "phone": "01712345678", "address": "House 1, Road 2", "city": "Dhaka"}
 
@@ -186,8 +186,8 @@ class ShopApiTests(APITestCase):
         self.client.force_authenticate(None)  # guests can use the cart
         c = self.add(self.case, 2).data
         self.assertEqual((c["subtotal"], c["delivery_fee"], c["total"], c["count"]), (200, 60, 260, 2))
-        self.assertEqual((c["free_delivery_left"], c["free_delivery_progress"]), (99, 67))
-        self.assertEqual(c["lines"][0]["line_total"], 200)
+        self.assertEqual(c["free_delivery_progress"], 67)
+        self.assertEqual(c["lines"][0]["line_total_display"], "৳200")
         c = self.add(self.phone, 5).data  # only 3 in stock
         self.assertEqual(c["lines"][1]["quantity"], 3)
         self.assertIn("Only 3", c["notice"])

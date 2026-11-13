@@ -1,8 +1,9 @@
 import { useEffect } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { useFetch } from '../api'
-import { EmptyState, Status } from '../components'
-import { useStore } from '../store'
+import EmptyState from '../components/EmptyState'
+import Status from '../components/Status'
+import { useStore } from '../useStore'
 
 export default function Orders() {
   const { auth, expire } = useStore()

@@ -69,8 +69,8 @@ class Cart:
         free_min = settings.FREE_DELIVERY_MIN
         left = max(0, free_min - subtotal)
         return {
-            "lines": [{"id": p.pk, "slug": p.slug, "name": p.name, "thumb": cdn(p.image, 200), "price": p.price,
-                       "price_display": taka(p.price), "quantity": q, "max_qty": p.max_qty, "line_total": p.price * q,
+            "lines": [{"id": p.pk, "slug": p.slug, "name": p.name, "thumb": cdn(p.image, 200),
+                       "price_display": taka(p.price), "quantity": q, "max_qty": p.max_qty,
                        "line_total_display": taka(p.price * q)} for p, q in lines],
             "count": sum(q for _, q in lines),
             "subtotal": subtotal,
@@ -79,7 +79,6 @@ class Cart:
             "delivery_display": taka(fee) if fee else "Free",
             "total": subtotal + fee,
             "total_display": taka(subtotal + fee),
-            "free_delivery_left": left,
             "free_delivery_progress": min(100, round(subtotal * 100 / free_min)) if free_min else 100,
             "meter": f"Add {taka(left)} more for free delivery." if left else "Delivery is free on this order.",
             "notice": " ".join(self.notes) or None,

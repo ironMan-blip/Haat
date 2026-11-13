@@ -1,8 +1,6 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api } from './api'
-
-const Store = createContext(null)
-export const useStore = () => useContext(Store)
+import { Store } from './useStore'
 
 // localStorage can throw (private mode, blocked storage): never let it break the page.
 const read = (k, fallback) => {

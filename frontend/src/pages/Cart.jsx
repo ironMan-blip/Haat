@@ -1,6 +1,9 @@
 import { Link } from 'react-router-dom'
-import { EmptyState, Qty, Status, Summary } from '../components'
-import { useStore } from '../store'
+import EmptyState from '../components/EmptyState'
+import Qty from '../components/Qty'
+import Status from '../components/Status'
+import Summary from '../components/Summary'
+import { useStore } from '../useStore'
 
 export default function Cart() {
   const { cart, setQty, remove } = useStore()
