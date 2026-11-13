@@ -6,7 +6,7 @@ import Summary from '../components/Summary'
 import { useStore } from '../useStore'
 
 export default function Cart() {
-  const { cart, setQty, remove } = useStore()
+  const { cart, config, setQty, remove } = useStore()
   if (!cart) return <Status loading />
   if (!cart.lines.length)
     return (
@@ -36,7 +36,7 @@ export default function Cart() {
       </div>
       <Summary>
         <Link to="/checkout" className="btn btn--wide">Go to checkout</Link>
-        <p className="summary-note">Pay in cash when your order arrives.</p>
+        {config?.cart_note && <p className="summary-note">{config.cart_note}</p>}
       </Summary>
     </section>
   )

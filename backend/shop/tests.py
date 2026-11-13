@@ -316,6 +316,7 @@ class ShopApiTests(APITestCase):
         self.assertEqual((c["total_display"], c["delivery_display"], c["meter"]),
                          ("৳260", "৳60", "Add ৳99 more for free delivery."))
         self.assertEqual(c["lines"][0]["each_line"], "৳100 each")
+        self.assertEqual(c["count_label"], "Cart, 2 items")
         o = self.checkout().data
         self.assertEqual(o["total_line"], "Total ৳260 (incl. ৳60 delivery)")
         self.assertEqual((o["title"], o["items"][0]["qty_line"]), (f"Order #{o['id']}", "2 × ৳100"))
@@ -330,6 +331,7 @@ class ShopApiTests(APITestCase):
         self.assertEqual(c["cities"][0], "Dhaka")  # the checkout's default
         self.assertEqual(c["payments"], [{"value": "cod", "label": "Cash on delivery", "hint": "Pay the rider when it arrives"}])
         self.assertEqual(c["sorts"][0], {"value": "", "label": "Newest"})
+        self.assertEqual(c["cart_note"], "Pay in cash when your order arrives.")
         Product.objects.filter(pk=self.case.pk).update(rating=4)
         self.assertEqual(self.client.get("/api/config/").data["stamp"], self.case.image)  # best-rated photo
 

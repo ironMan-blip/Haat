@@ -3,7 +3,7 @@ import { useStore } from '../useStore'
 import { CartIcon, UserIcon } from './icons'
 
 export default function Header() {
-  const { count, auth, logout } = useStore()
+  const { cart, count, auth, logout } = useStore()
   const [params] = useSearchParams()
   const navigate = useNavigate()
   const search = (e) => {
@@ -30,7 +30,7 @@ export default function Header() {
         ) : (
           <NavLink to="/login" aria-label="Log in"><UserIcon /><span className="label-wide">Log in</span></NavLink>
         )}
-        <NavLink to="/cart" aria-label={`Cart, ${count} items`}>
+        <NavLink to="/cart" aria-label={cart?.count_label ?? 'Cart'}>
           <CartIcon /><span className="label-wide">Cart</span>
           <span className="cart-count" data-n={count}>{count}</span>
         </NavLink>

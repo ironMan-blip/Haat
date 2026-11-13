@@ -119,4 +119,5 @@ def store_config(request):
         "footer_line": f"Order today, pay the rider in cash when the parcel reaches your door. "
                        f"Spend {free} or more and delivery is on us.",
         "perks": ["Cash on delivery, pay when it arrives", f"Free delivery on orders over {free}"],
+        "cart_note": "Pay in cash when your order arrives.",  # under the cart's checkout button
     })

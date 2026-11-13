@@ -43,7 +43,7 @@ export default function Checkout() {
       <form className="form form-card" onSubmit={submit}>
         <h1>Delivery details</h1>
         {!auth && <p className="soft">Ordering as a guest. <Link to="/login?next=/checkout">Log in</Link> to track orders on any device.</p>}
-        <label>Full name<input name="full_name" required maxLength={120} autoComplete="name" /></label>
+        <label>Full name<input name="full_name" required autoComplete="name" /></label>
         <label>Mobile number
           <input name="phone" type="tel" required placeholder="01712345678" autoComplete="tel" />
           <span className="hint">The rider will call this number before delivery.</span>
@@ -53,7 +53,7 @@ export default function Checkout() {
             {config.cities.map((c) => <option key={c}>{c}</option>)}
           </select>
         </label>
-        <label>Address<textarea name="address" required maxLength={300} rows={3} placeholder="House, road, area" autoComplete="street-address" /></label>
+        <label>Address<textarea name="address" required rows={3} placeholder="House, road, area" autoComplete="street-address" /></label>
         <fieldset>
           <legend>Payment</legend>
           {config.payments.map((m, i) => (
