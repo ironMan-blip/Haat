@@ -8,10 +8,11 @@ from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Count, Sum
+from django.db.models import Count, F, Sum
+from django.db.models.functions import TruncDate
 from django.http import HttpResponse
 from django.utils import timezone
-from django.utils.html import format_html
+from django.utils.html import format_html, format_html_join
 from django_otp.admin import OTPAdminSite
 
 from .auth import client_ident, locked_out, login_fail_keys, record_login_failure
@@ -43,34 +44,81 @@ class HaatAdminSite(OTPAdminSite):
             record_login_failure(keys)
         return response
 
-
     index_template = "admin/haat_index.html"  # own name: shop's templates load after django.contrib.admin's
     site_header = site_title = "Haat admin"
     index_title = "Dashboard"
 
     def index(self, request, extra_context=None):
+        now = timezone.localtime()
+        extra_context = {**(extra_context or {}), "now": now,
+                         "greeting": "Good morning" if now.hour < 12 else "Good afternoon" if now.hour < 17
+                         else "Good evening"}
         if request.user.has_perm("shop.view_order"):  # sales numbers only for staff who may see orders
-            today = timezone.localdate()
-            live = Order.objects.exclude(status="cancelled")
-            extra_context = {
-                **(extra_context or {}),
-                "stats": [  # label, value, order-list query string, hint
-                    ("Pending orders", Order.objects.filter(status="pending").count(), "?status__exact=pending",
-                     "Waiting to be shipped"),
-                    ("Orders today", Order.objects.filter(created__date=today).count(),
-                     f"?created__year={today.year}&created__month={today.month}&created__day={today.day}",
-                     "Placed since midnight"),
-                    ("Sales today", taka(live.filter(created__date=today).aggregate(s=Sum("total"))["s"]), "",
-                     "Excluding cancelled"),
-                    ("Sales, last 30 days", taka(live.filter(created__date__gt=today - timedelta(days=30))
-                                                 .aggregate(s=Sum("total"))["s"]), "", "Excluding cancelled"),
-                ],
-                "sold_out": Product.objects.filter(stock=0).count(),
-                "recent_orders": Order.objects.select_related("user")[:8],
-                "low_stock": Product.objects.filter(stock__lt=LOW_STOCK).order_by("stock", "name")[:8],
-                "low_stock_limit": LOW_STOCK,
-            }
+            extra_context.update(dashboard(now.date()))
         return super().index(request, extra_context)
+
+
+def change(cur, prev, against):
+    """(tone, text) comparing two periods, or None when there's nothing to compare against."""
+    if not prev:
+        return None
+    pct = round((cur - prev) / prev * 100)
+    return ("up" if pct > 0 else "down" if pct < 0 else "flat", f"{pct:+d}% vs {against}")
+
+
+def dashboard(today):
+    live = Order.objects.exclude(status="cancelled")
+    rows = (live.filter(created__date__gt=today - timedelta(days=60)).annotate(d=TruncDate("created"))
+            .values("d").annotate(s=Sum("total"), n=Count("id")).order_by())
+    by_day = {r["d"]: r for r in rows}
+
+    def total(key, first, last):  # sum of `key` from `first` to `last` days ago, both included
+        return sum(by_day.get(today - timedelta(days=i), {}).get(key) or 0 for i in range(first, last + 1))
+
+    sales_today, sales_30, orders_30 = total("s", 0, 0), total("s", 0, 29), total("n", 0, 29)
+    pending = Order.objects.filter(status="pending").count()
+    orders_today = Order.objects.filter(created__date=today).count()
+
+    chart = [{"day": today - timedelta(days=i), "s": total("s", i, i), "orders": total("n", i, i), "today": i == 0}
+             for i in range(13, -1, -1)]  # last 14 days, oldest first
+    peak = max(c["s"] for c in chart) or 1
+    for c in chart:
+        c["pct"], c["sales"] = round(c["s"] / peak * 100), taka(c["s"])
+
+    counts = dict(Order.objects.values_list("status").annotate(n=Count("id")).order_by())
+    all_orders = sum(counts.values()) or 1
+    status_mix = [{"key": k, "label": label, "n": counts.get(k, 0), "pct": round(counts.get(k, 0) / all_orders * 100)}
+                  for k, label in Order.STATUS]
+
+    top = (OrderItem.objects.filter(order__created__date__gt=today - timedelta(days=30))
+           .exclude(order__status="cancelled").values("product_id", "product__name")
+           .annotate(qty=Sum("quantity"), revenue=Sum(F("price") * F("quantity"))).order_by("-qty")[:5])
+
+    return {
+        "stats": [
+            {"label": "Pending orders", "value": pending, "icon": "box", "query": "?status__exact=pending",
+             "hint": "Waiting to be shipped" if pending else "All caught up", "alert": pending > 0},
+            {"label": "Orders today", "value": orders_today, "icon": "bag",
+             "query": f"?created__year={today.year}&created__month={today.month}&created__day={today.day}",
+             "hint": "Placed since midnight"},
+            {"label": "Sales today", "value": taka(sales_today), "icon": "coin", "hint": "Excluding cancelled",
+             "delta": change(sales_today, total("s", 1, 1), "yesterday")},
+            {"label": "Sales, last 30 days", "value": taka(sales_30), "icon": "chart",
+             "hint": f"Avg. order {taka(sales_30 // orders_30 if orders_30 else 0)}",
+             "delta": change(sales_30, total("s", 30, 59), "prior 30 days")},
+        ],
+        "pending": pending,
+        "chart": chart,
+        "chart_total": taka(total("s", 0, 13)),
+        "chart_empty": not any(c["orders"] for c in chart),
+        "status_mix": status_mix,
+        "order_total": sum(counts.values()),
+        "top_sellers": [{**t, "revenue": taka(t["revenue"])} for t in top],
+        "sold_out": Product.objects.filter(stock=0).count(),
+        "recent_orders": [(o, taka(o.total)) for o in Order.objects.all()[:8]],
+        "low_stock": Product.objects.filter(stock__lt=LOW_STOCK).order_by("stock", "name")[:8],
+        "low_stock_limit": LOW_STOCK,
+    }
 
 
 def badge(label, tone):
@@ -126,9 +174,6 @@ class ProductAdmin(admin.ModelAdmin):
 
     formfield_overrides = {models.URLField: {"widget": forms.URLInput(attrs={
         "class": "vURLField", "placeholder": "https://…", "data-haat-image": ""})}}  # no "Currently/Change" clutter
-
-    class Media:
-        js = ["shop/admin.js"]  # live preview and broken-image fallback
 
     @admin.display(description="Image")
     def thumb(self, obj):
@@ -191,24 +236,41 @@ def set_status(status):
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ["id", "created", "full_name", "phone", "city", "item_count", "total_taka", "status_badge",
+    list_display = ["id", "created", "full_name", "phone_link", "city", "item_count", "total_taka", "status_badge",
                     "user"]
     list_display_links = ["id", "full_name"]
     list_filter = ["status", "city", "created"]
     list_per_page = 25
     save_on_top = True
     list_select_related = ["user"]
-    search_fields = ["=id", "full_name", "phone", "user__username", "user__email"]
+    empty_value_display = "Guest"  # orders placed without an account have no user
+    search_fields =["=id", "full_name", "phone", "user__username", "user__email"]
     date_hierarchy = "created"
     actions = [set_status(s) for s, _ in Order.STATUS]
     inlines = [OrderItemInline]
     fieldsets = [
-        (None, {"fields": ["status", "user", "created"]}),
+        (None, {"fields": ["progress", "status", "user", "created"]}),
         ("Delivery", {"fields": ["full_name", "phone", "address", "city"]}),
         ("Payment", {"fields": ["payment", "subtotal", "delivery_fee", "total"]}),
     ]
     # Money and buyer are what the order was placed with; stock was taken for these amounts.
-    readonly_fields = ["user", "created", "payment", "subtotal", "delivery_fee", "total"]
+    readonly_fields = ["progress", "user", "created", "payment", "subtotal", "delivery_fee", "total"]
+
+    @admin.display(description="Progress")
+    def progress(self, obj):
+        if obj.status == "cancelled":
+            return format_html('<div class="haat-steps haat-steps-cancelled"><span class="is-done">Placed</span>'
+                               '<span class="is-now">Cancelled</span></div>')
+        steps = ["pending", "shipped", "delivered"]
+        reached = steps.index(obj.status)
+        return format_html('<div class="haat-steps">{}</div>', format_html_join(
+            "", '<span class="{}">{}</span>',
+            (("is-now" if i == reached else "is-done" if i < reached else "", label)
+             for i, label in enumerate(["Placed", "Shipped", "Delivered"]))))
+
+    @admin.display(description="Phone", ordering="phone")
+    def phone_link(self, obj):
+        return format_html('<a href="tel:{}">{}</a>', obj.phone, obj.phone)
 
     def get_queryset(self, request):
         return super().get_queryset(request).annotate(n=Sum("items__quantity"))

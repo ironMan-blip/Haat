@@ -16,6 +16,11 @@ def taka(n):
     return f"৳{num(n)}"
 
 
+def items(n):
+    """"1 item", "3 items"."""
+    return f"{n} item{'' if n == 1 else 's'}"
+
+
 def cdn(url, size):
     """Daraz CDN serves resized copies via a filename suffix; other hosts get the original."""
     return f"{url}_{size}x{size}q75.jpg" if DARAZ.match(url or "") else url

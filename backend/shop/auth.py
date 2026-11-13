@@ -1,5 +1,6 @@
 """API token lifetime, CSRF for the views that act on the session cookie, client IPs and login lockout."""
 import ipaddress
+import unicodedata
 from collections.abc import Mapping
 from datetime import timedelta
 
@@ -47,10 +48,22 @@ class ScopedThrottle(ClientIdent, throttling.ScopedRateThrottle):
     pass
 
 
+class GuestOrderThrottle(AnonThrottle):
+    """Orders placed without an account, per IP; signed-in buyers and reading orders are not counted."""
+    scope = "guest_order"
+
+    def allow_request(self, request, view):
+        return request.method != "POST" or super().allow_request(request, view)
+
+
 def login_fail_keys(username, request=None):
     """Failure counters shared by the API and admin logins, so neither is a way round the other's lockout.
-    Usernames can't differ only by case (see RegisterSerializer), so one counter per lowercased name."""
-    keys = [f"login-fails:user:{username[:150].lower()}"] if isinstance(username, str) and username else []
+    Usernames can't differ only by case (see RegisterSerializer), so one counter per lowercased name.
+    Both logins strip spaces, the admin also applies NFKC and DRF takes a JSON number, so the key does
+    too: else " rahim" or "ｒａｈｉｍ" would be a fresh counter that still guesses rahim's password."""
+    if isinstance(username, (str, int)) and not isinstance(username, bool):
+        username = unicodedata.normalize("NFKC", str(username)).strip()[:150].lower()
+    keys = [f"login-fails:user:{username}"] if isinstance(username, str) and username else []
     return keys + ([f"login-fails:ip:{client_ident(request)}"] if request else [])
 
 
@@ -61,7 +74,10 @@ def locked_out(keys):
 def record_login_failure(keys):
     for k in keys:
         cache.add(k, 0, settings.LOGIN_LOCKOUT_SECONDS)
-        cache.incr(k)
+        try:
+            cache.incr(k)
+        except ValueError:  # the counter expired between add and incr
+            cache.set(k, 1, settings.LOGIN_LOCKOUT_SECONDS)
 
 
 def expired(token):
@@ -72,7 +88,10 @@ class ExpiringTokenAuthentication(TokenAuthentication):
     """DRF tokens never expire on their own; these die TOKEN_TTL_DAYS after they were issued."""
 
     def authenticate_credentials(self, key):
-        user, token = super().authenticate_credentials(key)
+        try:
+            user, token = super().authenticate_credentials(key)
+        except exceptions.AuthenticationFailed:  # DRF's "Invalid token." means nothing to a buyer
+            raise exceptions.AuthenticationFailed("You were signed out. Please log in again.") from None
         if expired(token):
             token.delete()
             raise exceptions.AuthenticationFailed("Your session expired. Please log in again.")

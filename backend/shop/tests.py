@@ -15,10 +15,12 @@ from rest_framework.authtoken.models import Token
 from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIClient, APITestCase
 
+from .admin import change
 from .display import cdn, day, num, taka
 from .models import Category, Order, Product
 from .serializers import RegisterSerializer
 from .api.accounts import SignupThrottle
+from .auth import GuestOrderThrottle
 
 ADDR = {"full_name": "Rahim", "phone": "01712345678", "address": "House 1, Road 2", "city": "Dhaka"}
 
@@ -50,7 +52,7 @@ class ShopApiTests(APITestCase):
         r = self.checkout()
         self.assertEqual(r.status_code, 201, r.data)
         self.assertEqual((r.data["subtotal"], r.data["delivery_fee"], r.data["total"]), (30000, 0, 30000))
-        self.assertEqual((r.data["status_display"], r.data["payment_display"]), ("Pending", "Cash on delivery"))
+        self.assertEqual((r.data["status_display"], r.data["payment"]), ("Pending", "cod"))
         self.phone.refresh_from_db()
         self.assertEqual(self.phone.stock, 1)
         self.assertEqual(self.client.get("/api/cart/").data["lines"], [])
@@ -160,6 +162,7 @@ class ShopApiTests(APITestCase):
         self.client.force_authenticate(None)
         self.add(self.case, 1)
         self.client.credentials(HTTP_AUTHORIZATION="Token stale")
+        self.assertEqual(self.client.get("/api/orders/").data["message"], "You were signed out. Please log in again.")
         self.assertEqual(self.client.post("/api/auth/logout/").status_code, 204)
         self.client.credentials()
         self.assertEqual(self.client.get("/api/cart/").data["count"], 0)
@@ -204,13 +207,13 @@ class ShopApiTests(APITestCase):
         self.assertEqual(r.status_code, 400)
         self.assertIn("product", r.data)
 
-    def test_orders_need_login_and_are_private(self):
+    def test_orders_are_private(self):
         self.order((self.case, 1))
         other = User.objects.create_user("karim", password="pass-1234-word")
         self.client.force_authenticate(other)
         self.assertEqual(self.client.get("/api/orders/").data, [])
         self.client.force_authenticate(None)
-        self.assertEqual(self.client.get("/api/orders/").status_code, 401)
+        self.assertEqual(self.client.get("/api/orders/").data, [])  # a guest session sees no account's orders
 
     def test_register_then_login(self):
         self.client.force_authenticate(None)
@@ -312,15 +315,23 @@ class ShopApiTests(APITestCase):
         c = self.add(self.case, 2).data
         self.assertEqual((c["total_display"], c["delivery_display"], c["meter"]),
                          ("৳260", "৳60", "Add ৳99 more for free delivery."))
+        self.assertEqual(c["lines"][0]["each_line"], "৳100 each")
+        self.assertEqual(c["count_label"], "Cart, 2 items")
         o = self.checkout().data
         self.assertEqual(o["total_line"], "Total ৳260 (incl. ৳60 delivery)")
-        self.assertEqual(o["created_display"], day(Order.objects.get(pk=o["id"]).created))
+        self.assertEqual((o["title"], o["items"][0]["qty_line"]), (f"Order #{o['id']}", "2 × ৳100"))
+        self.assertEqual(o["notice"], f"✓ Order #{o['id']} placed. Keep cash ready for the rider.")
+        self.assertTrue(o["meta_line"].endswith(" · Dhaka · Cash on delivery"))
+        self.assertEqual(p["discount_label"], "25% off")
+        self.assertTrue(o["meta_line"].startswith(day(Order.objects.get(pk=o["id"]).created) + " · "))
         self.assertEqual(self.client.get("/api/home/").data["wall"][0][0].keys(), {"tag", "field"})
 
     def test_config_lists_cities_and_sorts(self):
         c = self.client.get("/api/config/").data
-        self.assertIn("Dhaka", c["cities"])
+        self.assertEqual(c["cities"][0], "Dhaka")  # the checkout's default
+        self.assertEqual(c["payments"], [{"value": "cod", "label": "Cash on delivery", "hint": "Pay the rider when it arrives"}])
         self.assertEqual(c["sorts"][0], {"value": "", "label": "Newest"})
+        self.assertEqual(c["cart_note"], "Pay in cash when your order arrives.")
         Product.objects.filter(pk=self.case.pk).update(rating=4)
         self.assertEqual(self.client.get("/api/config/").data["stamp"], self.case.image)  # best-rated photo
 
@@ -351,6 +362,19 @@ class SecurityTests(APITestCase):
             self.login("wrong", f"10.0.0.{i}")
         self.assertEqual(self.login("pass-1234-word", "10.0.1.1").status_code, 200)
         self.assertEqual(self.login("wrong", "10.0.1.2").status_code, 400)  # counting starts again
+
+    def test_padded_or_unicode_spellings_share_the_lockout(self):
+        # Both logins strip spaces (and the admin applies NFKC) before checking, so these all guess "rahim".
+        for i, name in enumerate([" rahim", "rahim ", "\trahim", "ｒａｈｉｍ", "  rahim  "]):
+            self.login("wrong", f"10.0.0.{i}", username=name)
+        self.assertEqual(self.login("pass-1234-word", "10.0.1.1").status_code, 429)
+
+    def test_numeric_username_shares_the_lockout(self):
+        User.objects.create_user("12345", password="pass-1234-word")
+        for i in range(5):
+            self.client.post("/api/auth/login/", {"username": 12345, "password": "wrong"}, format="json",
+                             REMOTE_ADDR=f"10.0.0.{i}")
+        self.assertEqual(self.login("pass-1234-word", "10.0.1.1", username="12345").status_code, 429)
 
     def test_ipv6_clients_are_counted_by_their_64(self):
         # Fresh usernames, so only the per-IP throttle can trip.
@@ -502,6 +526,22 @@ class AdminPanelTests(TestCase):
         self.assertContains(r, "Pending orders")
         self.assertContains(r, "৳260")
         self.assertContains(r, "2 left")
+        chart = r.context["chart"]
+        self.assertEqual(len(chart), 14)
+        self.assertEqual((chart[-1]["sales"], chart[-1]["pct"], chart[-1]["today"]), ("৳260", 100, True))
+        self.assertEqual([(t["product__name"], t["qty"]) for t in r.context["top_sellers"]], [("Phone", 2)])
+        self.assertEqual({m["key"]: m["n"] for m in r.context["status_mix"]}["pending"], 1)
+
+    def test_dashboard_compares_with_previous_period(self):
+        self.assertIsNone(change(100, 0, "yesterday"))
+        self.assertEqual(change(150, 100, "yesterday"), ("up", "+50% vs yesterday"))
+        self.assertEqual(change(50, 100, "yesterday"), ("down", "-50% vs yesterday"))
+
+    def test_order_page_shows_progress(self):
+        self.assertContains(self.get(f"/admin/shop/order/{self.order.pk}/change/"), 'class="is-now">Placed')
+        self.order.status = "cancelled"
+        self.order.save()
+        self.assertContains(self.get(f"/admin/shop/order/{self.order.pk}/change/"), 'class="is-now">Cancelled')
 
     def test_lists_show_status_pills_and_theme(self):
         self.assertContains(self.get("/admin/shop/order/"), 'haat-badge haat-pending')
@@ -530,3 +570,147 @@ class AdminPanelTests(TestCase):
                    "items-0-id": self.order.items.get().pk, "items-0-order": self.order.pk})
         self.order.refresh_from_db()
         self.assertEqual((self.order.status, self.order.total), ("shipped", 260))
+
+
+class GuestCheckoutTests(APITestCase):
+    """Ordering without an account: the order lives on the session, which is the only key to it."""
+
+    def setUp(self):
+        cache.clear()
+        cat = Category.objects.create(name="Mobiles", slug="mobiles")
+        self.case = Product.objects.create(category=cat, name="Case", slug="case", price=100, image="https://x.y/b.jpg", stock=50)
+        self.user = User.objects.create_user("rahim", password="pass-1234-word")
+
+    def order(self, client=None, **body):
+        c = client or self.client
+        c.post("/api/cart/", {"product": self.case.pk, "quantity": 1}, format="json")
+        total = c.get("/api/cart/").data["total"]
+        return c.post("/api/orders/", {**ADDR, "expected_total": total, **body}, format="json")
+
+    def test_guest_can_order_and_see_it(self):
+        r = self.order()
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual(Order.objects.get().user, None)
+        self.assertEqual(self.client.get("/api/cart/").data["lines"], [])
+        self.assertEqual([o["id"] for o in self.client.get("/api/orders/").data], [r.data["id"]])
+
+    def test_guest_sees_only_own_session_orders(self):
+        self.order()
+        self.assertEqual(APIClient().get("/api/orders/").data, [])
+
+    def test_session_list_never_shows_account_orders(self):
+        mine = Order.objects.create(user=self.user, full_name="X", phone="01712345678", address="A", city="Dhaka",
+                                    subtotal=100, delivery_fee=60, total=160)
+        s = self.client.session
+        s["guest_orders"] = [mine.pk]
+        s.save()
+        self.assertEqual(self.client.get("/api/orders/").data, [])
+
+    def test_guest_cannot_set_owner_status_or_money(self):
+        r = self.order(user=self.user.pk, status="delivered", total=1, subtotal=1, payment="card")
+        self.assertEqual(r.status_code, 201, r.data)
+        o = Order.objects.get()
+        self.assertEqual((o.user, o.status, o.total, o.payment), (None, "pending", 160, "cod"))
+
+    def test_orders_need_csrf_token_for_guests_and_users(self):
+        for user in [None, self.user]:
+            c = APIClient(enforce_csrf_checks=True)
+            c.force_authenticate(user)
+            token = c.get("/api/cart/").cookies["csrftoken"].value
+            c.post("/api/cart/", {"product": self.case.pk, "quantity": 1}, format="json", HTTP_X_CSRFTOKEN=token)
+            body = {**ADDR, "expected_total": c.get("/api/cart/").data["total"]}
+            self.assertEqual(c.post("/api/orders/", body, format="json").status_code, 403)  # cross-site post
+            self.assertEqual(c.post("/api/orders/", body, format="json", HTTP_X_CSRFTOKEN=token).status_code, 201)
+
+    def test_guest_order_rotates_session_key(self):
+        self.client.get("/api/cart/")
+        planted = self.client.session.session_key
+        self.order()
+        self.assertNotEqual(self.client.session.session_key, planted)
+        other = APIClient()
+        other.cookies["sessionid"] = planted  # whoever planted the old cookie
+        self.assertEqual(other.get("/api/orders/").data, [])
+
+    def test_logout_forgets_guest_orders(self):
+        self.order()
+        self.assertEqual(self.client.post("/api/auth/logout/").status_code, 204)
+        self.assertEqual(self.client.get("/api/orders/").data, [])
+
+    def test_login_shows_account_orders_only(self):
+        self.order()
+        self.client.force_authenticate(self.user)
+        self.assertEqual(self.client.get("/api/orders/").data, [])
+
+    def test_phone_cap_applies_to_guests(self):
+        for _ in range(5):
+            self.assertEqual(self.order().status_code, 201)
+        r = self.order()
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("phone", r.data)
+
+    def test_guest_orders_throttled_users_not(self):
+        with mock.patch.object(GuestOrderThrottle, "THROTTLE_RATES", {"guest_order": "2/hour"}):
+            codes = [self.order(phone=f"0171234567{i}").status_code for i in range(3)]
+            self.assertEqual(codes, [201, 201, 429])
+            self.assertEqual(self.client.get("/api/orders/").status_code, 200)  # reading is not throttled
+            self.client.force_authenticate(self.user)
+            self.assertEqual(self.order(phone="01812345678").status_code, 201)
+
+    def login(self):
+        r = self.client.post("/api/auth/login/", {"username": "rahim", "password": "pass-1234-word"}, format="json")
+        self.assertEqual(r.status_code, 200, r.data)
+
+    def test_login_claims_guest_orders_to_the_accounts_phones(self):
+        Order.objects.create(user=self.user, full_name="Rahim", phone=ADDR["phone"], address="A", city="Dhaka",
+                             subtotal=100, delivery_fee=60, total=160, status="delivered")
+        r = self.order()
+        self.login()
+        self.assertEqual(Order.objects.get(pk=r.data["id"]).user, self.user)
+        self.assertNotIn("guest_orders", self.client.session)
+
+    def test_login_on_shared_browser_leaves_others_guest_orders(self):
+        r = self.order()  # someone else ordered as a guest on this browser
+        self.login()
+        self.assertEqual(Order.objects.get(pk=r.data["id"]).user, None)
+
+    def test_new_account_claims_no_guest_orders(self):
+        r = self.order()
+        reg = self.client.post("/api/auth/register/", {"username": "karim", "password": "pass-1234-word"}, format="json")
+        self.assertEqual(reg.status_code, 201, reg.data)
+        self.assertEqual(Order.objects.get(pk=r.data["id"]).user, None)  # no past phone to match yet
+
+    def test_login_rotates_session_key(self):
+        self.client.get("/api/cart/")
+        planted = self.client.session.session_key
+        self.login()
+        self.assertNotEqual(self.client.session.session_key, planted)
+
+    def test_bengali_digit_phone_is_stored_ascii_and_capped(self):
+        r = self.order(phone="০১৭১২৩৪৫৬৭৮")
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual(Order.objects.get().phone, "01712345678")
+
+    def test_all_sold_out_says_which(self):
+        self.client.post("/api/cart/", {"product": self.case.pk, "quantity": 1}, format="json")
+        Product.objects.filter(pk=self.case.pk).update(stock=0)
+        r = self.client.post("/api/orders/", {**ADDR, "expected_total": 160}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("Case sold out", str(r.data["cart"]))
+
+    def test_deleting_user_keeps_their_orders(self):
+        self.client.force_authenticate(self.user)
+        self.order()
+        self.user.delete()
+        self.assertEqual(Order.objects.get().user, None)
+
+    def test_zero_price_rejected(self):
+        self.case.price = 0
+        with self.assertRaises(DjangoValidationError):
+            self.case.full_clean()
+
+    def test_guest_order_logged_without_personal_data(self):
+        with self.assertLogs("shop.security", "INFO") as logs:
+            r = self.order()
+        self.assertIn(f"guest order id={r.data['id']}", logs.output[0])
+        self.assertNotIn(ADDR["phone"], logs.output[0])
+        self.assertNotIn(ADDR["address"], logs.output[0])

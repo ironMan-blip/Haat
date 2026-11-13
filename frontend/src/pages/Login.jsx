@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import { useStore } from '../useStore'
 
@@ -32,7 +32,7 @@ export default function Login() {
       <form className="form form-card" onSubmit={submit}>
         <div>
           <h1>{mode === 'login' ? 'Welcome back' : 'Create an account'}</h1>
-          <p className="soft">{mode === 'login' ? 'Log in to check out and track your orders.' : 'It takes less than a minute.'}</p>
+          <p className="soft">{mode === 'login' ? 'Log in to track your orders on any device.' : 'It takes less than a minute.'}</p>
         </div>
         <input type="hidden" name="next" value={params.get('next') || ''} />
         <label>Username<input name="username" required autoComplete="username" /></label>
@@ -50,6 +50,7 @@ export default function Login() {
         <button type="button" className="link" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError('') }}>
           {mode === 'login' ? 'New here? Create an account' : 'Have an account? Log in'}
         </button>
+        {params.get('next') === '/checkout' && <Link to="/checkout" className="link">Continue as guest</Link>}
       </form>
     </section>
   )

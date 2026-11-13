@@ -7,11 +7,16 @@ from rest_framework import generics
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from ..display import cdn, num, taka
+from ..display import cdn, items, num, taka
 from ..models import Category, Order, Product
 from ..serializers import CategorySerializer, ProductDetailSerializer, ProductSerializer
 
+PAYMENT_HINTS = {"cod": "Pay the rider when it arrives"}
 SORTS = {"": "Newest", "price": "Price, low to high", "-price": "Price, high to low", "-rating": "Best rated"}
+
+
+def search_term(request):
+    return request.query_params.get("q", "").strip()[:100]  # bound the LIKE scan; blank means no search
 
 
 class ProductList(generics.ListAPIView):
@@ -23,7 +28,7 @@ class ProductList(generics.ListAPIView):
         params = self.request.query_params
         if params.get("category"):
             qs = qs.filter(category__slug=params["category"])
-        if q := params.get("q", "").strip()[:100]:  # bound the LIKE scan; blank means no search
+        if q := search_term(self.request):
             qs = qs.filter(Q(name__icontains=q) | Q(description__icontains=q))
         if params.get("sort") and params["sort"] in SORTS:
             qs = qs.order_by(params["sort"], "id")
@@ -33,7 +38,7 @@ class ProductList(generics.ListAPIView):
         # The page's heading, category links and empty-state text come with the results.
         results = self.get_serializer(self.get_queryset(), many=True).data
         cats = list(Category.objects.all())
-        slug, q = request.query_params.get("category", ""), request.query_params.get("q", "").strip()[:100]
+        slug, q = request.query_params.get("category", ""), search_term(request)
         cat = next((c for c in cats if c.slug == slug), None)
         if q:
             title, empty = f"Results for “{q}”", f"Nothing matches “{q}”. Try a shorter or different word."
@@ -45,7 +50,7 @@ class ProductList(generics.ListAPIView):
             title, empty = "Every product", "Nothing is on sale right now."
         return Response({
             "title": title,
-            "count_label": f"{len(results)} item{'' if len(results) == 1 else 's'}",
+            "count_label": items(len(results)),
             "empty": empty,
             "categories": CategorySerializer(cats, many=True).data,
             "results": results,
@@ -88,14 +93,14 @@ def home(request):
     by_cat = defaultdict(list)
     for p in products:
         by_cat[p.category_id].append(p)
-    ser = lambda items: ProductSerializer(items, many=True).data
+    ser = lambda ps: ProductSerializer(ps, many=True).data
     return Response({
         "wall": wall(products[:48]),
         "deals": ser(sorted((p for p in products if p.stock), key=lambda p: p.discount, reverse=True)[:14]),
         "best": [{**d, "panel_name": f"{p.name[:54].rstrip()}…" if len(p.name) > 56 else p.name,
                   "panel_fact": f"{taka(p.price)} · rated {p.rating} by {num(p.reviews)} buyers"}
                  for p, d in zip(best, ser(best))],
-        "menu": [{"name": c.name, "slug": c.slug, "count_label": f"{len(by_cat[c.pk])} items",
+        "menu": [{"name": c.name, "slug": c.slug, "count_label": items(len(by_cat[c.pk])),
                   "items": [{**d, "note": f"{p.discount}% below the usual {taka(p.original_price)}" if p.discount else None}
                             for p, d in zip(by_cat[c.pk][:6], ser(by_cat[c.pk][:6]))]}
                  for c in Category.objects.all()],
@@ -110,11 +115,13 @@ def store_config(request):
     stamp = Product.objects.order_by("-rating", "id").values_list("image", flat=True).first()  # footer photo
     free = taka(settings.FREE_DELIVERY_MIN)
     return Response({
-        "cities": [c for c, _ in Order.CITIES],
+        "cities": [c for c, _ in Order.CITIES],  # the first is the checkout's default
+        "payments": [{"value": v, "label": label, "hint": PAYMENT_HINTS.get(v)} for v, label in Order.PAYMENTS],
         "sorts": [{"value": k, "label": v} for k, v in SORTS.items()],
         "password_rules": password_validators_help_texts(),  # the sign-up form's hint
         "stamp": cdn(stamp, 200) if stamp else None,
         "footer_line": f"Order today, pay the rider in cash when the parcel reaches your door. "
                        f"Spend {free} or more and delivery is on us.",
         "perks": ["Cash on delivery, pay when it arrives", f"Free delivery on orders over {free}"],
+        "cart_note": "Pay in cash when your order arrives.",  # under the cart's checkout button
     })

@@ -6,7 +6,7 @@ import Summary from '../components/Summary'
 import { useStore } from '../useStore'
 
 export default function Cart() {
-  const { cart, setQty, remove } = useStore()
+  const { cart, config, setQty, remove } = useStore()
   if (!cart) return <Status loading />
   if (!cart.lines.length)
     return (
@@ -24,7 +24,7 @@ export default function Cart() {
               <img src={l.thumb} alt="" width="64" height="64" />
               <div className="line-text">
                 <Link to={`/p/${l.slug}`}>{l.name}</Link>
-                <span className="soft">{l.price_display} each</span>
+                <span className="soft">{l.each_line}</span>
               </div>
               <Qty value={l.quantity} max={l.max_qty} onChange={(q) => setQty(l.id, q)} label={`Quantity of ${l.name}`} />
               <span className="line-total">{l.line_total_display}</span>
@@ -36,7 +36,7 @@ export default function Cart() {
       </div>
       <Summary>
         <Link to="/checkout" className="btn btn--wide">Go to checkout</Link>
-        <p className="summary-note">Pay in cash when your order arrives.</p>
+        {config?.cart_note && <p className="summary-note">{config.cart_note}</p>}
       </Summary>
     </section>
   )

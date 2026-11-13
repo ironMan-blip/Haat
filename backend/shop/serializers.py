@@ -45,6 +45,9 @@ class ProductDetailSerializer(ProductSerializer):
     class Meta(ProductSerializer.Meta):
         fields = ProductSerializer.Meta.fields + ["category", "specs", "stock_label", "max_qty", "related"]
 
+    def to_representation(self, p):
+        return {**super().to_representation(p), "discount_label": f"{p.discount}% off" if p.discount else None}
+
     def get_related(self, p):
         others = Product.objects.select_related("category").filter(category=p.category_id).exclude(pk=p.pk)[:7]
         return ProductSerializer(others, many=True).data
@@ -87,7 +90,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
 
     def to_representation(self, it):
         return {**super().to_representation(it), "thumb": cdn(it.product.image, 200),
-                "price_display": taka(it.price)}
+                "price_display": taka(it.price), "qty_line": f"{it.quantity} × {taka(it.price)}"}
 
 
 class CartLineSerializer(serializers.Serializer):
@@ -98,36 +101,38 @@ class CartLineSerializer(serializers.Serializer):
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
     status_display = serializers.CharField(source="get_status_display", read_only=True)
-    payment_display = serializers.CharField(source="get_payment_display", read_only=True)
     # The total the buyer was shown; the order is refused if the cart has changed since.
     expected_total = serializers.IntegerField(write_only=True, min_value=0)
 
     class Meta:
         model = Order
         fields = ["id", "full_name", "phone", "address", "city", "subtotal", "delivery_fee", "total",
-                  "payment", "payment_display", "status", "status_display", "created", "items", "expected_total"]
+                  "payment", "status", "status_display", "created", "items", "expected_total"]
         read_only_fields = ["subtotal", "delivery_fee", "total", "payment", "status", "created"]
 
     def to_representation(self, o):
         fee = f"incl. {taka(o.delivery_fee)} delivery" if o.delivery_fee else "free delivery"
-        return {**super().to_representation(o), "created_display": day(o.created),
+        return {**super().to_representation(o), "title": f"Order #{o.id}",
+                "meta_line": f"{day(o.created)} · {o.city} · {o.get_payment_display()}",
                 "total_line": f"Total {taka(o.total)} ({fee})"}
 
     def validate_phone(self, value):
-        value = value.replace(" ", "").replace("-", "")
-        if not re.fullmatch(r"(\+?88)?01[3-9]\d{8}", value):
+        # Bengali (or any) decimal digits become ASCII, so one number has one spelling for the cap and the rider.
+        value = "".join(str(int(ch)) if ch.isdecimal() else ch for ch in value.replace(" ", "").replace("-", ""))
+        if not re.fullmatch(r"(\+?88)?01[3-9][0-9]{8}", value):
             raise serializers.ValidationError("Enter a Bangladeshi mobile number, e.g. 01712345678.")
         return value[-11:]  # one spelling per number, so the per-phone cap can't be dodged with +88
 
     @transaction.atomic
     def create(self, data):
         expected = data.pop("expected_total")
-        user = data["user"]
+        user = data["user"]  # None for a guest: no account to lock or cap, the phone cap still applies
         # Lock the buyer and the phone number so parallel checkouts can't both slip under the caps.
-        User.objects.select_for_update().get(pk=user.pk)
+        if user:
+            User.objects.select_for_update().get(pk=user.pk)
         with connection.cursor() as cur:
             cur.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", ["order-phone:" + data["phone"]])
-        if user.orders.filter(status="pending").count() >= settings.MAX_PENDING_ORDERS:
+        if user and user.orders.filter(status="pending").count() >= settings.MAX_PENDING_ORDERS:
             raise serializers.ValidationError(
                 f"You already have {settings.MAX_PENDING_ORDERS} orders waiting for delivery.")
         # The same cap per phone number, across accounts: new accounts are cheap, phones less so.
@@ -137,8 +142,8 @@ class OrderSerializer(serializers.ModelSerializer):
         # The order is built from the buyer's session cart. Lock rows so two orders can't oversell.
         cart = Cart(self.context["request"])
         lines = cart.lines(Product.objects.select_for_update())
-        if not lines:
-            raise serializers.ValidationError({"cart": "Your cart is empty."})
+        if not lines:  # keep the notes: "X sold out" says more than "empty"
+            raise serializers.ValidationError({"cart": " ".join([*cart.notes, "Your cart is empty."])})
         subtotal = 0
         for p, qty in lines:
             if p.stock < qty:

@@ -10,8 +10,15 @@ from rest_framework.response import Response
 
 from ..auth import (AnonThrottle, CsrfProtected, ScopedThrottle, UserThrottle, issue_token, locked_out,
                     login_fail_keys, record_login_failure, safe_next)
-from ..cart import Cart
 from ..serializers import RegisterSerializer
+from .checkout import claim_guest_orders
+
+
+def signed_in(request, user, status=200):
+    """Shared end of login and sign-up: move this session's guest orders over and hand out the token."""
+    claim_guest_orders(request, user)
+    return Response({"token": issue_token(user).key, "username": user.username, "next": safe_next(request)},
+                    status=status)
 
 
 class Login(ObtainAuthToken):
@@ -28,9 +35,7 @@ class Login(ObtainAuthToken):
             record_login_failure(keys)
             raise ValidationError(serializer.errors)
         cache.delete_many(keys)
-        user = serializer.validated_data["user"]
-        token = issue_token(user)
-        return Response({"token": token.key, "username": user.username, "next": safe_next(request)})
+        return signed_in(request, serializer.validated_data["user"])
 
 
 class SignupThrottle(AnonThrottle):
@@ -47,18 +52,17 @@ class Register(generics.CreateAPIView):
 
     def create(self, request, *args, **kwargs):
         super().create(request, *args, **kwargs)
-        return Response({"token": issue_token(self.user).key, "username": self.user.username,
-                         "next": safe_next(request)}, status=201)
+        return signed_in(request, self.user, status=201)
 
 
 @api_view(["POST"])
 @authentication_classes([])  # a stale token must still sign out, not fail with 401
 @permission_classes([CsrfProtected])  # it empties the session cart
 def logout(request):
-    # Revoke the presented token (DRF keeps one per user, so every device signs out),
-    # and empty this device's cart so the next person doesn't see it.
+    # Revoke the presented token (DRF keeps one per user, so every device signs out), and wipe this
+    # device's session (cart and guest orders) under a new key so the next person sees none of it.
     key = request.headers.get("Authorization", "").removeprefix("Token ").strip()
     if key:
         Token.objects.filter(key=key).delete()
-    Cart(request).clear()
+    request.session.flush()
     return Response(status=204)

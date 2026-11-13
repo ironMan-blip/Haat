@@ -1,55 +1,125 @@
 {% extends "admin/index.html" %}
 
 {% block content %}
-<h2 class="haat-hello">Welcome back, {% firstof user.get_short_name user.get_username %}</h2>
-<p class="haat-sub">Here is what needs your attention today.</p>
+{% url 'admin:shop_order_changelist' as orders_url %}
+<section class="haat-hero">
+  <div>
+    <p class="haat-eyebrow">{{ now|date:"l, j F" }}</p>
+    <h2 class="haat-hello">{{ greeting }}, {% firstof user.get_short_name user.get_username %}</h2>
+    <p class="haat-sub">
+      {% if stats %}
+        {% if pending %}<strong>{{ pending }} order{{ pending|pluralize }}</strong> waiting to ship. Start there.
+        {% else %}No orders waiting. The shelf is in good shape.{% endif %}
+      {% else %}Pick a section below to get started.{% endif %}
+    </p>
+  </div>
+  {% if stats %}
+  <nav class="haat-actions" aria-label="Quick actions">
+    {% if pending %}<a class="haat-btn haat-btn-primary" href="{{ orders_url }}?status__exact=pending">Process pending orders <span aria-hidden="true">→</span></a>{% endif %}
+    {% if perms.shop.add_product %}<a class="haat-btn {% if not pending %}haat-btn-primary{% endif %}" href="{% url 'admin:shop_product_add' %}">+ Add product</a>{% endif %}
+    {% if perms.shop.view_product and sold_out %}<a class="haat-btn" href="{% url 'admin:shop_product_changelist' %}?stock=out">Sold out <span class="haat-count">{{ sold_out }}</span></a>{% endif %}
+  </nav>
+  {% endif %}
+</section>
+
 {% if stats %}
 <div class="haat-stats">
-  {% url 'admin:shop_order_changelist' as orders_url %}
-  {% for label, value, query, hint in stats %}
-    {% if query %}<a class="haat-stat" href="{{ orders_url }}{{ query }}">{% else %}<div class="haat-stat">{% endif %}
-      <span>{{ label }}</span><strong>{{ value }}</strong><small>{{ hint }}</small>
-    {% if query %}</a>{% else %}</div>{% endif %}
+  {% for s in stats %}
+    {% if s.query %}<a class="haat-stat{% if s.alert %} is-alert{% endif %}" href="{{ orders_url }}{{ s.query }}">{% else %}<div class="haat-stat">{% endif %}
+      <span class="haat-stat-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        {% if s.icon == "box" %}<path d="M21 8 12 3 3 8v8l9 5 9-5V8Z"/><path d="m3 8 9 5 9-5M12 13v8"/>
+        {% elif s.icon == "bag" %}<path d="M5 8h14l-1 12H6L5 8Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>
+        {% elif s.icon == "coin" %}<circle cx="12" cy="12" r="9"/><path d="M9 8h4a2.5 2.5 0 0 1 0 5H9m0-5v9m0-4h6"/>
+        {% else %}<path d="M4 20V10m6 10V4m6 16v-7m4 7H3"/>{% endif %}
+        </svg>
+      </span>
+      <span class="haat-stat-label">{{ s.label }}</span>
+      <strong class="haat-stat-value">{{ s.value }}</strong>
+      <span class="haat-stat-foot">
+        {% if s.delta %}<span class="haat-delta haat-delta-{{ s.delta.0 }}">{{ s.delta.1 }}</span>{% endif %}
+        <small>{{ s.hint }}</small>
+      </span>
+    {% if s.query %}</a>{% else %}</div>{% endif %}
   {% endfor %}
 </div>
-<div class="haat-actions">
-  {% if perms.shop.add_product %}<a class="primary" href="{% url 'admin:shop_product_add' %}">+ Add product</a>{% endif %}
-  <a href="{{ orders_url }}?status__exact=pending">Process pending orders</a>
-  {% if perms.shop.view_product %}<a href="{% url 'admin:shop_product_changelist' %}?stock=out">Sold-out products ({{ sold_out }})</a>{% endif %}
+
+<div class="haat-grid haat-grid-wide">
+  <section class="haat-card">
+    <header class="haat-card-head">
+      <div><h3>Sales, last 14 days</h3><p>{{ chart_total }} excluding cancelled orders</p></div>
+    </header>
+    {% if chart_empty %}
+      <p class="haat-empty">No sales in the last two weeks yet. New orders will show up here.</p>
+    {% else %}
+    <ol class="haat-chart" aria-label="Daily sales, last 14 days">
+      {% for c in chart %}
+      <li class="{% if c.today %}is-today{% endif %}">
+        <span class="haat-bar" style="--h: {{ c.pct }}%; --i: {{ forloop.counter0 }}" tabindex="0">
+          <span class="haat-tip"><b>{{ c.sales }}</b>{{ c.orders }} order{{ c.orders|pluralize }} · {{ c.day|date:"D j M" }}</span>
+        </span>
+        <span class="haat-chart-day">{% if c.today %}Today{% else %}{{ c.day|date:"j" }}{% endif %}</span>
+      </li>
+      {% endfor %}
+    </ol>
+    {% endif %}
+  </section>
+
+  <section class="haat-card">
+    <header class="haat-card-head"><div><h3>Order status</h3><p>{{ order_total }} order{{ order_total|pluralize }} all time</p></div></header>
+    <div class="haat-mix" role="img" aria-label="{% for m in status_mix %}{{ m.label }} {{ m.n }}{% if not forloop.last %}, {% endif %}{% endfor %}">
+      {% for m in status_mix %}{% if m.n %}<span class="haat-mix-{{ m.key }}" style="flex: {{ m.n }}"></span>{% endif %}{% endfor %}
+    </div>
+    <ul class="haat-legend">
+      {% for m in status_mix %}
+      <li><a href="{{ orders_url }}?status__exact={{ m.key }}"><i class="haat-dot haat-mix-{{ m.key }}"></i>{{ m.label }}<span>{{ m.n }}</span><small>{{ m.pct }}%</small></a></li>
+      {% endfor %}
+    </ul>
+  </section>
 </div>
-<div class="haat-panels">
-  <div class="module">
-    <table>
-      <caption><a href="{{ orders_url }}" class="section">Recent orders</a></caption>
+
+<div class="haat-grid haat-grid-three">
+  <section class="haat-card haat-span-2">
+    <header class="haat-card-head"><div><h3>Recent orders</h3><p>Newest first</p></div><a class="haat-link" href="{{ orders_url }}">All orders →</a></header>
+    <table class="haat-table">
       <tbody>
-      {% for o in recent_orders %}
+      {% for o, total in recent_orders %}
         <tr>
           <th scope="row"><a href="{% url 'admin:shop_order_change' o.pk %}">#{{ o.pk }}</a></th>
-          <td>{{ o.full_name }}</td>
-          <td class="haat-num">৳{{ o.total }}</td>
+          <td><span class="haat-avatar" aria-hidden="true">{{ o.full_name|first|upper }}</span>{{ o.full_name }}<small>{{ o.city }}</small></td>
+          <td class="haat-num"><b>{{ total }}</b></td>
           <td><span class="haat-badge haat-{{ o.status }}">{{ o.get_status_display }}</span></td>
-          <td class="haat-num">{{ o.created|timesince }} ago</td>
+          <td class="haat-num haat-quiet">{{ o.created|timesince }} ago</td>
         </tr>
-      {% empty %}<tr><td class="haat-empty">No orders yet.</td></tr>{% endfor %}
+      {% empty %}<tr><td class="haat-empty">No orders yet. They appear here as soon as a customer checks out.</td></tr>{% endfor %}
       </tbody>
     </table>
+  </section>
+
+  <div class="haat-stack">
+    <section class="haat-card">
+      <header class="haat-card-head"><div><h3>Top sellers</h3><p>Units sold, last 30 days</p></div></header>
+      <ol class="haat-rank">
+        {% for t in top_sellers %}
+        <li><a href="{% url 'admin:shop_product_change' t.product_id %}">{{ t.product__name|truncatechars:40 }}</a><span><b>{{ t.qty }}</b><small>{{ t.revenue }}</small></span></li>
+        {% empty %}<li class="haat-empty">Nothing sold this month yet.</li>{% endfor %}
+      </ol>
+    </section>
+
+    {% if perms.shop.view_product %}
+    <section class="haat-card">
+      <header class="haat-card-head"><div><h3>Low stock</h3><p>Under {{ low_stock_limit }} units</p></div><a class="haat-link" href="{% url 'admin:shop_product_changelist' %}?stock=low">Restock →</a></header>
+      <ul class="haat-rank">
+        {% for p in low_stock %}
+        <li><a href="{% url 'admin:shop_product_change' p.pk %}">{{ p.name|truncatechars:40 }}</a>{% if p.stock %}<span class="haat-badge haat-low">{{ p.stock }} left</span>{% else %}<span class="haat-badge haat-out">Sold out</span>{% endif %}</li>
+        {% empty %}<li class="haat-empty">Everything is well stocked.</li>{% endfor %}
+      </ul>
+    </section>
+    {% endif %}
   </div>
-  {% if perms.shop.view_product %}
-  <div class="module">
-    <table>
-      <caption><a href="{% url 'admin:shop_product_changelist' %}?o=6" class="section">Low stock (under {{ low_stock_limit }})</a></caption>
-      <tbody>
-      {% for p in low_stock %}
-        <tr>
-          <th scope="row"><a href="{% url 'admin:shop_product_change' p.pk %}">{{ p.name|truncatechars:50 }}</a></th>
-          <td class="haat-num">{% if p.stock %}<span class="haat-badge haat-low">{{ p.stock }} left</span>{% else %}<span class="haat-badge haat-out">Sold out</span>{% endif %}</td>
-        </tr>
-      {% empty %}<tr><td class="haat-empty">Everything is well stocked.</td></tr>{% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% endif %}
 </div>
 {% endif %}
+
+<h3 class="haat-section-title">Manage</h3>
 {{ block.super }}
 {% endblock %}

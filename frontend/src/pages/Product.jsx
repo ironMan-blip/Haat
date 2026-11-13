@@ -17,8 +17,7 @@ function ProductPage({ slug }) {
   const { data: p, loading, error } = useFetch(`/products/${slug}/`)
   const { add, config } = useStore()
   const navigate = useNavigate()
-  const [pick, setQty] = useState(1)
-  const qty = Math.max(1, Math.min(pick, p?.max_qty ?? 1))
+  const [qty, setQty] = useState(1) // Qty stops at max_qty; the server caps it again
 
   return (
     <Status loading={loading} error={error}>
@@ -38,7 +37,7 @@ function ProductPage({ slug }) {
               <Rating p={p} />
               <p className="pdp-price">
                 {p.price_display}
-                {p.original_price_display && <> <s>{p.original_price_display}</s> <span className="off">{p.discount}% off</span></>}
+                {p.original_price_display && <> <s>{p.original_price_display}</s> <span className="off">{p.discount_label}</span></>}
               </p>
               {p.stock_level !== 'out' ? (
                 <>

@@ -2,7 +2,7 @@
 from django.conf import settings
 from rest_framework import serializers
 
-from .display import cdn, taka
+from .display import cdn, items, taka
 from .models import Product
 
 KEY = "cart"
@@ -68,11 +68,13 @@ class Cart:
         fee = delivery_fee(subtotal)
         free_min = settings.FREE_DELIVERY_MIN
         left = max(0, free_min - subtotal)
+        count = sum(q for _, q in lines)
         return {
             "lines": [{"id": p.pk, "slug": p.slug, "name": p.name, "thumb": cdn(p.image, 200),
-                       "price_display": taka(p.price), "quantity": q, "max_qty": p.max_qty,
+                       "each_line": f"{taka(p.price)} each", "quantity": q, "max_qty": p.max_qty,
                        "line_total_display": taka(p.price * q)} for p, q in lines],
-            "count": sum(q for _, q in lines),
+            "count": count,
+            "count_label": f"Cart, {items(count)}",  # the header's cart link
             "subtotal": subtotal,
             "subtotal_display": taka(subtotal),
             "delivery_fee": fee,
