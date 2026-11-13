@@ -32,8 +32,8 @@ def issue_token(user):
     """The user's token, replaced by a fresh one if it has expired."""
     token, created = Token.objects.get_or_create(user=user)
     if not created and expired(token):
-        token.delete()
-        token = Token.objects.create(user=user)
+        Token.objects.filter(pk=token.pk).delete()
+        token, _ = Token.objects.get_or_create(user=user)  # a parallel login may have made it already
     return token
 
 

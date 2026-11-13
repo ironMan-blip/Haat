@@ -7,6 +7,7 @@ from django.db.models import Q
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import generics, permissions
 from rest_framework.authtoken.models import Token
+from rest_framework.exceptions import NotFound
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.response import Response
@@ -50,8 +51,7 @@ class ProductList(generics.ListAPIView):
         params = self.request.query_params
         if params.get("category"):
             qs = qs.filter(category__slug=params["category"])
-        if params.get("q"):
-            q = params["q"][:100]  # bound the LIKE scan
+        if q := params.get("q", "").strip()[:100]:  # bound the LIKE scan; blank means no search
             qs = qs.filter(Q(name__icontains=q) | Q(description__icontains=q))
         if params.get("sort") and params["sort"] in SORTS:
             qs = qs.order_by(params["sort"], "id")
@@ -61,7 +61,7 @@ class ProductList(generics.ListAPIView):
         # The page's heading, category links and empty-state text come with the results.
         results = self.get_serializer(self.get_queryset(), many=True).data
         cats = list(Category.objects.all())
-        slug, q = request.query_params.get("category", ""), request.query_params.get("q", "")[:100]
+        slug, q = request.query_params.get("category", ""), request.query_params.get("q", "").strip()[:100]
         cat = next((c for c in cats if c.slug == slug), None)
         if q:
             title, empty = f"Results for “{q}”", f"Nothing matches “{q}”. Try a shorter or different word."
@@ -131,6 +131,8 @@ def cart_line(request, pk):
     if request.method == "DELETE":
         c.remove(pk)
     else:  # set quantity
+        if str(pk) not in c.items:  # a stale tab must not bring back a removed line
+            raise NotFound("That item is no longer in your cart.")
         body = request.data if isinstance(request.data, Mapping) else {}  # a JSON array or number is not a body
         line = CartLineSerializer(data={"product": pk, "quantity": body.get("quantity")})
         line.is_valid(raise_exception=True)

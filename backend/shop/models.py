@@ -107,14 +107,14 @@ class Order(models.Model):
             raise ValidationError(self.REOPEN_ERROR)
 
     def save(self, *args, **kwargs):
-        # Cancelling puts the items back in stock, once.
+        # Cancelling a pending order puts its items back in stock, once; shipped goods are not on the shelf.
         with transaction.atomic():
             was = Order.objects.select_for_update().filter(pk=self.pk).values_list("status", flat=True).first() \
                 if self.pk else None
             if was == "cancelled" and self.status != "cancelled":  # e.g. two admins racing
                 raise ValidationError(self.REOPEN_ERROR)
             super().save(*args, **kwargs)
-            if self.status == "cancelled" and was not in (None, "cancelled"):
+            if self.status == "cancelled" and was == "pending":
                 for item in self.items.all():
                     Product.objects.filter(pk=item.product_id).update(stock=F("stock") + item.quantity)
 

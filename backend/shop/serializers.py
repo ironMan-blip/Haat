@@ -116,7 +116,8 @@ class OrderSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"phone": f"This number already has {settings.MAX_PENDING_ORDERS} orders waiting for delivery."})
         # The order is built from the buyer's session cart. Lock rows so two orders can't oversell.
-        lines = Cart(self.context["request"]).lines(Product.objects.select_for_update())
+        cart = Cart(self.context["request"])
+        lines = cart.lines(Product.objects.select_for_update())
         if not lines:
             raise serializers.ValidationError({"cart": "Your cart is empty."})
         subtotal = 0
@@ -126,8 +127,8 @@ class OrderSerializer(serializers.ModelSerializer):
             subtotal += p.price * qty  # price from DB, never from client
         fee = delivery_fee(subtotal)
         if subtotal + fee != expected:  # another tab, a price edit or a stock drop changed the cart
-            raise serializers.ValidationError(
-                {"cart": "Your cart changed since you opened checkout. Check the new total and place the order again."})
+            raise serializers.ValidationError({"cart": " ".join(
+                [*cart.notes, "Your cart changed since you opened checkout. Check the new total and place the order again."])})
         order = Order.objects.create(subtotal=subtotal, delivery_fee=fee, total=subtotal + fee, **data)
         for p, qty in lines:
             OrderItem.objects.create(order=order, product=p, name=p.name, price=p.price, quantity=qty)

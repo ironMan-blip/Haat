@@ -103,6 +103,43 @@ class ShopApiTests(APITestCase):
         with self.assertRaises(ValidationError):
             o.full_clean()
 
+    def test_cancelling_shipped_order_does_not_restock(self):
+        self.order((self.case, 4))
+        o = Order.objects.get()
+        o.status = "delivered"
+        o.save()
+        o.status = "cancelled"
+        o.save()
+        self.case.refresh_from_db()
+        self.assertEqual(self.case.stock, 6)  # the goods are with the buyer, not on the shelf
+
+    def test_patch_on_removed_line_does_not_bring_it_back(self):
+        self.add(self.case, 1)
+        self.client.delete(f"/api/cart/{self.case.pk}/")
+        r = self.client.patch(f"/api/cart/{self.case.pk}/", {"quantity": 2}, format="json")
+        self.assertEqual(r.status_code, 404)
+        self.assertEqual(self.client.get("/api/cart/").data["lines"], [])
+
+    def test_blank_search_is_no_search(self):
+        r = self.client.get("/api/products/", {"q": "   "})
+        self.assertEqual((r.data["title"], len(r.data["results"])), ("Every product", 2))
+
+    def test_checkout_mismatch_says_what_changed(self):
+        self.add(self.phone, 3)
+        shown = self.client.get("/api/cart/").data["total"]
+        Product.objects.filter(pk=self.phone.pk).update(stock=2)
+        r = self.client.post("/api/orders/", {**ADDR, "expected_total": shown}, format="json")
+        self.assertIn("Only 2 of Phone left", r.data["message"])
+
+    def test_issue_token_survives_parallel_refresh(self):
+        from .auth import issue_token
+        stale = Token(key="stale", user=self.user, created=timezone.now() - timedelta(days=365))
+        fresh = Token.objects.create(user=self.user)  # the other login already replaced it
+        real = Token.objects.get_or_create
+        calls = iter([lambda **kw: (stale, False), real])
+        with mock.patch("shop.auth.Token.objects.get_or_create", side_effect=lambda **kw: next(calls)(**kw)):
+            self.assertEqual(issue_token(self.user), fresh)
+
     def test_logout_with_stale_token_still_empties_cart(self):
         self.client.force_authenticate(None)
         self.add(self.case, 1)
