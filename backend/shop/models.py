@@ -27,7 +27,7 @@ class Product(models.Model):
     name = models.CharField(max_length=200)
     slug = models.SlugField(max_length=220, unique=True)
     description = models.TextField(blank=True)
-    price = models.PositiveIntegerField(help_text="Taka")
+    price = models.PositiveIntegerField(help_text="Taka", validators=[MinValueValidator(1)])  # ৳0 = free order + free delivery
     original_price = models.PositiveIntegerField(null=True, blank=True, help_text="Before discount")
     image = models.URLField(max_length=500)
     rating = models.DecimalField(max_digits=2, decimal_places=1, default=0,
@@ -82,7 +82,8 @@ class Order(models.Model):
     CITIES = [(c, c) for c in ["Dhaka", "Chattogram", "Sylhet", "Khulna", "Rajshahi", "Barishal", "Rangpur", "Mymensingh"]]
 
     # Empty for guest orders; those are found only through the session that placed them.
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="orders", on_delete=models.CASCADE,
+    # SET_NULL: deleting a user must not delete their orders (and the stock they took) with them.
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="orders", on_delete=models.SET_NULL,
                              null=True, blank=True)
     full_name = models.CharField(max_length=120)
     phone = models.CharField(max_length=20)

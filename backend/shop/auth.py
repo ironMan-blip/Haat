@@ -69,7 +69,10 @@ def locked_out(keys):
 def record_login_failure(keys):
     for k in keys:
         cache.add(k, 0, settings.LOGIN_LOCKOUT_SECONDS)
-        cache.incr(k)
+        try:
+            cache.incr(k)
+        except ValueError:  # the counter expired between add and incr
+            cache.set(k, 1, settings.LOGIN_LOCKOUT_SECONDS)
 
 
 def expired(token):

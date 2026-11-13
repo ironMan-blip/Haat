@@ -11,6 +11,7 @@ from rest_framework.response import Response
 from ..auth import (AnonThrottle, CsrfProtected, ScopedThrottle, UserThrottle, issue_token, locked_out,
                     login_fail_keys, record_login_failure, safe_next)
 from ..serializers import RegisterSerializer
+from .checkout import claim_guest_orders
 
 
 class Login(ObtainAuthToken):
@@ -29,6 +30,7 @@ class Login(ObtainAuthToken):
         cache.delete_many(keys)
         user = serializer.validated_data["user"]
         token = issue_token(user)
+        claim_guest_orders(request, user)
         return Response({"token": token.key, "username": user.username, "next": safe_next(request)})
 
 
@@ -46,6 +48,7 @@ class Register(generics.CreateAPIView):
 
     def create(self, request, *args, **kwargs):
         super().create(request, *args, **kwargs)
+        claim_guest_orders(request, self.user)
         return Response({"token": issue_token(self.user).key, "username": self.user.username,
                          "next": safe_next(request)}, status=201)
 

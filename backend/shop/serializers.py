@@ -119,8 +119,9 @@ class OrderSerializer(serializers.ModelSerializer):
                 "total_line": f"Total {taka(o.total)} ({fee})"}
 
     def validate_phone(self, value):
-        value = value.replace(" ", "").replace("-", "")
-        if not re.fullmatch(r"(\+?88)?01[3-9]\d{8}", value):
+        # Bengali (or any) decimal digits become ASCII, so one number has one spelling for the cap and the rider.
+        value = "".join(str(int(ch)) if ch.isdecimal() else ch for ch in value.replace(" ", "").replace("-", ""))
+        if not re.fullmatch(r"(\+?88)?01[3-9][0-9]{8}", value):
             raise serializers.ValidationError("Enter a Bangladeshi mobile number, e.g. 01712345678.")
         return value[-11:]  # one spelling per number, so the per-phone cap can't be dodged with +88
 
@@ -143,8 +144,8 @@ class OrderSerializer(serializers.ModelSerializer):
         # The order is built from the buyer's session cart. Lock rows so two orders can't oversell.
         cart = Cart(self.context["request"])
         lines = cart.lines(Product.objects.select_for_update())
-        if not lines:
-            raise serializers.ValidationError({"cart": "Your cart is empty."})
+        if not lines:  # keep the notes: "X sold out" says more than "empty"
+            raise serializers.ValidationError({"cart": " ".join([*cart.notes, "Your cart is empty."])})
         subtotal = 0
         for p, qty in lines:
             if p.stock < qty:

@@ -641,6 +641,36 @@ class GuestCheckoutTests(APITestCase):
             self.client.force_authenticate(self.user)
             self.assertEqual(self.order(phone="01812345678").status_code, 201)
 
+    def test_login_claims_this_sessions_guest_orders(self):
+        r = self.order()
+        login = self.client.post("/api/auth/login/", {"username": "rahim", "password": "pass-1234-word"}, format="json")
+        self.assertEqual(login.status_code, 200, login.data)
+        self.assertEqual(Order.objects.get(pk=r.data["id"]).user, self.user)
+        self.assertNotIn("guest_orders", self.client.session)
+
+    def test_bengali_digit_phone_is_stored_ascii_and_capped(self):
+        r = self.order(phone="০১৭১২৩৪৫৬৭৮")
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual(Order.objects.get().phone, "01712345678")
+
+    def test_all_sold_out_says_which(self):
+        self.client.post("/api/cart/", {"product": self.case.pk, "quantity": 1}, format="json")
+        Product.objects.filter(pk=self.case.pk).update(stock=0)
+        r = self.client.post("/api/orders/", {**ADDR, "expected_total": 160}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("Case sold out", str(r.data["cart"]))
+
+    def test_deleting_user_keeps_their_orders(self):
+        self.client.force_authenticate(self.user)
+        self.order()
+        self.user.delete()
+        self.assertEqual(Order.objects.get().user, None)
+
+    def test_zero_price_rejected(self):
+        self.case.price = 0
+        with self.assertRaises(DjangoValidationError):
+            self.case.full_clean()
+
     def test_guest_order_logged_without_personal_data(self):
         with self.assertLogs("shop.security", "INFO") as logs:
             r = self.order()

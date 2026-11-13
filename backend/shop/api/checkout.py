@@ -17,6 +17,13 @@ GUEST_ORDERS = "guest_orders"  # session key: ids of the orders this session pla
 GUEST_ORDERS_KEPT = 20  # bounds the session row
 
 
+def claim_guest_orders(request, user):
+    """On sign-in, this session's guest orders move to the account, so they don't vanish from its list."""
+    ids = request.session.pop(GUEST_ORDERS, [])
+    if ids:
+        Order.objects.filter(user=None, pk__in=ids).update(user=user)
+
+
 @ensure_csrf_cookie  # the app loads the cart first, so this hands the frontend its CSRF token
 @api_view(["GET", "POST"])
 @permission_classes([CsrfProtected])
