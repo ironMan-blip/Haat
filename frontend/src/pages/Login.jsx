@@ -7,6 +7,7 @@ export default function Login() {
   const [mode, setMode] = useState('login')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [show, setShow] = useState(false)
   const { login } = useStore()
   const navigate = useNavigate()
   const [params] = useSearchParams()
@@ -39,8 +40,11 @@ export default function Login() {
         <label>Username<input name="username" required autoComplete="username" /></label>
         {mode === 'register' && <label>Email <span className="hint">(optional)</span><input name="email" type="email" autoComplete="email" /></label>}
         <label>Password
-          <input name="password" type="password" required minLength={8}
-            autoComplete={mode === 'login' ? 'current-password' : 'new-password'} />
+          <span className="pw">
+            <input name="password" type={show ? 'text' : 'password'} required minLength={8}
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'} />
+            <button type="button" className="link" onClick={() => setShow(!show)} aria-pressed={show}>{show ? 'Hide' : 'Show'}</button>
+          </span>
           {mode === 'register' && <span className="hint">At least 8 characters.</span>}
         </label>
         {error && <p className="alert" role="alert">{error}</p>}

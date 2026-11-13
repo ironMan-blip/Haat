@@ -108,7 +108,7 @@ export default function Home() {
           <h2>Today's best deals</h2>
           <Link to="/shop?sort=price" className="arrow">See all →</Link>
         </Reveal>
-        <TileGrid products={deals} />
+        <TileGrid products={deals} feature />
       </section>
 
       {best.length === 2 && <Showcase items={best} />}
