@@ -19,14 +19,24 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
 import os
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'dev-only-insecure-key')
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DJANGO_DEBUG', '1') == '1'
+from django.core.exceptions import ImproperlyConfigured
+
+# Safe by default: debug only when asked for, and no shared fallback key outside debug.
+DEBUG = os.environ.get('DJANGO_DEBUG') == '1'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY') or ('dev-only-insecure-key' if DEBUG else None)
+if not SECRET_KEY:
+    raise ImproperlyConfigured('Set DJANGO_SECRET_KEY (or DJANGO_DEBUG=1 for local development).')
 
 ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = 60 * 60 * 24 * 30  # raise to a year, add includeSubDomains, once HTTPS is proven
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    # Behind a TLS-terminating proxy, also set SECURE_PROXY_SSL_HEADER, or SSL redirect loops.
 
 
 # Application definition
@@ -130,7 +140,20 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': ['rest_framework.authentication.TokenAuthentication'],
     'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.AllowAny'],
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+        'rest_framework.throttling.ScopedRateThrottle',  # only views with throttle_scope
+    ],
+    # shortcut: counters live in the per-process local-memory cache; use a shared cache (Redis) with >1 worker.
+    'DEFAULT_THROTTLE_RATES': {'anon': '120/min', 'user': '300/min', 'auth': '5/min'},
+    # Client IP comes from REMOTE_ADDR, so a forged X-Forwarded-For can't dodge throttles.
+    # Set to the number of reverse proxies in front of Django when deployed behind one.
+    'NUM_PROXIES': int(os.environ.get('DJANGO_NUM_PROXIES', '0')),
 }
 
 FREE_DELIVERY_MIN = 299  # taka; Cartup-style free delivery threshold
 DELIVERY_FEE = 60
+MAX_PENDING_ORDERS = 5  # per buyer; COD orders cost nothing, so this stops stock hoarding
+
+ADMIN_PATH = os.environ.get('DJANGO_ADMIN_PATH', 'admin/')  # use a non-default path in production

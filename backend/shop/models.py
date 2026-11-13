@@ -36,12 +36,14 @@ class Product(models.Model):
 
 class Order(models.Model):
     STATUS = [("pending", "Pending"), ("shipped", "Shipped"), ("delivered", "Delivered"), ("cancelled", "Cancelled")]
+    # Delivery cities; frontend/src/pages/Checkout.jsx keeps the same list.
+    CITIES = [(c, c) for c in ["Dhaka", "Chattogram", "Sylhet", "Khulna", "Rajshahi", "Barishal", "Rangpur", "Mymensingh"]]
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="orders", on_delete=models.CASCADE)
     full_name = models.CharField(max_length=120)
     phone = models.CharField(max_length=20)
-    address = models.TextField()
-    city = models.CharField(max_length=60)
+    address = models.TextField(max_length=300)
+    city = models.CharField(max_length=60, choices=CITIES)
     subtotal = models.PositiveIntegerField()
     delivery_fee = models.PositiveIntegerField()
     total = models.PositiveIntegerField()

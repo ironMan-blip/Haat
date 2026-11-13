@@ -131,9 +131,7 @@ export function Footer({ stamp }) {
           <ul className="card-links">
             <li><Link to="/shop">Every product</Link></li>
             <li><Link to="/cart">Your cart</Link></li>
-            <li><Link to="/orders">Your orders</Link></li>
-            <li><a href="http://127.0.0.1:8000/admin/">Seller admin</a></li>
-          </ul>
+            <li><Link to="/orders">Your orders</Link></li>          </ul>
         </div>
         <p className="imprint">Haat MVP. Product photos and listings from daraz.com.bd, for demo only.</p>
       </div>

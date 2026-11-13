@@ -69,6 +69,13 @@ class OrderSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Enter a Bangladeshi mobile number, e.g. 01712345678.")
         return value
 
+    def validate(self, data):
+        user = self.context["request"].user
+        if user.orders.filter(status="pending").count() >= settings.MAX_PENDING_ORDERS:
+            raise serializers.ValidationError(
+                f"You already have {settings.MAX_PENDING_ORDERS} orders waiting for delivery.")
+        return data
+
     def validate_lines(self, lines):
         if not lines:
             raise serializers.ValidationError("Cart is empty.")

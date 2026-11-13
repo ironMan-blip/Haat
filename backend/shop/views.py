@@ -2,8 +2,10 @@ from django.conf import settings
 from django.db.models import Q
 from rest_framework import generics, permissions
 from rest_framework.authtoken.models import Token
+from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 
 from .models import Category, Product
 from .serializers import CategorySerializer, OrderSerializer, ProductSerializer, RegisterSerializer
@@ -26,7 +28,7 @@ class ProductList(generics.ListAPIView):
         if params.get("category"):
             qs = qs.filter(category__slug=params["category"])
         if params.get("q"):
-            q = params["q"]
+            q = params["q"][:100]  # bound the LIKE scan
             qs = qs.filter(Q(name__icontains=q) | Q(description__icontains=q))
         if params.get("sort") in {"price", "-price", "-rating"}:
             qs = qs.order_by(params["sort"], "id")
@@ -39,8 +41,14 @@ class ProductDetail(generics.RetrieveAPIView):
     lookup_field = "slug"
 
 
+class Login(ObtainAuthToken):
+    throttle_classes = [ScopedRateThrottle]  # the parent sets none at all
+    throttle_scope = "auth"  # slows password guessing
+
+
 class Register(generics.CreateAPIView):
     serializer_class = RegisterSerializer
+    throttle_scope = "auth"  # slows bulk sign-ups
 
     def perform_create(self, serializer):
         self.user = serializer.save()
@@ -67,6 +75,14 @@ class OrderListCreate(generics.ListCreateAPIView):
 @permission_classes([permissions.IsAuthenticated])
 def me(request):
     return Response({"username": request.user.username, "email": request.user.email})
+
+
+@api_view(["POST"])
+@permission_classes([permissions.IsAuthenticated])
+def logout(request):
+    # DRF keeps one token per user, so this signs out every device.
+    Token.objects.filter(user=request.user).delete()
+    return Response(status=204)
 
 
 @api_view(["GET"])

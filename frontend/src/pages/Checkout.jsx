@@ -4,6 +4,7 @@ import { api } from '../api'
 import { useStore } from '../store'
 import { Summary } from './Cart'
 
+// Server enforces this list too (Order.CITIES in backend/shop/models.py).
 const CITIES = ['Dhaka', 'Chattogram', 'Sylhet', 'Khulna', 'Rajshahi', 'Barishal', 'Rangpur', 'Mymensingh']
 
 export default function Checkout() {
@@ -47,7 +48,7 @@ export default function Checkout() {
             {CITIES.map((c) => <option key={c}>{c}</option>)}
           </select>
         </label>
-        <label>Address<textarea name="address" required rows={3} placeholder="House, road, area" autoComplete="street-address" /></label>
+        <label>Address<textarea name="address" required maxLength={300} rows={3} placeholder="House, road, area" autoComplete="street-address" /></label>
         <fieldset>
           <legend>Payment</legend>
           <label className="radio"><input type="radio" defaultChecked readOnly /> Cash on delivery</label>
