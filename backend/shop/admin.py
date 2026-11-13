@@ -44,7 +44,6 @@ class HaatAdminSite(OTPAdminSite):
             record_login_failure(keys)
         return response
 
-
     index_template = "admin/haat_index.html"  # own name: shop's templates load after django.contrib.admin's
     site_header = site_title = "Haat admin"
     index_title = "Dashboard"

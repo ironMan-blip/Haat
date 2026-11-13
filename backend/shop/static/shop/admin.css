@@ -215,8 +215,6 @@ ul.messagelist li.error { color: var(--haat-bad-fg); }
   background: var(--haat-card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b675f' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") no-repeat 13px 50% / 16px; }
 #changelist-search label img { display: none; }
 #changelist-search input[type=submit] { border-radius: 999px; padding: 9px 18px; height: auto; }
-.haat-kbd { display: inline-block; font: 600 .7rem/1 var(--font-family-primary); padding: 3px 6px; border-radius: 5px; border: 1px solid var(--border-color);
-  color: var(--haat-muted); background: var(--darkened-bg); margin-left: 4px; }
 #changelist .actions { background: var(--haat-card); border-bottom: 1px solid var(--haat-line); padding: 10px 12px; }
 #changelist .actions select { margin-left: 6px; }
 #changelist .actions .button { padding: 6px 14px; }

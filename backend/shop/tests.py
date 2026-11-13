@@ -52,7 +52,7 @@ class ShopApiTests(APITestCase):
         r = self.checkout()
         self.assertEqual(r.status_code, 201, r.data)
         self.assertEqual((r.data["subtotal"], r.data["delivery_fee"], r.data["total"]), (30000, 0, 30000))
-        self.assertEqual((r.data["status_display"], r.data["payment_display"]), ("Pending", "Cash on delivery"))
+        self.assertEqual((r.data["status_display"], r.data["payment"]), ("Pending", "cod"))
         self.phone.refresh_from_db()
         self.assertEqual(self.phone.stock, 1)
         self.assertEqual(self.client.get("/api/cart/").data["lines"], [])
@@ -323,7 +323,7 @@ class ShopApiTests(APITestCase):
         self.assertEqual(o["notice"], f"✓ Order #{o['id']} placed. Keep cash ready for the rider.")
         self.assertTrue(o["meta_line"].endswith(" · Dhaka · Cash on delivery"))
         self.assertEqual(p["discount_label"], "25% off")
-        self.assertEqual(o["created_display"], day(Order.objects.get(pk=o["id"]).created))
+        self.assertTrue(o["meta_line"].startswith(day(Order.objects.get(pk=o["id"]).created) + " · "))
         self.assertEqual(self.client.get("/api/home/").data["wall"][0][0].keys(), {"tag", "field"})
 
     def test_config_lists_cities_and_sorts(self):

@@ -101,20 +101,18 @@ class CartLineSerializer(serializers.Serializer):
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
     status_display = serializers.CharField(source="get_status_display", read_only=True)
-    payment_display = serializers.CharField(source="get_payment_display", read_only=True)
     # The total the buyer was shown; the order is refused if the cart has changed since.
     expected_total = serializers.IntegerField(write_only=True, min_value=0)
 
     class Meta:
         model = Order
         fields = ["id", "full_name", "phone", "address", "city", "subtotal", "delivery_fee", "total",
-                  "payment", "payment_display", "status", "status_display", "created", "items", "expected_total"]
+                  "payment", "status", "status_display", "created", "items", "expected_total"]
         read_only_fields = ["subtotal", "delivery_fee", "total", "payment", "status", "created"]
 
     def to_representation(self, o):
         fee = f"incl. {taka(o.delivery_fee)} delivery" if o.delivery_fee else "free delivery"
-        return {**super().to_representation(o), "created_display": day(o.created),
-                "title": f"Order #{o.id}",
+        return {**super().to_representation(o), "title": f"Order #{o.id}",
                 "meta_line": f"{day(o.created)} · {o.city} · {o.get_payment_display()}",
                 "total_line": f"Total {taka(o.total)} ({fee})"}
 

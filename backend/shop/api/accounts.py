@@ -14,6 +14,13 @@ from ..serializers import RegisterSerializer
 from .checkout import claim_guest_orders
 
 
+def signed_in(request, user, status=200):
+    """Shared end of login and sign-up: move this session's guest orders over and hand out the token."""
+    claim_guest_orders(request, user)
+    return Response({"token": issue_token(user).key, "username": user.username, "next": safe_next(request)},
+                    status=status)
+
+
 class Login(ObtainAuthToken):
     throttle_classes = [ScopedThrottle]  # the parent sets none at all
     throttle_scope = "auth"  # slows password guessing from one IP; the lockout below covers many IPs
@@ -28,10 +35,7 @@ class Login(ObtainAuthToken):
             record_login_failure(keys)
             raise ValidationError(serializer.errors)
         cache.delete_many(keys)
-        user = serializer.validated_data["user"]
-        token = issue_token(user)
-        claim_guest_orders(request, user)
-        return Response({"token": token.key, "username": user.username, "next": safe_next(request)})
+        return signed_in(request, serializer.validated_data["user"])
 
 
 class SignupThrottle(AnonThrottle):
@@ -48,9 +52,7 @@ class Register(generics.CreateAPIView):
 
     def create(self, request, *args, **kwargs):
         super().create(request, *args, **kwargs)
-        claim_guest_orders(request, self.user)
-        return Response({"token": issue_token(self.user).key, "username": self.user.username,
-                         "next": safe_next(request)}, status=201)
+        return signed_in(request, self.user, status=201)
 
 
 @api_view(["POST"])
