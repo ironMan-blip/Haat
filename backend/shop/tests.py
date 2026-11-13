@@ -1,4 +1,5 @@
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from rest_framework.test import APITestCase
 
 from .models import Category, Order, Product
@@ -8,6 +9,7 @@ ADDR = {"full_name": "Rahim", "phone": "01712345678", "address": "House 1, Road 
 
 class ShopApiTests(APITestCase):
     def setUp(self):
+        cache.clear()  # throttle counters live in the cache
         cat = Category.objects.create(name="Mobiles", slug="mobiles")
         self.phone = Product.objects.create(category=cat, name="Phone", slug="phone", price=15000, image="https://x.y/a.jpg", stock=3)
         self.case = Product.objects.create(category=cat, name="Case", slug="case", price=100, image="https://x.y/b.jpg", stock=10)
@@ -55,6 +57,41 @@ class ShopApiTests(APITestCase):
         self.assertEqual(r.status_code, 201)
         r = self.client.post("/api/auth/login/", {"username": "new", "password": "pass-1234-word"})
         self.assertIn("token", r.data)
+
+    def test_bad_city_and_long_address_rejected(self):
+        r = self.client.post("/api/orders/", {**ADDR, "city": "Atlantis", "address": "x" * 301,
+                                              "lines": [{"product": self.case.pk, "quantity": 1}]}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("city", r.data)
+        self.assertIn("address", r.data)
+
+    def test_pending_orders_capped(self):
+        for _ in range(5):
+            self.assertEqual(self.order((self.case, 1)).status_code, 201)
+        r = self.order((self.case, 1))
+        self.assertEqual(r.status_code, 400)
+        Order.objects.update(status="shipped")  # shipped orders no longer count
+        self.assertEqual(self.order((self.case, 1)).status_code, 201)
+
+    def test_logout_revokes_token(self):
+        self.client.force_authenticate(None)
+        token = self.client.post("/api/auth/login/", {"username": "rahim", "password": "pass-1234-word"}).data["token"]
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token}")
+        self.assertEqual(self.client.get("/api/auth/me/").status_code, 200)
+        self.assertEqual(self.client.post("/api/auth/logout/").status_code, 204)
+        self.assertEqual(self.client.get("/api/auth/me/").status_code, 401)
+
+    def test_login_is_throttled(self):
+        self.client.force_authenticate(None)
+        codes = [self.client.post("/api/auth/login/", {"username": "rahim", "password": "wrong"}).status_code
+                 for _ in range(6)]
+        self.assertEqual(codes, [400] * 5 + [429])
+
+    def test_spoofed_forwarded_for_does_not_dodge_throttle(self):
+        self.client.force_authenticate(None)
+        codes = [self.client.post("/api/auth/login/", {"username": "rahim", "password": "wrong"},
+                                  HTTP_X_FORWARDED_FOR=f"10.0.0.{i}").status_code for i in range(6)]
+        self.assertEqual(codes[-1], 429)
 
     def test_product_filters(self):
         self.assertEqual(len(self.client.get("/api/products/?q=case").data), 1)

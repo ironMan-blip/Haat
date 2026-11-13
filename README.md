@@ -6,9 +6,10 @@ A simple general store for Bangladesh. React (Vite) frontend, Django + DRF backe
 ## Run it
 
 ```bash
-# backend (Python 3.9+)
+# backend (Python 3.10+)
 cd backend
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+export DJANGO_DEBUG=1                        # dev only; without it Django demands a real secret key
 .venv/bin/python manage.py migrate
 .venv/bin/python manage.py seed              # 47 sample products from Daraz listings
 .venv/bin/python manage.py createsuperuser   # for /admin
@@ -24,7 +25,7 @@ Vite proxies `/api` to Django, so no CORS setup is needed in dev.
 
 Demo buyer account on the dev database: `demo_buyer` / `haat-demo-2026`.
 
-Tests: `cd backend && .venv/bin/python manage.py test shop`
+Tests: `cd backend && DJANGO_DEBUG=1 .venv/bin/python manage.py test shop`
 
 ## Architecture
 
@@ -34,7 +35,7 @@ frontend/  React 19 + react-router 7, no state library
   src/store.jsx      cart (localStorage), auth token, store config
   src/components.jsx header, footer, product tile, delivery meter, qty stepper
   src/pages/         Home, Shop (category/search/sort), Product, Cart, Checkout, Login, Orders
-backend/   Django 4.2 + DRF, one app: shop
+backend/   Django 5.2 LTS + DRF, one app: shop
   shop/models.py      Category, Product, Order, OrderItem
   shop/serializers.py order creation: DB prices, stock lock, delivery fee
   shop/views.py       REST endpoints
@@ -50,13 +51,32 @@ backend/   Django 4.2 + DRF, one app: shop
 | `/api/products/<slug>/` | GET | - | |
 | `/api/auth/register/` | POST | - | returns token |
 | `/api/auth/login/` | POST | - | returns token |
+| `/api/auth/logout/` | POST | Token | revokes the token |
+| `/api/auth/me/` | GET | Token | |
 | `/api/orders/` | GET, POST | Token | own orders only |
 
 Order rules (server side, tested): price comes from the database, never the client; stock is locked
 and decremented in one transaction; delivery is free at ৳299 and above, otherwise ৳60; payment is
-cash on delivery; phone must be a Bangladeshi mobile number.
+cash on delivery; phone must be a Bangladeshi mobile number; city must be a listed city; a buyer can
+have at most 5 pending orders. Login and register are throttled to 5 per minute per IP.
 
-Sellers manage products and order status in Django admin (`/admin`).
+Sellers manage products and order status in Django admin (`/admin`, or `DJANGO_ADMIN_PATH`).
+
+## Production settings
+
+Leave `DJANGO_DEBUG` unset. Then you must set `DJANGO_SECRET_KEY` (Django refuses to start without it),
+and HTTPS redirect, HSTS and secure cookies turn on.
+
+| Env var | Purpose |
+| --- | --- |
+| `DJANGO_SECRET_KEY` | long random value, e.g. `python -c "import secrets; print(secrets.token_urlsafe(50))"` |
+| `DJANGO_ALLOWED_HOSTS` | comma-separated hostnames |
+| `DJANGO_ADMIN_PATH` | non-default admin path, e.g. `seller-x7k2/` |
+| `DJANGO_NUM_PROXIES` | number of reverse proxies in front of Django (throttling uses the real client IP) |
+
+Also: serve the frontend and `/api` from one origin, send a Content-Security-Policy header from the web
+server, restrict the admin path by IP at the proxy, and use a shared cache (Redis) if you run more than
+one worker, so throttle counts are shared.
 
 ## Research that shaped it
 

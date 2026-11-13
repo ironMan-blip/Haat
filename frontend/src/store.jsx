@@ -41,7 +41,11 @@ export function StoreProvider({ children }) {
     remove: (id) => setCart((c) => c.filter((l) => l.id !== id)),
     clear: () => setCart([]),
     login: setAuth,
-    logout: () => setAuth(null),
+    logout: () => {
+      // Revoke the token server side too; a failed call (already stale) still signs out locally.
+      if (auth) api('/auth/logout/', { method: 'POST', token: auth.token }).catch(() => {})
+      setAuth(null)
+    },
   }
   return <Store.Provider value={value}>{children}</Store.Provider>
 }
