@@ -16,7 +16,9 @@ A simple general store for Bangladesh. React (Vite) frontend, Django + DRF backe
 - Order history (own orders only)
 
 **Sellers**
-- Django admin for products and order status
+- Admin dashboard: pending orders, sales today / last 30 days, recent orders, low stock
+- Manage products (inline price/stock edits, stock filter, image preview), categories, orders
+  (search by id/name/phone, bulk mark shipped/delivered/cancelled), users with their orders, API tokens, 2FA devices
 - Admin 2FA (authenticator app) with lockout after 5 failures
 - Cancelling an order restores stock
 

@@ -380,3 +380,48 @@ class AdminSecurityTests(TestCase):
             call_command("admin_totp", "boss", stdout=io.StringIO())
         call_command("admin_totp", "boss", "--reset", stdout=io.StringIO())
         self.assertNotEqual(TOTPDevice.objects.get(user=self.admin).key, self.device.key)
+
+
+class AdminPanelTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_superuser("boss", password="pass-1234-word")
+        cache.clear()
+        call_command("admin_totp", "boss", stdout=io.StringIO())
+        d = TOTPDevice.objects.get(user=self.admin)
+        code = format(TOTP(d.bin_key, d.step, d.t0, d.digits).token(), f"0{d.digits}d")
+        self.client.post("/admin/login/", {"username": "boss", "password": "pass-1234-word", "otp_token": code,
+                                           "otp_device": d.persistent_id})
+        self.get, self.post = self.client.get, self.client.post
+        cat = Category.objects.create(name="Mobiles", slug="mobiles")
+        self.phone = Product.objects.create(category=cat, name="Phone", slug="phone", price=100,
+                                            image="https://x.y/a.jpg", stock=2)
+        self.order = Order.objects.create(user=self.admin, subtotal=200, delivery_fee=60, total=260, **ADDR)
+        self.order.items.create(product=self.phone, name="Phone", price=100, quantity=2)
+
+    def test_dashboard_shows_sales_and_low_stock(self):
+        r = self.get("/admin/")
+        self.assertContains(r, "Pending orders")
+        self.assertContains(r, "৳260")
+        self.assertContains(r, "2 left")
+
+    def test_every_admin_list_loads(self):
+        for model in ["shop/product", "shop/category", "shop/order", "auth/user", f"auth/user/{self.admin.pk}/change"]:
+            self.assertEqual(self.get(f"/admin/{model}/").status_code, 200, model)
+
+    def test_bulk_cancel_restocks_once_and_never_reopens(self):
+        act = lambda a: self.post("/admin/shop/order/", {"action": a, "_selected_action": [self.order.pk]})
+        act("mark_cancelled")
+        self.phone.refresh_from_db()
+        self.assertEqual(self.phone.stock, 4)
+        act("mark_cancelled")
+        act("mark_shipped")
+        self.order.refresh_from_db()
+        self.phone.refresh_from_db()
+        self.assertEqual((self.order.status, self.phone.stock), ("cancelled", 4))
+
+    def test_order_money_is_read_only(self):
+        self.post(f"/admin/shop/order/{self.order.pk}/change/",
+                  {**ADDR, "status": "shipped", "total": 1, "items-TOTAL_FORMS": 1, "items-INITIAL_FORMS": 1,
+                   "items-0-id": self.order.items.get().pk, "items-0-order": self.order.pk})
+        self.order.refresh_from_db()
+        self.assertEqual((self.order.status, self.order.total), ("shipped", 260))
