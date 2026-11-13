@@ -1,21 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { Link, NavLink, useNavigate, useSearchParams } from 'react-router-dom'
-import { api, discount, img, taka } from './api'
+import { img, taka } from './api'
 import { useStore } from './store'
-
-export function useFetch(path) {
-  const [state, setState] = useState({ data: null, error: null, loading: true })
-  useEffect(() => {
-    if (!path) return
-    let live = true
-    setState((s) => ({ ...s, loading: true }))
-    api(path)
-      .then((data) => live && setState({ data, error: null, loading: false }))
-      .catch((error) => live && setState({ data: null, error, loading: false }))
-    return () => { live = false }
-  }, [path])
-  return state
-}
 
 // Adds .in when the element scrolls into view; CSS staggers its children. Content stays visible without JS.
 // eslint-disable-next-line no-unused-vars -- Tag is used as JSX
@@ -32,6 +18,15 @@ export function Reveal({ as: Tag = 'div', className = '', children, ...rest }) {
     return () => io.disconnect()
   }, [])
   return <Tag ref={ref} className={className} {...rest}>{children}</Tag>
+}
+
+// Inline icons, 1.75 stroke, currentColor.
+const svg = (d) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{d}</svg>
+)
+const Icon = {
+  cart: svg(<><path d="M3 4h2l2.4 11.2a1 1 0 0 0 1 .8h8.9a1 1 0 0 0 1-.8L20 8H6" /><circle cx="9" cy="20" r="1.3" /><circle cx="17" cy="20" r="1.3" /></>),
+  user: svg(<><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></>),
 }
 
 export function Header() {
@@ -51,35 +46,49 @@ export function Header() {
         <input id="q" name="q" type="search" placeholder="Search phones, rice, bedsheets…" defaultValue={params.get('q') || ''} key={params.get('q')} />
         <button className="btn">Search</button>
       </form>
-      <nav className="bar-links">
+      <nav className="bar-links" aria-label="Main">
         <NavLink to="/shop">Shop</NavLink>
         {auth ? (
           <>
             <NavLink to="/orders">Orders</NavLink>
-            <button className="link" onClick={logout}>Log out {auth.username}</button>
+            <span className="hello">Hi, {auth.username}</span>
+            <button className="link" onClick={logout}>Log out</button>
           </>
         ) : (
-          <NavLink to="/login">Log in</NavLink>
+          <NavLink to="/login" aria-label="Log in">{Icon.user}<span className="label-wide">Log in</span></NavLink>
         )}
-        <NavLink to="/cart" className="cart-link">Cart <span className="cart-count">{count}</span></NavLink>
+        <NavLink to="/cart" aria-label={`Cart, ${count} items`}>
+          {Icon.cart}<span className="label-wide">Cart</span>
+          <span className="cart-count" data-n={count}>{count}</span>
+        </NavLink>
       </nav>
     </header>
   )
 }
 
 export function Tile({ p, big }) {
-  const d = discount(p)
+  const d = p.discount
   return (
     <Link to={`/p/${p.slug}`} className={big ? 'tile tile--big' : 'tile'}>
       <span className="tile-pic">
         <img src={img(p.image, big ? 600 : 400)} alt="" loading="lazy" width="400" height="400" />
+        {d > 0 && <span className="badge">−{d}%</span>}
       </span>
       <span className="tile-name">{p.name}</span>
+      {p.reviews > 0 && <Rating p={p} />}
       <span className="tile-price">
         {taka(p.price)}
-        {d > 0 && <> <s>{taka(p.original_price)}</s> <span className="off">{d}% off</span></>}
+        {d > 0 && <> <s>{taka(p.original_price)}</s></>}
       </span>
     </Link>
+  )
+}
+
+export function Rating({ p }) {
+  return (
+    <span className="rating" aria-label={`Rated ${p.rating} out of 5 by ${p.reviews.toLocaleString()} buyers`}>
+      <b>{p.rating}</b> ({p.reviews.toLocaleString()})
+    </span>
   )
 }
 
@@ -93,15 +102,31 @@ export function TileGrid({ products }) {
 
 // The live thing: how far the cart is from free delivery.
 export function DeliveryMeter() {
-  const { subtotal, config } = useStore()
-  if (!subtotal) return null
-  const left = config.free_delivery_min - subtotal
-  const pct = Math.min(100, (subtotal / config.free_delivery_min) * 100)
+  const { cart } = useStore()
+  if (!cart?.subtotal) return null
+  const left = cart.free_delivery_left
   return (
     <div className="meter" role="status">
       <p>{left > 0 ? <>Add <strong>{taka(left)}</strong> more for free delivery.</> : <>Delivery is free on this order.</>}</p>
-      <span className="meter-track"><span className="meter-fill" style={{ width: `${pct}%` }} /></span>
+      <span className="meter-track"><span className="meter-fill" style={{ width: `${cart.free_delivery_progress}%` }} /></span>
     </div>
+  )
+}
+
+// Cart totals beside the cart and checkout pages; children hold the page's action.
+export function Summary({ children }) {
+  const { cart } = useStore()
+  return (
+    <aside className="summary" aria-label="Order summary">
+      <h2>Order summary</h2>
+      <DeliveryMeter />
+      <dl>
+        <dt>Subtotal</dt><dd>{taka(cart.subtotal)}</dd>
+        <dt>Delivery</dt><dd>{cart.delivery_fee ? taka(cart.delivery_fee) : 'Free'}</dd>
+        <dt className="total">Total</dt><dd className="total">{taka(cart.total)}</dd>
+      </dl>
+      {children}
+    </aside>
   )
 }
 
@@ -115,7 +140,9 @@ export function Qty({ value, max, onChange, label }) {
   )
 }
 
-export function Footer({ stamp }) {
+export function Footer() {
+  const { config } = useStore()
+  const stamp = config?.stamp
   return (
     <footer className="foot">
       <div className="card">
@@ -124,14 +151,15 @@ export function Footer({ stamp }) {
         </svg>
         <div className="card-left">
           <p className="card-sign">See you at the haat.</p>
-          <p>Order today, pay the rider in cash when the parcel reaches your door. Spend ৳299 or more and delivery is on us.</p>
+          <p>Order today, pay the rider in cash when the parcel reaches your door. {config && `Spend ${taka(config.free_delivery_min)} or more and delivery is on us.`}</p>
         </div>
         <div className="card-right">
           {stamp && <img className="stamp" src={img(stamp, 200)} alt="" width="88" height="117" loading="lazy" />}
           <ul className="card-links">
             <li><Link to="/shop">Every product</Link></li>
             <li><Link to="/cart">Your cart</Link></li>
-            <li><Link to="/orders">Your orders</Link></li>          </ul>
+            <li><Link to="/orders">Your orders</Link></li>
+          </ul>
         </div>
         <p className="imprint">Haat MVP. Product photos and listings from daraz.com.bd, for demo only.</p>
       </div>
@@ -139,8 +167,50 @@ export function Footer({ stamp }) {
   )
 }
 
+export function Skeleton({ n = 8 }) {
+  return (
+    <div className="tiles" aria-busy="true" aria-label="Loading">
+      {Array.from({ length: n }, (_, i) => (
+        <div className="skel-tile" key={i}>
+          <span className="skel skel-pic" />
+          <span className="skel skel-line" />
+          <span className="skel skel-line short" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export function EmptyState({ icon, title, children, action }) {
+  return (
+    <div className="state">
+      <span className="state-icon" aria-hidden="true">{icon}</span>
+      <h1>{title}</h1>
+      {children && <p>{children}</p>}
+      {action}
+    </div>
+  )
+}
+
 export function Status({ loading, error, children }) {
-  if (loading) return <p className="note">Loading…</p>
-  if (error) return <p className="note error">Could not load: {error.message}. Is the Django server running?</p>
+  if (loading) return <div className="page"><Skeleton /></div>
+  if (error)
+    return (
+      <EmptyState icon="!" title="We couldn't load this page"
+        action={<button className="btn" onClick={() => location.reload()}>Try again</button>}>
+        Check your connection and try again. ({error.message})
+      </EmptyState>
+    )
   return children
+}
+
+export function Toast() {
+  const { notice } = useStore()
+  if (!notice) return null
+  return (
+    <div className="toast" role="status" key={notice.at}>
+      <p>{notice.text}</p>
+      {notice.link && <Link to="/cart">View cart</Link>}
+    </div>
+  )
 }

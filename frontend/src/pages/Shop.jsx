@@ -1,10 +1,11 @@
 import { Link, useSearchParams } from 'react-router-dom'
-import { Status, TileGrid, useFetch } from '../components'
-
-const SORTS = { '': 'Newest', price: 'Price, low to high', '-price': 'Price, high to low', '-rating': 'Best rated' }
+import { useFetch } from '../api'
+import { EmptyState, Status, TileGrid } from '../components'
+import { useStore } from '../store'
 
 export default function Shop() {
   const [params, setParams] = useSearchParams()
+  const { config } = useStore()
   const category = params.get('category') || ''
   const q = params.get('q') || ''
   const sort = params.get('sort') || ''
@@ -24,7 +25,7 @@ export default function Shop() {
     <section className="page shop">
       <div className="sec-head">
         <h1>{title}</h1>
-        {products.data && <span>{products.data.length} items</span>}
+        {products.data && <span className="soft">{products.data.length} {products.data.length === 1 ? 'item' : 'items'}</span>}
       </div>
       <div className="filters">
         <nav aria-label="Categories" className="cat-links">
@@ -36,12 +37,16 @@ export default function Shop() {
         <label className="sort">
           Sort
           <select value={sort} onChange={(e) => set('sort', e.target.value)}>
-            {Object.entries(SORTS).map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+            {(config?.sorts || []).map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
         </label>
       </div>
       <Status loading={products.loading} error={products.error}>
-        {products.data?.length ? <TileGrid products={products.data} key={qs} /> : <p className="note">Nothing matches. Try a shorter word.</p>}
+        {products.data?.length ? <TileGrid products={products.data} key={qs} /> : (
+          <EmptyState icon="⌕" title="No products found" action={<Link to="/shop" className="btn btn--paper">Clear filters</Link>}>
+            {q ? `Nothing matches “${q}”. Try a shorter or different word.` : 'This category has nothing in stock right now.'}
+          </EmptyState>
+        )}
       </Status>
     </section>
   )
