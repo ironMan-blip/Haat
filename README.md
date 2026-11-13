@@ -29,6 +29,36 @@ Tests: `cd backend && DJANGO_DEBUG=1 .venv/bin/python manage.py test shop`
 
 ## Architecture
 
+```mermaid
+flowchart LR
+  subgraph FE["Frontend · React 19 + Vite :5174"]
+    Pages["Pages: Home · Shop · Product<br/>Cart · Checkout · Login · Orders"]
+    Store["store.jsx<br/>cart in localStorage · auth token · config"]
+    Pages --- Store
+  end
+
+  FE -- "/api (Vite proxy)" --> API
+
+  subgraph BE["Backend · Django 5.2 + DRF :8000"]
+    API["shop app REST API<br/>config · categories · products<br/>auth register/login/logout/me · orders"]
+    Rules["Order rules<br/>DB prices · stock lock · free delivery ≥ ৳299 else ৳60<br/>COD only · BD phone · listed city · max 5 pending<br/>auth throttle 5/min"]
+    Admin["Django admin<br/>products · order status"]
+    API --> Rules
+  end
+
+  subgraph DB["SQLite"]
+    Models["Category → Product → OrderItem ← Order ← User"]
+  end
+
+  Buyer([Buyer]) --> FE
+  Seller([Seller]) --> Admin
+  Rules --> DB
+  Admin --> DB
+  Daraz[(Daraz search)] -- "scripts/fetch_daraz.py" --> Fixture["fixtures/daraz_products.json"]
+  Fixture -- "manage.py seed" --> DB
+  Daraz -. "product images hotlinked" .-> FE
+```
+
 ```
 frontend/  React 19 + react-router 7, no state library
   src/api.js         fetch wrapper, taka formatting, Daraz image resize
