@@ -1,5 +1,4 @@
 import logging
-import re
 from datetime import timedelta
 
 from django import forms
@@ -16,6 +15,7 @@ from django.utils.html import format_html
 from django_otp.admin import OTPAdminSite
 
 from .auth import client_ident, locked_out, login_fail_keys, record_login_failure
+from .display import cdn, taka
 from .models import LOW_STOCK, Category, Order, OrderItem, Product
 
 log = logging.getLogger("shop.security")
@@ -71,18 +71,6 @@ class HaatAdminSite(OTPAdminSite):
                 "low_stock_limit": LOW_STOCK,
             }
         return super().index(request, extra_context)
-
-
-DARAZ = re.compile(r"^https://[^/]+\.(slatic\.net|daraz\.com\.bd)/")
-
-
-def cdn(url, size):
-    """Daraz CDN serves resized copies via a filename suffix (same rule as frontend/src/api.js img())."""
-    return f"{url}_{size}x{size}q75.jpg" if DARAZ.match(url or "") else url
-
-
-def taka(n):
-    return f"৳{n or 0:,}"
 
 
 def badge(label, tone):

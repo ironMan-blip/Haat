@@ -15,6 +15,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIClient, APITestCase
 
+from .display import cdn, day, num, taka
 from .models import Category, Order, Product
 from .serializers import RegisterSerializer
 from .views import SignupThrottle
@@ -297,7 +298,24 @@ class ShopApiTests(APITestCase):
         h = self.client.get("/api/home/").data
         self.assertEqual(h["deals"][0]["slug"], "rice")  # the sold-out 99% deal is skipped
         self.assertEqual([p["slug"] for p in h["best"]], ["rice", "case"])  # one per category
-        self.assertEqual({m["slug"]: m["count"] for m in h["menu"]}, {"mobiles": 2, "rice": 2})
+        self.assertEqual({m["slug"]: m["count_label"] for m in h["menu"]}, {"mobiles": "2 items", "rice": "2 items"})
+
+    def test_server_writes_every_display_string(self):
+        self.assertEqual((num(999), num(1234), num(1234567), taka(0), taka(None)), ("999", "1,234", "12,34,567", "৳0", "৳0"))
+        self.assertEqual(cdn("https://x.slatic.net/a.jpg", 200), "https://x.slatic.net/a.jpg_200x200q75.jpg")
+        self.assertEqual(cdn("https://x.y/a.jpg", 200), "https://x.y/a.jpg")
+        Product.objects.filter(pk=self.phone.pk).update(original_price=20000, reviews=12345, rating=4.5)
+        p = self.client.get("/api/products/phone/").data
+        self.assertEqual((p["price_display"], p["original_price_display"], p["badge"]), ("৳15,000", "৳20,000", "−25%"))
+        self.assertEqual((p["reviews_display"], p["rating_label"]), ("12,345", "Rated 4.5 out of 5 by 12,345 buyers"))
+        self.assertIsNone(self.client.get("/api/products/case/").data["rating_label"])  # no reviews, no rating line
+        c = self.add(self.case, 2).data
+        self.assertEqual((c["total_display"], c["delivery_display"], c["meter"]),
+                         ("৳260", "৳60", "Add ৳99 more for free delivery."))
+        o = self.checkout().data
+        self.assertEqual(o["total_line"], "Total ৳260 (incl. ৳60 delivery)")
+        self.assertEqual(o["created_display"], day(Order.objects.get(pk=o["id"]).created))
+        self.assertEqual(self.client.get("/api/home/").data["wall"][0][0].keys(), {"tag", "field"})
 
     def test_config_lists_cities_and_sorts(self):
         c = self.client.get("/api/config/").data

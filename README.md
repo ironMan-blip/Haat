@@ -89,12 +89,13 @@ flowchart LR
 
 ```
 frontend/  React 19 + react-router 7, no state library
-  src/api.js         fetch wrapper, useFetch hook, taka formatting, Daraz image resize
+  src/api.js         fetch wrapper, useFetch hook
   src/store.jsx      auth token; holds the server's cart and config responses
   src/components.jsx header, footer, product tile, delivery meter, order summary, qty stepper
   src/pages/         Home, Shop (category/search/sort), Product, Cart, Checkout, Login, Orders
 backend/   Django 5.2 LTS + DRF, one app: shop
   shop/models.py      Category, Product (discount, stock level, specs, rank), Order, OrderItem
+  shop/display.py     taka, Indian digit grouping, dates, image sizes: the API sends every string ready to print
   shop/cart.py        session cart: quantities, totals, delivery fee, free-delivery meter
   shop/serializers.py order creation from the cart: DB prices, stock lock
   shop/views.py       REST endpoints
@@ -115,7 +116,8 @@ backend/   Django 5.2 LTS + DRF, one app: shop
 | `/api/auth/logout/` | POST | Token | revokes the token |
 | `/api/orders/` | GET, POST | Token | own orders only; POST takes the address and orders the session cart |
 
-Every error response carries `message`: the one line the app shows.
+Every error response carries `message`: the one line the app shows. The frontend only renders: prices (`*_display`),
+badges, rating labels, image sizes (`thumb`/`image`/`image_large`), dates, totals lines and copy all come from the API.
 
 Order rules (server side, tested): price comes from the database, never the client; stock is locked
 and decremented in one transaction; delivery is free at ৳299 and above, otherwise ৳60; payment is

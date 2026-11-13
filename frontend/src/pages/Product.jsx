@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { img, taka, useFetch } from '../api'
+import { useFetch } from '../api'
 import { Qty, Rating, Status, TileGrid } from '../components'
 import { useStore } from '../store'
 
@@ -27,15 +27,15 @@ function ProductPage({ slug }) {
               <Link to={`/shop?category=${p.category.slug}`}>{p.category.name}</Link>
             </nav>
             <div className="pdp-pic">
-              <img src={img(p.image, 800)} alt={p.name} width="800" height="800" />
+              <img src={p.image_large} alt={p.name} width="800" height="800" />
             </div>
             <div className="pdp-info">
               <Link to={`/shop?category=${p.category.slug}`} className="pdp-cat">{p.category.name}</Link>
               <h1>{p.name}</h1>
-              {p.reviews > 0 && <Rating p={p} />}
+              <Rating p={p} />
               <p className="pdp-price">
-                {taka(p.price)}
-                {p.discount > 0 && <> <s>{taka(p.original_price)}</s> <span className="off">{p.discount}% off</span></>}
+                {p.price_display}
+                {p.original_price_display && <> <s>{p.original_price_display}</s> <span className="off">{p.discount}% off</span></>}
               </p>
               {p.stock_level !== 'out' ? (
                 <>
@@ -46,8 +46,7 @@ function ProductPage({ slug }) {
                     <button className="btn btn--line" onClick={() => add(p, qty).then((ok) => ok && navigate('/cart'))}>Buy now</button>
                   </div>
                   <ul className="perks">
-                    <li>Cash on delivery, pay when it arrives</li>
-                    {config && <li>Free delivery on orders over {taka(config.free_delivery_min)}</li>}
+                    {config?.perks.map((t) => <li key={t}>{t}</li>)}
                   </ul>
                 </>
               ) : (

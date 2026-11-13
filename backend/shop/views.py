@@ -17,6 +17,7 @@ from rest_framework.views import exception_handler as drf_exception_handler
 from .auth import (AnonThrottle, CsrfProtected, ScopedThrottle, UserThrottle, issue_token, locked_out,
                    login_fail_keys, record_login_failure, safe_next)
 from .cart import Cart
+from .display import cdn, num, taka
 from .models import Category, Order, Product
 from .serializers import (CartLineSerializer, CategorySerializer, OrderSerializer, ProductDetailSerializer,
                           ProductSerializer, RegisterSerializer)
@@ -87,6 +88,22 @@ class ProductDetail(generics.RetrieveAPIView):
     lookup_field = "slug"
 
 
+def wall(products):
+    """Brickwork of goods and price tags, like a haat laid out on the ground: 8 rows of 16, every third
+    brick a price tag (colour field f1-f3 by column band), the rest photos."""
+    if not products:
+        return []
+    rows = []
+    for r in range(8):
+        row = []
+        for c in range(16):
+            p = products[(r * 11 + c * 5) % len(products)]
+            row.append({"tag": taka(p.price), "field": f"f{c // 3 % 3 + 1}"} if (r + c) % 3 == 0
+                       else {"image": cdn(p.image, 200)})
+        rows.append(row)
+    return rows
+
+
 @api_view(["GET"])
 def home(request):
     # shortcut: ranks every product in Python, fine for a few hundred; move to DB annotations beyond that.
@@ -103,11 +120,18 @@ def home(request):
         by_cat[p.category_id].append(p)
     ser = lambda items: ProductSerializer(items, many=True).data
     return Response({
-        "wall": [{"image": p.image, "price": p.price} for p in products[:48]],
+        "wall": wall(products[:48]),
         "deals": ser(sorted((p for p in products if p.stock), key=lambda p: p.discount, reverse=True)[:14]),
-        "best": ser(best),
-        "menu": [{"name": c.name, "slug": c.slug, "count": len(by_cat[c.pk]), "items": ser(by_cat[c.pk][:6])}
+        "best": [{**d, "panel_name": f"{p.name[:54].rstrip()}…" if len(p.name) > 56 else p.name,
+                  "panel_fact": f"{taka(p.price)} · rated {p.rating} by {num(p.reviews)} buyers"}
+                 for p, d in zip(best, ser(best))],
+        "menu": [{"name": c.name, "slug": c.slug, "count_label": f"{len(by_cat[c.pk])} items",
+                  "items": [{**d, "note": f"{p.discount}% below the usual {taka(p.original_price)}" if p.discount else None}
+                            for p, d in zip(by_cat[c.pk][:6], ser(by_cat[c.pk][:6]))]}
                  for c in Category.objects.all()],
+        "hero": {"head": "Phones to rice, one haat.", "line": "Pay the rider in cash when it reaches your door."},
+        "promise": f"Spend {taka(settings.FREE_DELIVERY_MIN)} and delivery is free. Under that it costs "
+                   f"{taka(settings.DELIVERY_FEE)}. You pay the rider in cash at the door.",
     })
 
 
@@ -205,11 +229,16 @@ def logout(request):
 
 @api_view(["GET"])
 def store_config(request):
+    stamp = Product.objects.order_by("-rating", "id").values_list("image", flat=True).first()  # footer photo
+    free = taka(settings.FREE_DELIVERY_MIN)
     return Response({
         "free_delivery_min": settings.FREE_DELIVERY_MIN,
         "delivery_fee": settings.DELIVERY_FEE,
         "cities": [c for c, _ in Order.CITIES],
         "sorts": [{"value": k, "label": v} for k, v in SORTS.items()],
         "password_rules": password_validators_help_texts(),  # the sign-up form's hint
-        "stamp": Product.objects.order_by("-rating", "id").values_list("image", flat=True).first(),  # footer photo
+        "stamp": cdn(stamp, 200) if stamp else None,
+        "footer_line": f"Order today, pay the rider in cash when the parcel reaches your door. "
+                       f"Spend {free} or more and delivery is on us.",
+        "perks": ["Cash on delivery, pay when it arrives", f"Free delivery on orders over {free}"],
     })

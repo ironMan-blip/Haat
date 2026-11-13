@@ -30,9 +30,3 @@ export function useFetch(path, token) {
   }, [path, token])
   return state
 }
-
-export const taka = (n) => `৳${Number(n).toLocaleString('en-IN')}`
-
-// Daraz CDN serves resized copies via a filename suffix; other hosts get the original.
-const DARAZ = /^https:\/\/[^/]+\.(slatic\.net|daraz\.com\.bd)\//
-export const img = (url, size = 400) => (DARAZ.test(url) ? `${url}_${size}x${size}q75.jpg` : url)

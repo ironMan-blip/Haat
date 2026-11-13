@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react'
 import { Link, NavLink, useNavigate, useSearchParams } from 'react-router-dom'
-import { img, taka } from './api'
 import { useStore } from './store'
 
 // Adds .in when the element scrolls into view; CSS staggers its children. Content stays visible without JS.
@@ -69,20 +68,19 @@ export function Header() {
 // The name link stretches over the whole tile (CSS ::after); the add button sits above it.
 function Tile({ p, big }) {
   const { add } = useStore()
-  const d = p.discount
-  const out = p.stock === 0
+  const out = p.stock_level === 'out'
   return (
     <article className={`tile${big ? ' tile--big' : ''}${out ? ' tile--out' : ''}`}>
       <span className="tile-pic">
-        <img src={img(p.image, big ? 600 : 400)} alt="" loading="lazy" width="400" height="400" />
-        {out ? <span className="badge badge--out">Sold out</span> : d > 0 && <span className="badge">−{d}%</span>}
+        <img src={p.image} alt="" loading="lazy" width="400" height="400" />
+        {p.badge && <span className={out ? 'badge badge--out' : 'badge'}>{p.badge}</span>}
       </span>
       <Link to={`/p/${p.slug}`} className="tile-name">{p.name}</Link>
-      {p.reviews > 0 && <Rating p={p} />}
+      <Rating p={p} />
       <span className="tile-foot">
         <span className="tile-price">
-          {taka(p.price)}
-          {d > 0 && <> <s>{taka(p.original_price)}</s></>}
+          {p.price_display}
+          {p.original_price_display && <> <s>{p.original_price_display}</s></>}
         </span>
         {!out && (
           <button type="button" className="tile-add" onClick={() => add(p)} aria-label={`Add ${p.name} to cart`}>
@@ -95,11 +93,8 @@ function Tile({ p, big }) {
 }
 
 export function Rating({ p }) {
-  return (
-    <span className="rating" aria-label={`Rated ${p.rating} out of 5 by ${p.reviews.toLocaleString()} buyers`}>
-      <b>{p.rating}</b> ({p.reviews.toLocaleString()})
-    </span>
-  )
+  if (!p.rating_label) return null
+  return <span className="rating" aria-label={p.rating_label}><b>{p.rating}</b> ({p.reviews_display})</span>
 }
 
 // `feature` enlarges every 7th tile: for short curated rows, not for long lists people scan.
@@ -115,10 +110,9 @@ export function TileGrid({ products, feature }) {
 function DeliveryMeter() {
   const { cart } = useStore()
   if (!cart?.subtotal) return null
-  const left = cart.free_delivery_left
   return (
     <div className="meter" role="status">
-      <p>{left > 0 ? <>Add <strong>{taka(left)}</strong> more for free delivery.</> : <>Delivery is free on this order.</>}</p>
+      <p>{cart.meter}</p>
       <span className="meter-track"><span className="meter-fill" style={{ width: `${cart.free_delivery_progress}%` }} /></span>
     </div>
   )
@@ -132,9 +126,9 @@ export function Summary({ children }) {
       <h2>Order summary</h2>
       <DeliveryMeter />
       <dl>
-        <dt>Subtotal</dt><dd>{taka(cart.subtotal)}</dd>
-        <dt>Delivery</dt><dd>{cart.delivery_fee ? taka(cart.delivery_fee) : 'Free'}</dd>
-        <dt className="total">Total</dt><dd className="total">{taka(cart.total)}</dd>
+        <dt>Subtotal</dt><dd>{cart.subtotal_display}</dd>
+        <dt>Delivery</dt><dd>{cart.delivery_display}</dd>
+        <dt className="total">Total</dt><dd className="total">{cart.total_display}</dd>
       </dl>
       {children}
     </aside>
@@ -153,7 +147,6 @@ export function Qty({ value, max, onChange, label }) {
 
 export function Footer() {
   const { config } = useStore()
-  const stamp = config?.stamp
   return (
     <footer className="foot">
       <div className="card">
@@ -162,10 +155,10 @@ export function Footer() {
         </svg>
         <div className="card-left">
           <p className="card-sign">See you at the haat.</p>
-          <p>Order today, pay the rider in cash when the parcel reaches your door. {config && `Spend ${taka(config.free_delivery_min)} or more and delivery is on us.`}</p>
+          <p>{config?.footer_line}</p>
         </div>
         <div className="card-right">
-          {stamp && <img className="stamp" src={img(stamp, 200)} alt="" width="88" height="117" loading="lazy" />}
+          {config?.stamp && <img className="stamp" src={config.stamp} alt="" width="88" height="117" loading="lazy" />}
           <ul className="card-links">
             <li><Link to="/shop">Every product</Link></li>
             <li><Link to="/cart">Your cart</Link></li>
