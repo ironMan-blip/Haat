@@ -1,4 +1,5 @@
 """API token lifetime, and CSRF for the views that act on the session cookie."""
+from collections.abc import Mapping
 from datetime import timedelta
 
 from django.conf import settings
@@ -6,6 +7,7 @@ from django.contrib.auth.models import User
 from django.db.models.signals import pre_save
 from django.dispatch import receiver
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from rest_framework import exceptions, permissions
 from rest_framework.authentication import CSRFCheck, TokenAuthentication
 from rest_framework.authtoken.models import Token
@@ -33,6 +35,13 @@ def issue_token(user):
         token.delete()
         token = Token.objects.create(user=user)
     return token
+
+
+def safe_next(request):
+    """Where the app goes after sign-in: a same-site path only ("//host" and "/\\host" are other sites)."""
+    nxt = request.data.get("next") if isinstance(request.data, Mapping) else None
+    ok = isinstance(nxt, str) and nxt.startswith("/") and url_has_allowed_host_and_scheme(nxt, allowed_hosts=None)
+    return nxt if ok else "/"
 
 
 @receiver(pre_save, sender=User)

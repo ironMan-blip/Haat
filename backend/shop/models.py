@@ -58,6 +58,10 @@ class Product(models.Model):
         return "out" if not self.stock else "low" if self.stock < LOW_STOCK else "in"
 
     @property
+    def stock_label(self):
+        return {"out": "Sold out", "low": f"Only {self.stock} left", "in": "In stock"}[self.stock_level]
+
+    @property
     def specs(self):
         return [line.strip() for line in self.description.splitlines() if line.strip()]
 

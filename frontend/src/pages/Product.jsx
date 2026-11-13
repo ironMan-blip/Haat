@@ -39,7 +39,7 @@ function ProductPage({ slug }) {
               </p>
               {p.stock_level !== 'out' ? (
                 <>
-                  <p className={p.stock_level === 'low' ? 'stock stock--low' : 'stock'}>{p.stock_level === 'low' ? `Only ${p.stock} left` : 'In stock'}</p>
+                  <p className={p.stock_level === 'low' ? 'stock stock--low' : 'stock'}>{p.stock_label}</p>
                   <div className="pdp-buy">
                     <Qty value={qty} max={p.max_qty} onChange={setQty} label="Quantity" />
                     <button className="btn" onClick={() => add(p, qty)}>Add to cart</button>
@@ -51,7 +51,7 @@ function ProductPage({ slug }) {
                   </ul>
                 </>
               ) : (
-                <p className="stock stock--out">Sold out</p>
+                <p className="stock stock--out">{p.stock_label}</p>
               )}
               {p.specs.length > 0 && (
                 <ul className="pdp-spec">

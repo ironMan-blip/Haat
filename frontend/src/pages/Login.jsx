@@ -8,12 +8,9 @@ export default function Login() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [show, setShow] = useState(false)
-  const { login } = useStore()
+  const { login, config } = useStore()
   const navigate = useNavigate()
   const [params] = useSearchParams()
-  const raw = params.get('next') || ''
-  // Same-site paths only: "//host" and "/\host" are read by browsers as another site.
-  const next = /^\/(?![/\\])/.test(raw) ? raw : '/'
 
   const submit = async (e) => {
     e.preventDefault()
@@ -23,7 +20,7 @@ export default function Login() {
     try {
       const res = await api(mode === 'login' ? '/auth/login/' : '/auth/register/', { method: 'POST', body })
       login({ token: res.token, username: res.username })
-      navigate(next, { replace: true })
+      navigate(res.next, { replace: true }) // the server checked it is a same-site path
     } catch (err) {
       setError(err.message)
       setBusy(false)
@@ -37,15 +34,16 @@ export default function Login() {
           <h1>{mode === 'login' ? 'Welcome back' : 'Create an account'}</h1>
           <p className="soft">{mode === 'login' ? 'Log in to check out and track your orders.' : 'It takes less than a minute.'}</p>
         </div>
+        <input type="hidden" name="next" value={params.get('next') || ''} />
         <label>Username<input name="username" required autoComplete="username" /></label>
         {mode === 'register' && <label>Email <span className="hint">(optional)</span><input name="email" type="email" autoComplete="email" /></label>}
         <label>Password
           <span className="pw">
-            <input name="password" type={show ? 'text' : 'password'} required minLength={8}
+            <input name="password" type={show ? 'text' : 'password'} required
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'} />
             <button type="button" className="link" onClick={() => setShow(!show)} aria-pressed={show}>{show ? 'Hide' : 'Show'}</button>
           </span>
-          {mode === 'register' && <span className="hint">At least 8 characters.</span>}
+          {mode === 'register' && config && <span className="hint">{config.password_rules.join(' ')}</span>}
         </label>
         {error && <p className="alert" role="alert">{error}</p>}
         <button className="btn btn--wide" disabled={busy}>{busy ? 'Please wait…' : mode === 'login' ? 'Log in' : 'Create account'}</button>

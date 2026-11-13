@@ -30,7 +30,7 @@ class ProductDetailSerializer(ProductSerializer):
     related = serializers.SerializerMethodField()
 
     class Meta(ProductSerializer.Meta):
-        fields = ProductSerializer.Meta.fields + ["specs", "stock_level", "max_qty", "related"]
+        fields = ProductSerializer.Meta.fields + ["specs", "stock_level", "stock_label", "max_qty", "related"]
 
     def get_related(self, p):
         others = Product.objects.select_related("category").filter(category=p.category_id).exclude(pk=p.pk)[:7]

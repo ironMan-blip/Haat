@@ -203,14 +203,30 @@ class ShopApiTests(APITestCase):
         self.assertEqual(codes[-1], 429)
 
     def test_product_filters(self):
-        self.assertEqual(len(self.client.get("/api/products/?q=case").data), 1)
-        self.assertEqual(len(self.client.get("/api/products/?category=mobiles").data), 2)
-        self.assertEqual(self.client.get("/api/products/?sort=price").data[0]["slug"], "case")
+        r = self.client.get("/api/products/?q=case").data
+        self.assertEqual((len(r["results"]), r["title"], r["count_label"]), (1, "Results for “case”", "1 item"))
+        r = self.client.get("/api/products/?category=mobiles").data
+        self.assertEqual((len(r["results"]), r["title"]), (2, "Mobiles"))
+        self.assertEqual(self.client.get("/api/products/?sort=price").data["results"][0]["slug"], "case")
+        r = self.client.get("/api/products/?category=nope").data
+        self.assertEqual((r["results"], r["title"]), ([], "Category not found"))
+
+    def test_errors_carry_one_message(self):
+        r = self.client.post("/api/cart/", {"product": 999999, "quantity": 1})
+        self.assertIn("product", r.data)
+        self.assertIsInstance(r.data["message"], str)
+        r = self.client.post("/api/auth/login/", {"username": "rahim", "password": "wrong"})
+        self.assertEqual(r.data["message"], r.data["non_field_errors"][0])
+
+    def test_login_next_stays_on_site(self):
+        nexts = [self.client.post("/api/auth/login/", {"username": "rahim", "password": "pass-1234-word", "next": n}
+                                  ).data["next"] for n in ["/checkout", "//evil.com", "/\\evil.com", "https://evil.com", ""]]
+        self.assertEqual(nexts, ["/checkout", "/", "/", "/", "/"])
 
     def test_product_derived_fields(self):
         Product.objects.filter(pk=self.phone.pk).update(original_price=20000, description="6GB RAM\n\n128GB\n5000mAh")
         p = self.client.get("/api/products/phone/").data
-        self.assertEqual((p["discount"], p["stock_level"], p["max_qty"]), (25, "low", 3))
+        self.assertEqual((p["discount"], p["stock_level"], p["stock_label"], p["max_qty"]), (25, "low", "Only 3 left", 3))
         self.assertEqual(p["specs"], ["6GB RAM", "128GB", "5000mAh"])
         self.assertEqual(p["summary"], "6GB RAM · 128GB")
         self.assertEqual([r["slug"] for r in p["related"]], ["case"])

@@ -41,8 +41,7 @@ export default function Checkout() {
         <h1>Delivery details</h1>
         <label>Full name<input name="full_name" required maxLength={120} autoComplete="name" /></label>
         <label>Mobile number
-          <input name="phone" type="tel" required placeholder="01712345678" autoComplete="tel"
-            pattern="(\+?88)?[\s\-]*01[3-9]([\s\-]*\d){8}" title="A Bangladeshi mobile number, e.g. 01712345678" />
+          <input name="phone" type="tel" required placeholder="01712345678" autoComplete="tel" />
           <span className="hint">The rider will call this number before delivery.</span>
         </label>
         <label>City

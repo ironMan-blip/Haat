@@ -11,20 +11,9 @@ export async function api(path, { method = 'GET', body, token } = {}) {
   if (method !== 'GET' && csrfToken()) headers['X-CSRFToken'] = csrfToken()
   const res = await fetch(`/api${path}`, { method, headers, body: body && JSON.stringify(body) })
   const data = await res.json().catch(() => null)
-  if (!res.ok) throw Object.assign(new Error(firstError(data) || `Request failed (${res.status})`), { status: res.status })
+  // The server puts the line to show in `message` on every API error.
+  if (!res.ok) throw Object.assign(new Error(data?.message || `Request failed (${res.status})`), { status: res.status })
   return data
-}
-
-// DRF errors are nested {field: [msg]} or {lines: [{product: [msg]}]}: show the first message.
-function firstError(data) {
-  if (data == null) return null
-  if (typeof data === 'string') return data
-  const values = Array.isArray(data) ? data : Object.values(data)
-  for (const v of values) {
-    const msg = firstError(v)
-    if (msg) return msg
-  }
-  return null
 }
 
 // GET `path` (skipped while null) and track {data, error, loading}; stale responses are dropped.

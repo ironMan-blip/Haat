@@ -41,7 +41,7 @@ export function StoreProvider({ children }) {
     // Resolves true once the item is in the cart, false if the server refused it.
     add: (p, quantity = 1) =>
       api('/cart/', { method: 'POST', body: { product: p.id, quantity } })
-        .then((c) => { setCart(c); say(c.notice || `Added to cart: ${p.name}`, true); return true })
+        .then((c) => { setCart(c); say(c.notice, true); return true })
         .catch((err) => { say(err.message); return false }),
     setQty: (id, quantity) => call(`/cart/${id}/`, { method: 'PATCH', body: { quantity } }),
     remove: (id) => call(`/cart/${id}/`, { method: 'DELETE' }),

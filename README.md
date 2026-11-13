@@ -79,17 +79,18 @@ backend/   Django 5.2 LTS + DRF, one app: shop
 
 | Endpoint | Method | Auth | Notes |
 | --- | --- | --- | --- |
-| `/api/config/` | GET | - | free-delivery threshold, fee, cities, sort options, footer photo |
+| `/api/config/` | GET | - | free-delivery threshold, fee, cities, sort options, password rules, footer photo |
 | `/api/home/` | GET | - | wall, deals, best rated, category menu |
-| `/api/categories/` | GET | - | |
-| `/api/products/?category=&q=&sort=` | GET | - | sort: `price`, `-price`, `-rating` |
-| `/api/products/<slug>/` | GET | - | adds specs, stock level, max qty, related |
+| `/api/products/?category=&q=&sort=` | GET | - | `{title, count_label, empty, categories, results}`; sort: `price`, `-price`, `-rating` |
+| `/api/products/<slug>/` | GET | - | adds specs, stock level and label, max qty, related |
 | `/api/cart/` | GET, POST | - | session cart with totals; POST `{product, quantity}` adds |
 | `/api/cart/<id>/` | PATCH, DELETE | - | set `{quantity}` or remove a line |
-| `/api/auth/register/` | POST | - | returns token |
-| `/api/auth/login/` | POST | - | returns token, username |
+| `/api/auth/register/` | POST | - | returns token, username, safe `next` path |
+| `/api/auth/login/` | POST | - | returns token, username, safe `next` path |
 | `/api/auth/logout/` | POST | Token | revokes the token |
 | `/api/orders/` | GET, POST | Token | own orders only; POST takes the address and orders the session cart |
+
+Every error response carries `message`: the one line the app shows.
 
 Order rules (server side, tested): price comes from the database, never the client; stock is locked
 and decremented in one transaction; delivery is free at ৳299 and above, otherwise ৳60; payment is
