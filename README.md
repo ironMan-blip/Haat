@@ -15,6 +15,7 @@ createdb haat                                # PostgreSQL; local socket by defau
 .venv/bin/python manage.py migrate
 .venv/bin/python manage.py seed              # 47 sample products from Daraz listings
 .venv/bin/python manage.py createsuperuser   # for /admin
+.venv/bin/python manage.py admin_totp <username>  # admin needs an authenticator-app code; scan the printed URL
 .venv/bin/python manage.py runserver 127.0.0.1:8000
 
 # frontend (Node 20+)
@@ -93,9 +94,16 @@ backend/   Django 5.2 LTS + DRF, one app: shop
 Order rules (server side, tested): price comes from the database, never the client; stock is locked
 and decremented in one transaction; delivery is free at ৳299 and above, otherwise ৳60; payment is
 cash on delivery; phone must be a Bangladeshi mobile number; city must be a listed city; a buyer can
-have at most 5 pending orders. Login and register are throttled to 5 per minute per IP.
+have at most 5 pending orders, and so can a phone number across all accounts. Login and register are
+throttled to 5 per minute per IP, and sign-ups to 50 per day per IP. Login tokens expire after 30 days and
+are revoked on logout and on any password change. Cart changes need Django's CSRF token (the frontend
+reads it from the `csrftoken` cookie that `GET /api/cart/` sets).
 
-Sellers manage products and order status in Django admin (`/admin`, or `DJANGO_ADMIN_PATH`).
+Sellers manage products and order status in Django admin (`/admin`, or `DJANGO_ADMIN_PATH`). Admin login
+needs the password plus an authenticator code (log in with the password first, then pick the device and
+enter the code); 5 failures lock that IP and that username out for 15 minutes. Orders can't be deleted
+or have items edited in admin: cancel them instead, which puts the stock back. Lost phone:
+`manage.py admin_totp <username> --reset`.
 
 ## Production settings
 
@@ -107,14 +115,22 @@ and HTTPS redirect, HSTS and secure cookies turn on.
 | `DJANGO_SECRET_KEY` | long random value, e.g. `python -c "import secrets; print(secrets.token_urlsafe(50))"` |
 | `DJANGO_ALLOWED_HOSTS` | comma-separated hostnames |
 | `DJANGO_ADMIN_PATH` | non-default admin path, e.g. `seller-x7k2/` |
+| `REDIS_URL` | e.g. `redis://localhost:6379/0`; required with more than one worker, so throttle and lockout counts are shared |
 | `DJANGO_NUM_PROXIES` | number of reverse proxies in front of Django (throttling uses the real client IP); above 0 also trusts the proxy's `X-Forwarded-Proto` for HTTPS |
 
 Run `manage.py collectstatic` (into `backend/staticfiles/`) so the admin has its CSS, and run
 `manage.py clearsessions` daily (cron): every guest who fills a cart leaves a session row.
 
-Also: serve the frontend and `/api` from one origin, send a Content-Security-Policy header from the web
-server, restrict the admin path by IP at the proxy, and use a shared cache (Redis) if you run more than
-one worker, so throttle counts are shared.
+Also:
+- Serve the frontend and `/api` from one origin, and have the proxy pass the browser's `Host` header to
+  Django (nginx: `proxy_set_header Host $host;`). The CSRF check compares it with `Origin`.
+- The built `index.html` carries a Content-Security-Policy. Headers that a `<meta>` tag can't set must come
+  from the web server serving the frontend: `Content-Security-Policy: frame-ancestors 'none'`,
+  `Strict-Transport-Security`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`.
+- Restrict the admin path by IP at the proxy if you can.
+- Logs (errors, admin login failures and lockouts) go to stdout.
+- Not done yet: phone OTP at checkout. The per-phone cap slows hoarding with fake orders, but anyone can
+  type a made-up number; add an SMS gateway before scaling.
 
 ## Research that shaped it
 

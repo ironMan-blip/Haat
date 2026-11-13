@@ -32,6 +32,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework.authtoken',
+    'django_otp',
+    'django_otp.plugins.otp_totp',  # admin 2FA: authenticator-app codes
     'shop',
 ]
 
@@ -41,6 +43,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django_otp.middleware.OTPMiddleware',  # marks admin sessions that passed 2FA
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -83,17 +86,39 @@ STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'  # `manage.py collectstatic` target, for admin CSS in production
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Throttle and admin-lockout counters live here. Every worker must share them, so set REDIS_URL
+# whenever more than one process serves the site; local memory is per process and resets on restart.
+CACHES = {'default': {'BACKEND': 'django.core.cache.backends.redis.RedisCache', 'LOCATION': os.environ['REDIS_URL']}
+          if os.environ.get('REDIS_URL') else {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}}
+
+# Errors and security events (admin lockouts) go to stdout, where the process manager collects them.
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {'console': {'class': 'logging.StreamHandler'}},
+    'loggers': {
+        'django': {'handlers': ['console'], 'level': 'INFO' if DEBUG else 'WARNING'},
+        'shop': {'handlers': ['console'], 'level': 'INFO'},
+    },
+}
+
+OTP_TOTP_ISSUER = 'Haat admin'
+
 # Frontend talks to /api via the Vite dev proxy, so no CORS setup needed.
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': ['rest_framework.authentication.TokenAuthentication'],
+    'DEFAULT_AUTHENTICATION_CLASSES': ['shop.auth.ExpiringTokenAuthentication'],
     'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.AllowAny'],
+    # The browsable HTML API is a dev tool; production speaks JSON only.
+    'DEFAULT_RENDERER_CLASSES': ['rest_framework.renderers.JSONRenderer']
+                                + (['rest_framework.renderers.BrowsableAPIRenderer'] if DEBUG else []),
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
         'rest_framework.throttling.UserRateThrottle',
         'rest_framework.throttling.ScopedRateThrottle',  # only views with throttle_scope
     ],
-    # shortcut: counters live in the per-process local-memory cache; use a shared cache (Redis) with >1 worker.
-    'DEFAULT_THROTTLE_RATES': {'anon': '120/min', 'user': '300/min', 'auth': '5/min'},
+    # signup: per IP per day, against bulk accounts that hoard stock with free COD orders.
+    # Mobile carriers put many people behind one IP (CGNAT), so this stays loose.
+    'DEFAULT_THROTTLE_RATES': {'anon': '120/min', 'user': '300/min', 'auth': '5/min', 'signup': '50/day'},
     # Client IP comes from REMOTE_ADDR, so a forged X-Forwarded-For can't dodge throttles.
     # Set to the number of reverse proxies in front of Django when deployed behind one.
     'NUM_PROXIES': int(os.environ.get('DJANGO_NUM_PROXIES', '0')),
@@ -101,6 +126,9 @@ REST_FRAMEWORK = {
 
 FREE_DELIVERY_MIN = 299  # taka; Cartup-style free delivery threshold
 DELIVERY_FEE = 60
-MAX_PENDING_ORDERS = 5  # per buyer; COD orders cost nothing, so this stops stock hoarding
+MAX_PENDING_ORDERS = 5  # per buyer and per phone number; COD orders cost nothing, so this stops stock hoarding
+TOKEN_TTL_DAYS = 30  # API tokens die after this; logging in again issues a fresh one
+ADMIN_LOGIN_MAX_FAILS = 5  # per IP and per username, then locked out for ADMIN_LOCKOUT_SECONDS
+ADMIN_LOCKOUT_SECONDS = 15 * 60
 
 ADMIN_PATH = os.environ.get('DJANGO_ADMIN_PATH', 'admin/')  # use a non-default path in production

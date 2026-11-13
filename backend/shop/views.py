@@ -1,13 +1,17 @@
 from collections import defaultdict
+from collections.abc import Mapping
 
 from django.conf import settings
 from django.db.models import Q
+from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import generics, permissions
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
-from rest_framework.decorators import api_view, authentication_classes
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.response import Response
-from rest_framework.throttling import ScopedRateThrottle
+from rest_framework.throttling import AnonRateThrottle, ScopedRateThrottle, UserRateThrottle
+
+from .auth import CsrfProtected, issue_token
 
 from .cart import Cart
 from .models import Category, Order, Product
@@ -69,7 +73,9 @@ def home(request):
     })
 
 
+@ensure_csrf_cookie  # the app loads the cart first, so this hands the frontend its CSRF token
 @api_view(["GET", "POST"])
+@permission_classes([CsrfProtected])
 def cart(request):
     c = Cart(request)
     if request.method == "POST":  # add to cart
@@ -80,12 +86,14 @@ def cart(request):
 
 
 @api_view(["PATCH", "DELETE"])
+@permission_classes([CsrfProtected])
 def cart_line(request, pk):
     c = Cart(request)
     if request.method == "DELETE":
         c.remove(pk)
     else:  # set quantity
-        line = CartLineSerializer(data={"product": pk, "quantity": request.data.get("quantity")})
+        body = request.data if isinstance(request.data, Mapping) else {}  # a JSON array or number is not a body
+        line = CartLineSerializer(data={"product": pk, "quantity": body.get("quantity")})
         line.is_valid(raise_exception=True)
         c.set(line.validated_data["product"], line.validated_data["quantity"])
     return Response(c.data())
@@ -99,12 +107,17 @@ class Login(ObtainAuthToken):
         serializer = self.serializer_class(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data["user"]
-        token, _ = Token.objects.get_or_create(user=user)
+        token = issue_token(user)
         return Response({"token": token.key, "username": user.username})
+
+
+class SignupThrottle(AnonRateThrottle):
+    scope = "signup"  # daily cap per IP, on top of the per-minute "auth" one
 
 
 class Register(generics.CreateAPIView):
     serializer_class = RegisterSerializer
+    throttle_classes = [AnonRateThrottle, UserRateThrottle, ScopedRateThrottle, SignupThrottle]
     throttle_scope = "auth"  # slows bulk sign-ups
 
     def perform_create(self, serializer):
@@ -112,8 +125,7 @@ class Register(generics.CreateAPIView):
 
     def create(self, request, *args, **kwargs):
         super().create(request, *args, **kwargs)
-        token, _ = Token.objects.get_or_create(user=self.user)
-        return Response({"token": token.key, "username": self.user.username}, status=201)
+        return Response({"token": issue_token(self.user).key, "username": self.user.username}, status=201)
 
 
 class OrderListCreate(generics.ListCreateAPIView):
@@ -130,6 +142,7 @@ class OrderListCreate(generics.ListCreateAPIView):
 
 @api_view(["POST"])
 @authentication_classes([])  # a stale token must still sign out, not fail with 401
+@permission_classes([CsrfProtected])  # it empties the session cart
 def logout(request):
     # Revoke the presented token (DRF keeps one per user, so every device signs out),
     # and empty this device's cart so the next person doesn't see it.

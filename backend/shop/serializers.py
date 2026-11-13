@@ -3,7 +3,8 @@ import re
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
-from django.db import transaction
+from django.contrib.auth.validators import ASCIIUsernameValidator
+from django.db import IntegrityError, connection, transaction
 from rest_framework import serializers
 
 from .cart import Cart, delivery_fee
@@ -37,7 +38,9 @@ class ProductDetailSerializer(ProductSerializer):
 
 
 class RegisterSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True)
+    password = serializers.CharField(write_only=True, max_length=128)  # bounds hashing and similarity checks
+    # ASCII only: Unicode look-alikes ("rafi" with a Cyrillic "а") would pass as a different user.
+    username = serializers.CharField(max_length=150, validators=[ASCIIUsernameValidator()])
 
     class Meta:
         model = User
@@ -55,7 +58,11 @@ class RegisterSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, data):
-        return User.objects.create_user(**data)
+        try:
+            with transaction.atomic():
+                return User.objects.create_user(**data)
+        except IntegrityError:  # a parallel sign-up took the name; the case-insensitive index caught it
+            raise serializers.ValidationError({"username": "A user with that username already exists."})
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
@@ -89,17 +96,23 @@ class OrderSerializer(serializers.ModelSerializer):
         value = value.replace(" ", "").replace("-", "")
         if not re.fullmatch(r"(\+?88)?01[3-9]\d{8}", value):
             raise serializers.ValidationError("Enter a Bangladeshi mobile number, e.g. 01712345678.")
-        return value
+        return value[-11:]  # one spelling per number, so the per-phone cap can't be dodged with +88
 
     @transaction.atomic
     def create(self, data):
         expected = data.pop("expected_total")
         user = data["user"]
-        # Lock the buyer so two parallel checkouts can't both slip under the pending-order cap.
+        # Lock the buyer and the phone number so parallel checkouts can't both slip under the caps.
         User.objects.select_for_update().get(pk=user.pk)
+        with connection.cursor() as cur:
+            cur.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", ["order-phone:" + data["phone"]])
         if user.orders.filter(status="pending").count() >= settings.MAX_PENDING_ORDERS:
             raise serializers.ValidationError(
                 f"You already have {settings.MAX_PENDING_ORDERS} orders waiting for delivery.")
+        # The same cap per phone number, across accounts: new accounts are cheap, phones less so.
+        if Order.objects.filter(status="pending", phone=data["phone"]).count() >= settings.MAX_PENDING_ORDERS:
+            raise serializers.ValidationError(
+                {"phone": f"This number already has {settings.MAX_PENDING_ORDERS} orders waiting for delivery."})
         # The order is built from the buyer's session cart. Lock rows so two orders can't oversell.
         lines = Cart(self.context["request"]).lines(Product.objects.select_for_update())
         if not lines:

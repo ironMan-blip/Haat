@@ -1,8 +1,23 @@
+import io
+from datetime import timedelta
+from unittest import mock
+
 from django.contrib.auth.models import User
 from django.core.cache import cache
-from rest_framework.test import APITestCase
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.management import CommandError, call_command
+from django.db import IntegrityError, transaction
+from django.test import TestCase
+from django.utils import timezone
+from django_otp.oath import TOTP
+from django_otp.plugins.otp_totp.models import TOTPDevice
+from rest_framework.authtoken.models import Token
+from rest_framework.exceptions import ValidationError
+from rest_framework.test import APIClient, APITestCase
 
 from .models import Category, Order, Product
+from .serializers import RegisterSerializer
+from .views import SignupThrottle
 
 ADDR = {"full_name": "Rahim", "phone": "01712345678", "address": "House 1, Road 2", "city": "Dhaka"}
 
@@ -218,3 +233,130 @@ class ShopApiTests(APITestCase):
         self.assertEqual(c["sorts"][0], {"value": "", "label": "Newest"})
         Product.objects.filter(pk=self.case.pk).update(rating=4)
         self.assertEqual(self.client.get("/api/config/").data["stamp"], self.case.image)  # best-rated photo
+
+
+class SecurityTests(APITestCase):
+    def setUp(self):
+        cache.clear()
+        cat = Category.objects.create(name="Mobiles", slug="mobiles")
+        self.case = Product.objects.create(category=cat, name="Case", slug="case", price=100, image="https://x.y/b.jpg", stock=50)
+        self.user = User.objects.create_user("rahim", password="pass-1234-word")
+
+    def token_client(self, key):
+        c = APIClient()
+        c.credentials(HTTP_AUTHORIZATION=f"Token {key}")
+        return c
+
+    def test_cart_changes_need_csrf_token(self):
+        c = APIClient(enforce_csrf_checks=True)
+        body = {"product": self.case.pk, "quantity": 1}
+        self.assertEqual(c.post("/api/cart/", body, format="json").status_code, 403)  # cross-site form or fetch
+        self.assertEqual(c.post("/api/auth/logout/").status_code, 403)
+        token = c.get("/api/cart/").cookies["csrftoken"].value  # the app's first call hands it out
+        self.assertEqual(c.post("/api/cart/", body, format="json", HTTP_X_CSRFTOKEN=token).status_code, 200)
+        r = c.patch(f"/api/cart/{self.case.pk}/", {"quantity": 2}, format="json", HTTP_X_CSRFTOKEN=token)
+        self.assertEqual(r.data["count"], 2)
+        self.assertEqual(c.post("/api/auth/logout/", HTTP_X_CSRFTOKEN=token).status_code, 204)
+
+    def test_cart_patch_with_non_object_body_is_400_not_500(self):
+        self.client.post("/api/cart/", {"product": self.case.pk, "quantity": 1}, format="json")
+        self.assertEqual(self.client.patch(f"/api/cart/{self.case.pk}/", [1], format="json").status_code, 400)
+
+    def test_expired_token_is_refused_and_login_issues_a_new_one(self):
+        old = Token.objects.create(user=self.user)
+        Token.objects.filter(pk=old.pk).update(created=timezone.now() - timedelta(days=31))
+        self.assertEqual(self.token_client(old.key).get("/api/orders/").status_code, 401)
+        self.assertFalse(Token.objects.filter(pk=old.pk).exists())
+        Token.objects.create(user=self.user)
+        Token.objects.filter(user=self.user).update(created=timezone.now() - timedelta(days=31))
+        new = self.client.post("/api/auth/login/", {"username": "rahim", "password": "pass-1234-word"}).data["token"]
+        self.assertNotEqual(new, old.key)
+        self.assertEqual(self.token_client(new).get("/api/orders/").status_code, 200)
+
+    def test_password_change_revokes_tokens(self):
+        token = Token.objects.create(user=self.user)
+        self.user.last_login = timezone.now()
+        self.user.save()  # an unrelated save keeps the token
+        self.assertEqual(self.token_client(token.key).get("/api/orders/").status_code, 200)
+        self.user.set_password("new-pass-9876-x")
+        self.user.save()
+        self.assertEqual(self.token_client(token.key).get("/api/orders/").status_code, 401)
+
+    def test_register_rejects_huge_password_and_lookalike_username(self):
+        r = self.client.post("/api/auth/register/", {"username": "longpw", "password": "ab" * 100}, format="json")
+        self.assertIn("password", r.data)
+        r = self.client.post("/api/auth/register/", {"username": "rаhim", "password": "pass-1234-word"}, format="json")
+        self.assertIn("username", r.data)  # Cyrillic "а"
+
+    def test_case_twins_blocked_by_database_too(self):
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            User.objects.create_user("RAHIM")
+        # The serializer turns the race into a normal error, not a 500.
+        ser = RegisterSerializer()
+        with self.assertRaises(ValidationError):
+            ser.create({"username": "Rahim", "password": "pass-1234-word"})
+
+    def test_signup_has_a_daily_cap_per_ip(self):
+        with mock.patch.object(SignupThrottle, "THROTTLE_RATES", {"signup": "2/day"}):
+            codes = [self.client.post("/api/auth/register/", {"username": f"u{i}", "password": "pass-1234-word"}).status_code
+                     for i in range(3)]
+        self.assertEqual(codes, [201, 201, 429])
+
+    def test_pending_cap_counts_the_phone_across_accounts(self):
+        for i in range(5):
+            u = User.objects.create_user(f"buyer{i}")
+            Order.objects.create(user=u, full_name="X", phone="01712345678", address="A", city="Dhaka",
+                                 subtotal=100, delivery_fee=60, total=160)
+        self.client.force_authenticate(self.user)
+        self.client.post("/api/cart/", {"product": self.case.pk, "quantity": 1}, format="json")
+        total = self.client.get("/api/cart/").data["total"]
+        r = self.client.post("/api/orders/", {**ADDR, "phone": "+8801712345678", "expected_total": total}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("phone", r.data)  # "+88" spelling counts as the same number
+        r = self.client.post("/api/orders/", {**ADDR, "phone": "01812345678", "expected_total": total}, format="json")
+        self.assertEqual(r.status_code, 201)
+
+    def test_cancelled_order_cannot_be_reopened_even_without_clean(self):
+        o = Order.objects.create(user=self.user, full_name="X", phone="01712345678", address="A", city="Dhaka",
+                                 subtotal=100, delivery_fee=60, total=160, status="cancelled")
+        o.status = "pending"
+        with self.assertRaises(DjangoValidationError):
+            o.save()
+
+
+class AdminSecurityTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.admin = User.objects.create_superuser("boss", password="pass-1234-word")
+        call_command("admin_totp", "boss", stdout=io.StringIO())
+        self.device = TOTPDevice.objects.get(user=self.admin)
+
+    def login(self, password="pass-1234-word", code=None):
+        return self.client.post("/admin/login/", {"username": "boss", "password": password, "otp_token": code or "",
+                                                  "otp_device": self.device.persistent_id})
+
+    def code(self):
+        d = self.device
+        return format(TOTP(d.bin_key, d.step, d.t0, d.digits).token(), f"0{d.digits}d")
+
+    def test_admin_needs_authenticator_code(self):
+        self.assertEqual(self.login().status_code, 200)  # password alone: form shown again
+        self.assertEqual(self.login(code=self.code()).status_code, 302)
+
+    def test_admin_locks_out_after_failed_logins(self):
+        codes = [self.login(password="wrong").status_code for _ in range(6)]
+        self.assertEqual(codes, [200] * 5 + [429])
+        self.assertEqual(self.login(code=self.code()).status_code, 429)  # even the right password waits
+
+    def test_orders_cannot_be_deleted_in_admin(self):
+        self.login(code=self.code())
+        o = Order.objects.create(user=self.admin, full_name="X", phone="01712345678", address="A", city="Dhaka",
+                                 subtotal=100, delivery_fee=60, total=160)
+        self.assertEqual(self.client.post(f"/admin/shop/order/{o.pk}/delete/", {"post": "yes"}).status_code, 403)
+        self.assertTrue(Order.objects.filter(pk=o.pk).exists())
+
+    def test_admin_totp_refuses_to_replace_a_device_silently(self):
+        with self.assertRaises(CommandError):
+            call_command("admin_totp", "boss", stdout=io.StringIO())
+        call_command("admin_totp", "boss", "--reset", stdout=io.StringIO())
+        self.assertNotEqual(TOTPDevice.objects.get(user=self.admin).key, self.device.key)

@@ -95,18 +95,20 @@ class Order(models.Model):
     def __str__(self):
         return f"Order #{self.pk}"
 
-    def _saved_status(self):
-        return Order.objects.filter(pk=self.pk).values_list("status", flat=True).first() if self.pk else None
+    REOPEN_ERROR = {"status": "A cancelled order can't be reopened: its stock is already back on sale."}
 
-    def clean(self):
-        if self._saved_status() == "cancelled" and self.status != "cancelled":
-            raise ValidationError({"status": "A cancelled order can't be reopened: its stock is already back on sale."})
+    def clean(self):  # friendly form error; save() enforces the same rule under the row lock
+        was = Order.objects.filter(pk=self.pk).values_list("status", flat=True).first() if self.pk else None
+        if was == "cancelled" and self.status != "cancelled":
+            raise ValidationError(self.REOPEN_ERROR)
 
     def save(self, *args, **kwargs):
         # Cancelling puts the items back in stock, once.
         with transaction.atomic():
             was = Order.objects.select_for_update().filter(pk=self.pk).values_list("status", flat=True).first() \
                 if self.pk else None
+            if was == "cancelled" and self.status != "cancelled":  # e.g. two admins racing
+                raise ValidationError(self.REOPEN_ERROR)
             super().save(*args, **kwargs)
             if self.status == "cancelled" and was not in (None, "cancelled"):
                 for item in self.items.all():
