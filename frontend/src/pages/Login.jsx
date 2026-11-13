@@ -29,16 +29,20 @@ export default function Login() {
 
   return (
     <section className="page auth">
-      <form className="form" onSubmit={submit}>
-        <h1>{mode === 'login' ? 'Log in' : 'Create an account'}</h1>
+      <form className="form form-card" onSubmit={submit}>
+        <div>
+          <h1>{mode === 'login' ? 'Welcome back' : 'Create an account'}</h1>
+          <p className="soft">{mode === 'login' ? 'Log in to check out and track your orders.' : 'It takes less than a minute.'}</p>
+        </div>
         <label>Username<input name="username" required autoComplete="username" /></label>
-        {mode === 'register' && <label>Email<input name="email" type="email" autoComplete="email" /></label>}
+        {mode === 'register' && <label>Email <span className="hint">(optional)</span><input name="email" type="email" autoComplete="email" /></label>}
         <label>Password
           <input name="password" type="password" required minLength={8}
             autoComplete={mode === 'login' ? 'current-password' : 'new-password'} />
+          {mode === 'register' && <span className="hint">At least 8 characters.</span>}
         </label>
-        {error && <p className="error" role="alert">{error}</p>}
-        <button className="btn btn--wide" disabled={busy}>{mode === 'login' ? 'Log in' : 'Create account'}</button>
+        {error && <p className="alert" role="alert">{error}</p>}
+        <button className="btn btn--wide" disabled={busy}>{busy ? 'Please wait…' : mode === 'login' ? 'Log in' : 'Create account'}</button>
         <button type="button" className="link" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError('') }}>
           {mode === 'login' ? 'New here? Create an account' : 'Have an account? Log in'}
         </button>

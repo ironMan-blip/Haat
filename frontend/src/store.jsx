@@ -16,26 +16,34 @@ export function StoreProvider({ children }) {
   const [auth, setAuth] = useState(() => read('haat-auth', null)) // {token, username}
   const [cart, setCart] = useState(() => read('haat-cart', []))
   const [config, setConfig] = useState({ free_delivery_min: 299, delivery_fee: 60 })
+  const [notice, setNotice] = useState(null) // last added item, shown as a toast
 
   useEffect(() => { write('haat-cart', cart) }, [cart])
   useEffect(() => { write('haat-auth', auth) }, [auth])
   useEffect(() => { api('/config/').then(setConfig).catch(() => {}) }, [])
+  useEffect(() => {
+    if (!notice) return
+    const t = setTimeout(() => setNotice(null), 3500)
+    return () => clearTimeout(t)
+  }, [notice])
 
   const setQty = (id, qty) =>
     setCart((c) => c.map((l) => (l.id === id ? { ...l, qty: Math.max(1, Math.min(qty, l.stock, 20)) } : l)))
 
-  const add = (p, qty = 1) =>
+  const add = (p, qty = 1) => {
+    setNotice({ name: p.name, at: Date.now() })
     setCart((c) => {
       const line = c.find((l) => l.id === p.id)
       if (line) return c.map((l) => (l === line ? { ...l, qty: Math.min(l.qty + qty, p.stock, 20) } : l))
       return [...c, { id: p.id, slug: p.slug, name: p.name, price: p.price, image: p.image, stock: p.stock, qty }]
     })
+  }
 
   const subtotal = cart.reduce((s, l) => s + l.price * l.qty, 0)
   const fee = subtotal === 0 || subtotal >= config.free_delivery_min ? 0 : config.delivery_fee
 
   const value = {
-    auth, config, cart, subtotal, fee,
+    auth, config, cart, subtotal, fee, notice,
     count: cart.reduce((s, l) => s + l.qty, 0),
     add, setQty,
     remove: (id) => setCart((c) => c.filter((l) => l.id !== id)),

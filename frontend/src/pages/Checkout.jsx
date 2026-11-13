@@ -39,10 +39,14 @@ export default function Checkout() {
 
   return (
     <section className="page checkout-grid">
-      <form className="form" onSubmit={submit}>
+      <form className="form form-card" onSubmit={submit}>
         <h1>Delivery details</h1>
         <label>Full name<input name="full_name" required maxLength={120} autoComplete="name" /></label>
-        <label>Mobile number<input name="phone" required inputMode="tel" placeholder="01XXXXXXXXX" autoComplete="tel" /></label>
+        <label>Mobile number
+          <input name="phone" required inputMode="tel" placeholder="01712345678" autoComplete="tel"
+            pattern="(\+?88)?01[3-9][0-9]{8}" title="Bangladeshi mobile number, e.g. 01712345678" />
+          <span className="hint">The rider will call this number before delivery.</span>
+        </label>
         <label>City
           <select name="city" required defaultValue="Dhaka">
             {CITIES.map((c) => <option key={c}>{c}</option>)}
@@ -51,9 +55,9 @@ export default function Checkout() {
         <label>Address<textarea name="address" required maxLength={300} rows={3} placeholder="House, road, area" autoComplete="street-address" /></label>
         <fieldset>
           <legend>Payment</legend>
-          <label className="radio"><input type="radio" defaultChecked readOnly /> Cash on delivery</label>
+          <label className="radio"><input type="radio" defaultChecked readOnly /> Cash on delivery <span className="hint">Pay the rider when it arrives</span></label>
         </fieldset>
-        {error && <p className="error" role="alert">{error}</p>}
+        {error && <p className="alert" role="alert">{error}</p>}
         <button className="btn btn--wide" disabled={busy}>{busy ? 'Placing order…' : 'Place order'}</button>
       </form>
       <Summary />

@@ -1,5 +1,5 @@
 import { Link, useSearchParams } from 'react-router-dom'
-import { Status, TileGrid, useFetch } from '../components'
+import { EmptyState, Status, TileGrid, useFetch } from '../components'
 
 const SORTS = { '': 'Newest', price: 'Price, low to high', '-price': 'Price, high to low', '-rating': 'Best rated' }
 
@@ -24,7 +24,7 @@ export default function Shop() {
     <section className="page shop">
       <div className="sec-head">
         <h1>{title}</h1>
-        {products.data && <span>{products.data.length} items</span>}
+        {products.data && <span className="soft">{products.data.length} {products.data.length === 1 ? 'item' : 'items'}</span>}
       </div>
       <div className="filters">
         <nav aria-label="Categories" className="cat-links">
@@ -41,7 +41,11 @@ export default function Shop() {
         </label>
       </div>
       <Status loading={products.loading} error={products.error}>
-        {products.data?.length ? <TileGrid products={products.data} key={qs} /> : <p className="note">Nothing matches. Try a shorter word.</p>}
+        {products.data?.length ? <TileGrid products={products.data} key={qs} /> : (
+          <EmptyState icon="⌕" title="No products found" action={<Link to="/shop" className="btn btn--paper">Clear filters</Link>}>
+            {q ? `Nothing matches “${q}”. Try a shorter or different word.` : 'This category has nothing in stock right now.'}
+          </EmptyState>
+        )}
       </Status>
     </section>
   )

@@ -100,7 +100,7 @@ export default function Home() {
               <h1 className="dock-head">Phones to rice, one haat.</h1>
               <p className="dock-line">Pay the rider in cash when it reaches your door.</p>
             </div>
-            <Link to="/shop" className="btn btn--paper">Start shopping</Link>
+            <Link to="/shop" className="btn">Start shopping</Link>
             <nav className="dock-links" aria-label="Categories">
               {(cats.data || []).map((c) => <Link key={c.slug} to={`/shop?category=${c.slug}`}>{c.name}</Link>)}
             </nav>
@@ -110,8 +110,8 @@ export default function Home() {
 
       <section className="page">
         <Reveal className="sec-head">
-          <h2>Lowest prices today</h2>
-          <Link to="/shop?sort=price">See all by price</Link>
+          <h2>Today's best deals</h2>
+          <Link to="/shop?sort=price" className="arrow">See all →</Link>
         </Reveal>
         <TileGrid products={deals} />
       </section>

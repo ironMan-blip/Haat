@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
-import { Route, Routes, useLocation } from 'react-router-dom'
-import { Footer, Header, useFetch } from './components'
+import { Link, Route, Routes, useLocation } from 'react-router-dom'
+import { EmptyState, Footer, Header, Toast, useFetch } from './components'
 import Home from './pages/Home'
 import Shop from './pages/Shop'
 import Product from './pages/Product'
@@ -26,10 +26,15 @@ export default function App() {
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/login" element={<Login />} />
           <Route path="/orders" element={<Orders />} />
-          <Route path="*" element={<p className="note page">Nothing at this address.</p>} />
+          <Route path="*" element={
+            <EmptyState icon="?" title="Page not found" action={<Link to="/" className="btn">Back to the home page</Link>}>
+              The link may be old or mistyped. Search above or browse the shop.
+            </EmptyState>
+          } />
         </Routes>
       </main>
       <Footer stamp={data?.[0]?.image} />
+      <Toast />
     </>
   )
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { api, img, taka } from '../api'
-import { Status } from '../components'
+import { EmptyState, Status } from '../components'
 import { useStore } from '../store'
 
 export default function Orders() {
@@ -25,9 +25,13 @@ export default function Orders() {
   return (
     <section className="page orders">
       <h1>Your orders</h1>
-      {params.get('placed') && <p className="ok" role="status">Order #{params.get('placed')} placed. Keep cash ready for the rider.</p>}
+      {params.get('placed') && <p className="ok" role="status">✓ Order #{params.get('placed')} placed. Keep cash ready for the rider.</p>}
       <Status {...state}>
-        {state.data?.length === 0 && <p className="note">No orders yet. <Link to="/shop">Start shopping</Link></p>}
+        {state.data?.length === 0 && (
+          <EmptyState icon="📦" title="No orders yet" action={<Link to="/shop" className="btn">Start shopping</Link>}>
+            When you place an order, you can track it here.
+          </EmptyState>
+        )}
         {state.data?.map((o) => (
           <article key={o.id} className="order">
             <div className="order-head">

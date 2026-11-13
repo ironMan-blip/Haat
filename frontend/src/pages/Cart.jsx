@@ -1,12 +1,13 @@
 import { Link } from 'react-router-dom'
 import { img, taka } from '../api'
-import { DeliveryMeter, Qty } from '../components'
+import { DeliveryMeter, EmptyState, Qty } from '../components'
 import { useStore } from '../store'
 
 export function Summary({ children }) {
   const { subtotal, fee } = useStore()
   return (
-    <aside className="summary">
+    <aside className="summary" aria-label="Order summary">
+      <h2>Order summary</h2>
       <DeliveryMeter />
       <dl>
         <dt>Subtotal</dt><dd>{taka(subtotal)}</dd>
@@ -22,15 +23,14 @@ export default function Cart() {
   const { cart, setQty, remove } = useStore()
   if (!cart.length)
     return (
-      <section className="page empty">
-        <h1>Your cart is empty</h1>
-        <p><Link to="/shop" className="btn">Browse the haat</Link></p>
-      </section>
+      <EmptyState icon="🛒" title="Your cart is empty" action={<Link to="/shop" className="btn">Start shopping</Link>}>
+        Add something you like and it will wait for you here.
+      </EmptyState>
     )
   return (
     <section className="page checkout-grid">
       <div>
-        <h1>Cart</h1>
+        <h1>Your cart</h1>
         <ul className="lines">
           {cart.map((l) => (
             <li key={l.id} className="line">
@@ -41,13 +41,15 @@ export default function Cart() {
               </div>
               <Qty value={l.qty} max={Math.min(l.stock, 20)} onChange={(q) => setQty(l.id, q)} label={`Quantity of ${l.name}`} />
               <span className="line-total">{taka(l.price * l.qty)}</span>
-              <button className="link" onClick={() => remove(l.id)}>Remove</button>
+              <button className="link link--danger" onClick={() => remove(l.id)} aria-label={`Remove ${l.name}`}>Remove</button>
             </li>
           ))}
         </ul>
+        <p className="back"><Link to="/shop" className="arrow">← Continue shopping</Link></p>
       </div>
       <Summary>
-        <Link to="/checkout" className="btn btn--wide">Checkout</Link>
+        <Link to="/checkout" className="btn btn--wide">Go to checkout</Link>
+        <p className="summary-note">Pay in cash when your order arrives.</p>
       </Summary>
     </section>
   )
