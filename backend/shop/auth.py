@@ -47,6 +47,14 @@ class ScopedThrottle(ClientIdent, throttling.ScopedRateThrottle):
     pass
 
 
+class GuestOrderThrottle(AnonThrottle):
+    """Orders placed without an account, per IP; signed-in buyers and reading orders are not counted."""
+    scope = "guest_order"
+
+    def allow_request(self, request, view):
+        return request.method != "POST" or super().allow_request(request, view)
+
+
 def login_fail_keys(username, request=None):
     """Failure counters shared by the API and admin logins, so neither is a way round the other's lockout.
     Usernames can't differ only by case (see RegisterSerializer), so one counter per lowercased name."""

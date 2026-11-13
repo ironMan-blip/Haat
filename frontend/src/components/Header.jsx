@@ -21,9 +21,9 @@ export default function Header() {
       </form>
       <nav className="bar-links" aria-label="Main">
         <NavLink to="/shop">Shop</NavLink>
+        <NavLink to="/orders">Orders</NavLink>{/* guests see the orders this session placed */}
         {auth ? (
           <>
-            <NavLink to="/orders">Orders</NavLink>
             <span className="hello">Hi, {auth.username}</span>
             <button className="link" onClick={logout}>Log out</button>
           </>

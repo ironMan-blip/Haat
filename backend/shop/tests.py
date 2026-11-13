@@ -20,6 +20,7 @@ from .display import cdn, day, num, taka
 from .models import Category, Order, Product
 from .serializers import RegisterSerializer
 from .api.accounts import SignupThrottle
+from .auth import GuestOrderThrottle
 
 ADDR = {"full_name": "Rahim", "phone": "01712345678", "address": "House 1, Road 2", "city": "Dhaka"}
 
@@ -205,13 +206,13 @@ class ShopApiTests(APITestCase):
         self.assertEqual(r.status_code, 400)
         self.assertIn("product", r.data)
 
-    def test_orders_need_login_and_are_private(self):
+    def test_orders_are_private(self):
         self.order((self.case, 1))
         other = User.objects.create_user("karim", password="pass-1234-word")
         self.client.force_authenticate(other)
         self.assertEqual(self.client.get("/api/orders/").data, [])
         self.client.force_authenticate(None)
-        self.assertEqual(self.client.get("/api/orders/").status_code, 401)
+        self.assertEqual(self.client.get("/api/orders/").data, [])  # a guest session sees no account's orders
 
     def test_register_then_login(self):
         self.client.force_authenticate(None)
@@ -547,3 +548,95 @@ class AdminPanelTests(TestCase):
                    "items-0-id": self.order.items.get().pk, "items-0-order": self.order.pk})
         self.order.refresh_from_db()
         self.assertEqual((self.order.status, self.order.total), ("shipped", 260))
+
+
+class GuestCheckoutTests(APITestCase):
+    """Ordering without an account: the order lives on the session, which is the only key to it."""
+
+    def setUp(self):
+        cache.clear()
+        cat = Category.objects.create(name="Mobiles", slug="mobiles")
+        self.case = Product.objects.create(category=cat, name="Case", slug="case", price=100, image="https://x.y/b.jpg", stock=50)
+        self.user = User.objects.create_user("rahim", password="pass-1234-word")
+
+    def order(self, client=None, **body):
+        c = client or self.client
+        c.post("/api/cart/", {"product": self.case.pk, "quantity": 1}, format="json")
+        total = c.get("/api/cart/").data["total"]
+        return c.post("/api/orders/", {**ADDR, "expected_total": total, **body}, format="json")
+
+    def test_guest_can_order_and_see_it(self):
+        r = self.order()
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual(Order.objects.get().user, None)
+        self.assertEqual(self.client.get("/api/cart/").data["lines"], [])
+        self.assertEqual([o["id"] for o in self.client.get("/api/orders/").data], [r.data["id"]])
+
+    def test_guest_sees_only_own_session_orders(self):
+        self.order()
+        self.assertEqual(APIClient().get("/api/orders/").data, [])
+
+    def test_session_list_never_shows_account_orders(self):
+        mine = Order.objects.create(user=self.user, full_name="X", phone="01712345678", address="A", city="Dhaka",
+                                    subtotal=100, delivery_fee=60, total=160)
+        s = self.client.session
+        s["guest_orders"] = [mine.pk]
+        s.save()
+        self.assertEqual(self.client.get("/api/orders/").data, [])
+
+    def test_guest_cannot_set_owner_status_or_money(self):
+        r = self.order(user=self.user.pk, status="delivered", total=1, subtotal=1, payment="card")
+        self.assertEqual(r.status_code, 201, r.data)
+        o = Order.objects.get()
+        self.assertEqual((o.user, o.status, o.total, o.payment), (None, "pending", 160, "cod"))
+
+    def test_orders_need_csrf_token_for_guests_and_users(self):
+        for user in [None, self.user]:
+            c = APIClient(enforce_csrf_checks=True)
+            c.force_authenticate(user)
+            token = c.get("/api/cart/").cookies["csrftoken"].value
+            c.post("/api/cart/", {"product": self.case.pk, "quantity": 1}, format="json", HTTP_X_CSRFTOKEN=token)
+            body = {**ADDR, "expected_total": c.get("/api/cart/").data["total"]}
+            self.assertEqual(c.post("/api/orders/", body, format="json").status_code, 403)  # cross-site post
+            self.assertEqual(c.post("/api/orders/", body, format="json", HTTP_X_CSRFTOKEN=token).status_code, 201)
+
+    def test_guest_order_rotates_session_key(self):
+        self.client.get("/api/cart/")
+        planted = self.client.session.session_key
+        self.order()
+        self.assertNotEqual(self.client.session.session_key, planted)
+        other = APIClient()
+        other.cookies["sessionid"] = planted  # whoever planted the old cookie
+        self.assertEqual(other.get("/api/orders/").data, [])
+
+    def test_logout_forgets_guest_orders(self):
+        self.order()
+        self.assertEqual(self.client.post("/api/auth/logout/").status_code, 204)
+        self.assertEqual(self.client.get("/api/orders/").data, [])
+
+    def test_login_shows_account_orders_only(self):
+        self.order()
+        self.client.force_authenticate(self.user)
+        self.assertEqual(self.client.get("/api/orders/").data, [])
+
+    def test_phone_cap_applies_to_guests(self):
+        for _ in range(5):
+            self.assertEqual(self.order().status_code, 201)
+        r = self.order()
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("phone", r.data)
+
+    def test_guest_orders_throttled_users_not(self):
+        with mock.patch.object(GuestOrderThrottle, "THROTTLE_RATES", {"guest_order": "2/hour"}):
+            codes = [self.order(phone=f"0171234567{i}").status_code for i in range(3)]
+            self.assertEqual(codes, [201, 201, 429])
+            self.assertEqual(self.client.get("/api/orders/").status_code, 200)  # reading is not throttled
+            self.client.force_authenticate(self.user)
+            self.assertEqual(self.order(phone="01812345678").status_code, 201)
+
+    def test_guest_order_logged_without_personal_data(self):
+        with self.assertLogs("shop.security", "INFO") as logs:
+            r = self.order()
+        self.assertIn(f"guest order id={r.data['id']}", logs.output[0])
+        self.assertNotIn(ADDR["phone"], logs.output[0])
+        self.assertNotIn(ADDR["address"], logs.output[0])

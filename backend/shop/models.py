@@ -81,7 +81,9 @@ class Order(models.Model):
     # Delivery cities; the checkout form reads them from /api/config/.
     CITIES = [(c, c) for c in ["Dhaka", "Chattogram", "Sylhet", "Khulna", "Rajshahi", "Barishal", "Rangpur", "Mymensingh"]]
 
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="orders", on_delete=models.CASCADE)
+    # Empty for guest orders; those are found only through the session that placed them.
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="orders", on_delete=models.CASCADE,
+                             null=True, blank=True)
     full_name = models.CharField(max_length=120)
     phone = models.CharField(max_length=20)
     address = models.TextField(max_length=300)

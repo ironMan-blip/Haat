@@ -87,6 +87,10 @@ STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'  # `manage.py collectstatic` target, for admin CSS in production
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Keep sessions server-side: they hold the cart and guest orders, and logout's flush must kill old
+# cookies. Signed-cookie sessions would let a saved cookie replay a guest's orders after logout.
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+
 # Throttle and admin-lockout counters live here. Every worker must share them, so set REDIS_URL
 # whenever more than one process serves the site; local memory is per process and resets on restart.
 CACHES = {'default': {'BACKEND': 'django.core.cache.backends.redis.RedisCache', 'LOCATION': os.environ['REDIS_URL']}
@@ -121,7 +125,9 @@ REST_FRAMEWORK = {
     ],
     # signup: per IP per day, against bulk accounts that hoard stock with free COD orders.
     # Mobile carriers put many people behind one IP (CGNAT), so this stays loose.
-    'DEFAULT_THROTTLE_RATES': {'anon': '120/min', 'user': '300/min', 'auth': '5/min', 'signup': '50/day'},
+    # guest_order: orders without an account, per IP; loose for CGNAT, the per-phone cap is the real limit.
+    'DEFAULT_THROTTLE_RATES': {'anon': '120/min', 'user': '300/min', 'auth': '5/min', 'signup': '50/day',
+                               'guest_order': '30/hour'},
     # Client IP comes from REMOTE_ADDR, so a forged X-Forwarded-For can't dodge throttles.
     # Set to the number of reverse proxies in front of Django when deployed behind one.
     'NUM_PROXIES': int(os.environ.get('DJANGO_NUM_PROXIES', '0')),

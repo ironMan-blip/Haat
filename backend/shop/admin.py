@@ -244,7 +244,8 @@ class OrderAdmin(admin.ModelAdmin):
     list_per_page = 25
     save_on_top = True
     list_select_related = ["user"]
-    search_fields = ["=id", "full_name", "phone", "user__username", "user__email"]
+    empty_value_display = "Guest"  # orders placed without an account have no user
+    search_fields =["=id", "full_name", "phone", "user__username", "user__email"]
     date_hierarchy = "created"
     actions = [set_status(s) for s, _ in Order.STATUS]
     inlines = [OrderItemInline]

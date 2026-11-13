@@ -122,12 +122,13 @@ class OrderSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def create(self, data):
         expected = data.pop("expected_total")
-        user = data["user"]
+        user = data["user"]  # None for a guest: no account to lock or cap, the phone cap still applies
         # Lock the buyer and the phone number so parallel checkouts can't both slip under the caps.
-        User.objects.select_for_update().get(pk=user.pk)
+        if user:
+            User.objects.select_for_update().get(pk=user.pk)
         with connection.cursor() as cur:
             cur.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", ["order-phone:" + data["phone"]])
-        if user.orders.filter(status="pending").count() >= settings.MAX_PENDING_ORDERS:
+        if user and user.orders.filter(status="pending").count() >= settings.MAX_PENDING_ORDERS:
             raise serializers.ValidationError(
                 f"You already have {settings.MAX_PENDING_ORDERS} orders waiting for delivery.")
         # The same cap per phone number, across accounts: new accounts are cheap, phones less so.

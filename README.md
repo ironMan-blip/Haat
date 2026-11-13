@@ -12,7 +12,7 @@ A simple general store for Bangladesh. React (Vite) frontend, Django + DRF backe
 - Quick-add buttons on product tiles; out-of-stock states
 - Guest session cart with totals and a free-delivery meter (free at ৳299+, else ৳60)
 - Register / login with password visibility toggle; tokens expire after 30 days
-- Checkout with cash on delivery, Bangladeshi phone and city validation
+- Checkout with cash on delivery, Bangladeshi phone and city validation; guests can order without an account
 - Order history (own orders only) with status badges
 - Toast messages, empty states, scroll-reveal animations, star rating labels
 - Responsive product images (200/400/800px copies from the Daraz CDN)
@@ -126,8 +126,8 @@ backend/   Django 5.2 LTS + DRF, one app: shop
 | `/api/cart/<id>/` | PATCH, DELETE | - | set `{quantity}` or remove a line |
 | `/api/auth/register/` | POST | - | returns token, username, safe `next` path |
 | `/api/auth/login/` | POST | - | returns token, username, safe `next` path |
-| `/api/auth/logout/` | POST | Token | revokes the token |
-| `/api/orders/` | GET, POST | Token | own orders only; POST takes the address and orders the session cart |
+| `/api/auth/logout/` | POST | Token | revokes the token and wipes the session (cart, guest orders) |
+| `/api/orders/` | GET, POST | optional | account's orders, or a guest's orders from this session; POST (CSRF) takes the address and orders the session cart |
 
 Every error response carries `message`: the one line the app shows. The frontend only renders: prices (`*_display`),
 badges, rating labels, image sizes (`thumb`/`image`/`image_large`), dates, totals lines and copy all come from the API.
@@ -135,7 +135,9 @@ badges, rating labels, image sizes (`thumb`/`image`/`image_large`), dates, total
 Order rules (server side, tested): price comes from the database, never the client; stock is locked
 and decremented in one transaction; delivery is free at ৳299 and above, otherwise ৳60; payment is
 cash on delivery; phone must be a Bangladeshi mobile number; city must be a listed city; a buyer can
-have at most 5 pending orders, and so can a phone number across all accounts. Login and register are
+have at most 5 pending orders, and so can a phone number across all accounts and guests. Guest orders
+are throttled to 30 per hour per IP, rotate the session key, and are listed only to the session that
+placed them (never merged into an account). Login and register are
 throttled to 5 per minute per IP, and sign-ups to 50 per day per IP. Login tokens expire after 30 days and
 are revoked on logout and on any password change. Cart changes need Django's CSRF token (the frontend
 reads it from the `csrftoken` cookie that `GET /api/cart/` sets).
@@ -169,7 +171,7 @@ Also:
   from the web server serving the frontend: `Content-Security-Policy: frame-ancestors 'none'`,
   `Strict-Transport-Security`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`.
 - Restrict the admin path by IP at the proxy if you can.
-- Logs (errors, admin login failures and lockouts) go to stdout.
+- Logs (errors, admin login failures and lockouts, guest order ids with IP, no personal data) go to stdout.
 - Not done yet: phone OTP at checkout. The per-phone cap slows hoarding with fake orders, but anyone can
   type a made-up number; add an SMS gateway before scaling.
 

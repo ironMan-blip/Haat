@@ -10,7 +10,6 @@ from rest_framework.response import Response
 
 from ..auth import (AnonThrottle, CsrfProtected, ScopedThrottle, UserThrottle, issue_token, locked_out,
                     login_fail_keys, record_login_failure, safe_next)
-from ..cart import Cart
 from ..serializers import RegisterSerializer
 
 
@@ -55,10 +54,10 @@ class Register(generics.CreateAPIView):
 @authentication_classes([])  # a stale token must still sign out, not fail with 401
 @permission_classes([CsrfProtected])  # it empties the session cart
 def logout(request):
-    # Revoke the presented token (DRF keeps one per user, so every device signs out),
-    # and empty this device's cart so the next person doesn't see it.
+    # Revoke the presented token (DRF keeps one per user, so every device signs out), and wipe this
+    # device's session (cart and guest orders) under a new key so the next person sees none of it.
     key = request.headers.get("Authorization", "").removeprefix("Token ").strip()
     if key:
         Token.objects.filter(key=key).delete()
-    Cart(request).clear()
+    request.session.flush()
     return Response(status=204)
