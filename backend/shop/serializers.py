@@ -18,19 +18,21 @@ class CategorySerializer(serializers.ModelSerializer):
 
 
 class ProductSerializer(serializers.ModelSerializer):
-    category = CategorySerializer(read_only=True)
+    """What a product tile shows; lists send many, so keep it small."""
 
     class Meta:
         model = Product
-        fields = ["id", "name", "slug", "description", "summary", "price", "original_price", "discount",
-                  "image", "rating", "reviews", "stock", "category"]
+        fields = ["id", "name", "slug", "summary", "price", "original_price", "discount",
+                  "image", "rating", "reviews", "stock"]
 
 
 class ProductDetailSerializer(ProductSerializer):
+    category = CategorySerializer(read_only=True)
     related = serializers.SerializerMethodField()
 
     class Meta(ProductSerializer.Meta):
-        fields = ProductSerializer.Meta.fields + ["specs", "stock_level", "stock_label", "max_qty", "related"]
+        fields = ProductSerializer.Meta.fields + ["category", "specs", "stock_level", "stock_label", "max_qty",
+                                                  "related"]
 
     def get_related(self, p):
         others = Product.objects.select_related("category").filter(category=p.category_id).exclude(pk=p.pk)[:7]

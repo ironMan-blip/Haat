@@ -4,7 +4,6 @@ import { img, taka } from './api'
 import { useStore } from './store'
 
 // Adds .in when the element scrolls into view; CSS staggers its children. Content stays visible without JS.
-// eslint-disable-next-line no-unused-vars -- Tag is used as JSX
 export function Reveal({ as: Tag = 'div', className = '', children, ...rest }) {
   const ref = useRef(null)
   useEffect(() => {
@@ -68,7 +67,7 @@ export function Header() {
 }
 
 // The name link stretches over the whole tile (CSS ::after); the add button sits above it.
-export function Tile({ p, big }) {
+function Tile({ p, big }) {
   const { add } = useStore()
   const d = p.discount
   const out = p.stock === 0
@@ -113,7 +112,7 @@ export function TileGrid({ products, feature }) {
 }
 
 // The live thing: how far the cart is from free delivery.
-export function DeliveryMeter() {
+function DeliveryMeter() {
   const { cart } = useStore()
   if (!cart?.subtotal) return null
   const left = cart.free_delivery_left
@@ -179,7 +178,7 @@ export function Footer() {
   )
 }
 
-export function Skeleton({ n = 8 }) {
+function Skeleton({ n = 8 }) {
   return (
     <div className="tiles" aria-busy="true" aria-label="Loading">
       {Array.from({ length: n }, (_, i) => (

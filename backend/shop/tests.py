@@ -230,6 +230,10 @@ class ShopApiTests(APITestCase):
         self.assertEqual(p["specs"], ["6GB RAM", "128GB", "5000mAh"])
         self.assertEqual(p["summary"], "6GB RAM · 128GB")
         self.assertEqual([r["slug"] for r in p["related"]], ["case"])
+        self.assertEqual(p["category"]["slug"], "mobiles")
+        # List payloads carry tiles only: no long description or nested category per product.
+        tile = self.client.get("/api/products/").data["results"][0]
+        self.assertFalse({"description", "category"} & tile.keys())
 
     def test_home_sections(self):
         other = Category.objects.create(name="Rice", slug="rice")

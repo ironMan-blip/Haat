@@ -14,7 +14,6 @@ from rest_framework.throttling import AnonRateThrottle, ScopedRateThrottle, User
 from rest_framework.views import exception_handler as drf_exception_handler
 
 from .auth import CsrfProtected, issue_token, safe_next
-
 from .cart import Cart
 from .models import Category, Order, Product
 from .serializers import (CartLineSerializer, CategorySerializer, OrderSerializer, ProductDetailSerializer,
