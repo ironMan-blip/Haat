@@ -1,6 +1,6 @@
 # Haat — MVP e-commerce
 
-A simple general store for Bangladesh. React (Vite) frontend, Django + DRF backend, SQLite.
+A simple general store for Bangladesh. React (Vite) frontend, Django + DRF backend, PostgreSQL.
 "Haat" (হাট) is the open village market; the design lays products out like goods at a haat stall.
 
 ## Run it
@@ -10,8 +10,8 @@ A simple general store for Bangladesh. React (Vite) frontend, Django + DRF backe
 cd backend
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 export DJANGO_DEBUG=1                        # dev only; without it Django demands a real secret key
-export POSTGRES_DB=haat                      # optional: use PostgreSQL (`createdb haat` first); unset = SQLite
-                                             # remote DB: also POSTGRES_USER/PASSWORD/HOST/PORT
+createdb haat                                # PostgreSQL; local socket by default
+                                             # other DB: POSTGRES_DB/USER/PASSWORD/HOST/PORT
 .venv/bin/python manage.py migrate
 .venv/bin/python manage.py seed              # 47 sample products from Daraz listings
 .venv/bin/python manage.py createsuperuser   # for /admin
@@ -48,7 +48,7 @@ flowchart LR
     API --> Rules
   end
 
-  subgraph DB["SQLite"]
+  subgraph DB["PostgreSQL"]
     Models["Category → Product → OrderItem ← Order ← User"]
   end
 
