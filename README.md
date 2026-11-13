@@ -33,15 +33,15 @@ Tests: `cd backend && DJANGO_DEBUG=1 .venv/bin/python manage.py test shop`
 flowchart LR
   subgraph FE["Frontend · React 19 + Vite :5174"]
     Pages["Pages: Home · Shop · Product<br/>Cart · Checkout · Login · Orders"]
-    Store["store.jsx<br/>cart in localStorage · auth token · config"]
+    Store["store.jsx<br/>auth token · last cart and config responses"]
     Pages --- Store
   end
 
   FE -- "/api (Vite proxy)" --> API
 
   subgraph BE["Backend · Django 5.2 + DRF :8000"]
-    API["shop app REST API<br/>config · categories · products<br/>auth register/login/logout/me · orders"]
-    Rules["Order rules<br/>DB prices · stock lock · free delivery ≥ ৳299 else ৳60<br/>COD only · BD phone · listed city · max 5 pending<br/>auth throttle 5/min"]
+    API["shop app REST API<br/>config · home · categories · products · cart<br/>auth register/login/logout/me · orders"]
+    Rules["Cart + order rules (session cart)<br/>DB prices · stock lock · free delivery ≥ ৳299 else ৳60<br/>COD only · BD phone · listed city · max 5 pending<br/>auth throttle 5/min"]
     Admin["Django admin<br/>products · order status"]
     API --> Rules
   end
@@ -62,12 +62,13 @@ flowchart LR
 ```
 frontend/  React 19 + react-router 7, no state library
   src/api.js         fetch wrapper, taka formatting, Daraz image resize
-  src/store.jsx      cart (localStorage), auth token, store config
+  src/store.jsx      auth token; holds the server's cart and config responses
   src/components.jsx header, footer, product tile, delivery meter, qty stepper
   src/pages/         Home, Shop (category/search/sort), Product, Cart, Checkout, Login, Orders
 backend/   Django 5.2 LTS + DRF, one app: shop
-  shop/models.py      Category, Product, Order, OrderItem
-  shop/serializers.py order creation: DB prices, stock lock, delivery fee
+  shop/models.py      Category, Product (discount, stock level, specs, rank), Order, OrderItem
+  shop/cart.py        session cart: quantities, totals, delivery fee, free-delivery meter
+  shop/serializers.py order creation from the cart: DB prices, stock lock
   shop/views.py       REST endpoints
   shop/management/commands/seed.py  loads + cleans shop/fixtures/daraz_products.json
   scripts/fetch_daraz.py            re-pulls that fixture from Daraz search
@@ -75,15 +76,18 @@ backend/   Django 5.2 LTS + DRF, one app: shop
 
 | Endpoint | Method | Auth | Notes |
 | --- | --- | --- | --- |
-| `/api/config/` | GET | - | free-delivery threshold, fee |
+| `/api/config/` | GET | - | free-delivery threshold, fee, cities, sort options |
+| `/api/home/` | GET | - | wall, deals, best rated, category menu |
 | `/api/categories/` | GET | - | |
 | `/api/products/?category=&q=&sort=` | GET | - | sort: `price`, `-price`, `-rating` |
-| `/api/products/<slug>/` | GET | - | |
+| `/api/products/<slug>/` | GET | - | adds specs, stock level, max qty, related |
+| `/api/cart/` | GET, POST | - | session cart with totals; POST `{product, quantity}` adds |
+| `/api/cart/<id>/` | PATCH, DELETE | - | set `{quantity}` or remove a line |
 | `/api/auth/register/` | POST | - | returns token |
-| `/api/auth/login/` | POST | - | returns token |
+| `/api/auth/login/` | POST | - | returns token, username |
 | `/api/auth/logout/` | POST | Token | revokes the token |
 | `/api/auth/me/` | GET | Token | |
-| `/api/orders/` | GET, POST | Token | own orders only |
+| `/api/orders/` | GET, POST | Token | own orders only; POST takes the address and orders the session cart |
 
 Order rules (server side, tested): price comes from the database, never the client; stock is locked
 and decremented in one transaction; delivery is free at ৳299 and above, otherwise ৳60; payment is

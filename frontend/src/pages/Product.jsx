@@ -1,13 +1,12 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { discount, img, taka } from '../api'
+import { img, taka } from '../api'
 import { Qty, Rating, Status, TileGrid, useFetch } from '../components'
 import { useStore } from '../store'
 
 export default function Product() {
   const { slug } = useParams()
   const { data: p, loading, error } = useFetch(`/products/${slug}/`)
-  const related = useFetch(p && `/products/?category=${p.category.slug}`)
   const { add, config } = useStore()
   const navigate = useNavigate()
   const [qty, setQty] = useState(1)
@@ -30,35 +29,35 @@ export default function Product() {
               {p.reviews > 0 && <Rating p={p} />}
               <p className="pdp-price">
                 {taka(p.price)}
-                {discount(p) > 0 && <> <s>{taka(p.original_price)}</s> <span className="off">{discount(p)}% off</span></>}
+                {p.discount > 0 && <> <s>{taka(p.original_price)}</s> <span className="off">{p.discount}% off</span></>}
               </p>
-              {p.stock > 0 ? (
+              {p.stock_level !== 'out' ? (
                 <>
-                  <p className={p.stock < 10 ? 'stock stock--low' : 'stock'}>{p.stock < 10 ? `Only ${p.stock} left` : 'In stock'}</p>
+                  <p className={p.stock_level === 'low' ? 'stock stock--low' : 'stock'}>{p.stock_level === 'low' ? `Only ${p.stock} left` : 'In stock'}</p>
                   <div className="pdp-buy">
-                    <Qty value={qty} max={Math.min(p.stock, 20)} onChange={setQty} label="Quantity" />
+                    <Qty value={qty} max={p.max_qty} onChange={setQty} label="Quantity" />
                     <button className="btn" onClick={() => add(p, qty)}>Add to cart</button>
                     <button className="btn btn--line" onClick={() => { add(p, qty); navigate('/cart') }}>Buy now</button>
                   </div>
                   <ul className="perks">
                     <li>Cash on delivery, pay when it arrives</li>
-                    <li>Free delivery on orders over {taka(config.free_delivery_min)}</li>
+                    {config && <li>Free delivery on orders over {taka(config.free_delivery_min)}</li>}
                   </ul>
                 </>
               ) : (
                 <p className="stock stock--out">Sold out</p>
               )}
-              {p.description && (
+              {p.specs.length > 0 && (
                 <ul className="pdp-spec">
-                  {p.description.split('\n').map((line, i) => <li key={i}>{line}</li>)}
+                  {p.specs.map((line, i) => <li key={i}>{line}</li>)}
                 </ul>
               )}
             </div>
           </section>
-          {related.data?.length > 1 && (
+          {p.related.length > 0 && (
             <section className="page">
               <div className="sec-head"><h2>More in {p.category.name}</h2></div>
-              <TileGrid products={related.data.filter((r) => r.id !== p.id).slice(0, 7)} />
+              <TileGrid products={p.related} />
             </section>
           )}
         </>

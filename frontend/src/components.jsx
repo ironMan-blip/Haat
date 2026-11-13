@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, useNavigate, useSearchParams } from 'react-router-dom'
-import { api, discount, img, taka } from './api'
+import { api, img, taka } from './api'
 import { useStore } from './store'
 
 export function useFetch(path) {
@@ -81,7 +81,7 @@ export function Header() {
 }
 
 export function Tile({ p, big }) {
-  const d = discount(p)
+  const d = p.discount
   return (
     <Link to={`/p/${p.slug}`} className={big ? 'tile tile--big' : 'tile'}>
       <span className="tile-pic">
@@ -116,14 +116,13 @@ export function TileGrid({ products }) {
 
 // The live thing: how far the cart is from free delivery.
 export function DeliveryMeter() {
-  const { subtotal, config } = useStore()
-  if (!subtotal) return null
-  const left = config.free_delivery_min - subtotal
-  const pct = Math.min(100, (subtotal / config.free_delivery_min) * 100)
+  const { cart } = useStore()
+  if (!cart?.subtotal) return null
+  const left = cart.free_delivery_left
   return (
     <div className="meter" role="status">
       <p>{left > 0 ? <>Add <strong>{taka(left)}</strong> more for free delivery.</> : <>Delivery is free on this order.</>}</p>
-      <span className="meter-track"><span className="meter-fill" style={{ width: `${pct}%` }} /></span>
+      <span className="meter-track"><span className="meter-fill" style={{ width: `${cart.free_delivery_progress}%` }} /></span>
     </div>
   )
 }
@@ -139,6 +138,7 @@ export function Qty({ value, max, onChange, label }) {
 }
 
 export function Footer({ stamp }) {
+  const { config } = useStore()
   return (
     <footer className="foot">
       <div className="card">
@@ -147,7 +147,7 @@ export function Footer({ stamp }) {
         </svg>
         <div className="card-left">
           <p className="card-sign">See you at the haat.</p>
-          <p>Order today, pay the rider in cash when the parcel reaches your door. Spend ৳299 or more and delivery is on us.</p>
+          <p>Order today, pay the rider in cash when the parcel reaches your door. {config && `Spend ${taka(config.free_delivery_min)} or more and delivery is on us.`}</p>
         </div>
         <div className="card-right">
           {stamp && <img className="stamp" src={img(stamp, 200)} alt="" width="88" height="117" loading="lazy" />}
@@ -204,8 +204,8 @@ export function Toast() {
   if (!notice) return null
   return (
     <div className="toast" role="status" key={notice.at}>
-      <p>Added to cart: {notice.name}</p>
-      <Link to="/cart">View cart</Link>
+      <p>{notice.text}</p>
+      {notice.link && <Link to="/cart">View cart</Link>}
     </div>
   )
 }

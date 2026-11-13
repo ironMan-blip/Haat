@@ -15,7 +15,7 @@ export default function Orders() {
     api('/orders/', { token })
       .then((data) => setState({ data, error: null, loading: false }))
       .catch((error) => {
-        if (/credentials|token/i.test(error.message)) logout() // stale token
+        if (error.status === 401) logout() // stale token
         setState({ data: null, error, loading: false })
       })
   }, [token]) // eslint-disable-line react-hooks/exhaustive-deps -- logout is recreated every render
@@ -36,10 +36,10 @@ export default function Orders() {
           <article key={o.id} className="order">
             <div className="order-head">
               <h2>Order #{o.id}</h2>
-              <span className={`status status--${o.status}`}>{o.status}</span>
+              <span className={`status status--${o.status}`}>{o.status_display}</span>
             </div>
             <p className="soft">
-              {new Date(o.created).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} · {o.city} · Cash on delivery
+              {new Date(o.created).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} · {o.city} · {o.payment_display}
             </p>
             <ul className="lines">
               {o.items.map((it) => (

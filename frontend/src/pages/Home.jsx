@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { discount, img, taka } from '../api'
+import { img, taka } from '../api'
 import { Reveal, Status, TileGrid, useFetch } from '../components'
 import { useStore } from '../store'
 
@@ -49,26 +49,25 @@ function Showcase({ items }) {
   )
 }
 
-function Menu({ products, categories }) {
+function Menu({ menu }) {
   return (
     <section className="menu page">
-      {categories.map((cat) => {
-        const items = products.filter((p) => p.category.slug === cat.slug)
+      {menu.map((cat) => {
         return (
           <Reveal className="menu-cat" key={cat.slug} id={cat.slug}>
             <div className="menu-head">
               <h2><Link to={`/shop?category=${cat.slug}`}>{cat.name}</Link></h2>
-              <span>{items.length} items</span>
+              <span>{cat.count} items</span>
             </div>
             <ul className="menu-items">
-              {items.slice(0, 6).map((p) => (
+              {cat.items.map((p) => (
                 <li key={p.id}>
                   <Link to={`/p/${p.slug}`} className="menu-item">
                     <img src={img(p.image, 200)} alt="" width="64" height="64" loading="lazy" />
                     <span className="menu-text">
                       <span className="menu-line"><b>{p.name}</b><span>{taka(p.price)}</span></span>
-                      <span className="menu-desc">{p.description.split('\n').slice(0, 2).join(' · ') || p.category.name}</span>
-                      {discount(p) > 0 && <span className="menu-note">{discount(p)}% below the usual {taka(p.original_price)}</span>}
+                      <span className="menu-desc">{p.summary}</span>
+                      {p.discount > 0 && <span className="menu-note">{p.discount}% below the usual {taka(p.original_price)}</span>}
                     </span>
                   </Link>
                 </li>
@@ -82,19 +81,15 @@ function Menu({ products, categories }) {
 }
 
 export default function Home() {
-  const products = useFetch('/products/')
-  const cats = useFetch('/categories/')
+  const { data, loading, error } = useFetch('/home/') // server picks deals, best rated and the menu
   const { config } = useStore()
-  const list = products.data || []
-  const deals = [...list].sort((a, b) => discount(b) - discount(a)).slice(0, 14)
-  const ranked = [...list].sort((a, b) => b.rating * Math.log(b.reviews + 2) - a.rating * Math.log(a.reviews + 2))
-  const best = ranked.filter((p, i) => ranked.findIndex((q) => q.category.slug === p.category.slug) === i).slice(0, 2) // top item of two different categories
+  const { wall = [], deals = [], best = [], menu = [] } = data || {}
 
   return (
-    <Status loading={products.loading} error={products.error}>
-      {list.length > 0 && (
+    <Status loading={loading} error={error}>
+      {wall.length > 0 && (
         <section className="hero">
-          <Wall products={list} />
+          <Wall products={wall} />
           <div className="dock">
             <div>
               <h1 className="dock-head">Phones to rice, one haat.</h1>
@@ -102,7 +97,7 @@ export default function Home() {
             </div>
             <Link to="/shop" className="btn">Start shopping</Link>
             <nav className="dock-links" aria-label="Categories">
-              {(cats.data || []).map((c) => <Link key={c.slug} to={`/shop?category=${c.slug}`}>{c.name}</Link>)}
+              {menu.map((c) => <Link key={c.slug} to={`/shop?category=${c.slug}`}>{c.name}</Link>)}
             </nav>
           </div>
         </section>
@@ -118,13 +113,15 @@ export default function Home() {
 
       {best.length === 2 && <Showcase items={best} />}
 
-      <section className="promise">
-        <Reveal as="p" className="promise-line">
-          Spend {taka(config.free_delivery_min)} and delivery is free. Under that it costs {taka(config.delivery_fee)}. You pay the rider in cash at the door.
-        </Reveal>
-      </section>
+      {config && (
+        <section className="promise">
+          <Reveal as="p" className="promise-line">
+            Spend {taka(config.free_delivery_min)} and delivery is free. Under that it costs {taka(config.delivery_fee)}. You pay the rider in cash at the door.
+          </Reveal>
+        </section>
+      )}
 
-      {cats.data && <Menu products={list} categories={cats.data} />}
+      <Menu menu={menu} />
     </Status>
   )
 }

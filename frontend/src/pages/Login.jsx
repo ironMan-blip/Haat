@@ -19,7 +19,7 @@ export default function Login() {
     const body = Object.fromEntries(new FormData(e.currentTarget))
     try {
       const res = await api(mode === 'login' ? '/auth/login/' : '/auth/register/', { method: 'POST', body })
-      login({ token: res.token, username: body.username })
+      login({ token: res.token, username: res.username })
       navigate(next, { replace: true })
     } catch (err) {
       setError(err.message)

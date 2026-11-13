@@ -1,10 +1,10 @@
 import { Link, useSearchParams } from 'react-router-dom'
 import { EmptyState, Status, TileGrid, useFetch } from '../components'
-
-const SORTS = { '': 'Newest', price: 'Price, low to high', '-price': 'Price, high to low', '-rating': 'Best rated' }
+import { useStore } from '../store'
 
 export default function Shop() {
   const [params, setParams] = useSearchParams()
+  const { config } = useStore()
   const category = params.get('category') || ''
   const q = params.get('q') || ''
   const sort = params.get('sort') || ''
@@ -36,7 +36,7 @@ export default function Shop() {
         <label className="sort">
           Sort
           <select value={sort} onChange={(e) => set('sort', e.target.value)}>
-            {Object.entries(SORTS).map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+            {(config?.sorts || []).map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
         </label>
       </div>

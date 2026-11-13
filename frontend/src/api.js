@@ -5,7 +5,7 @@ export async function api(path, { method = 'GET', body, token } = {}) {
   if (token) headers.Authorization = `Token ${token}`
   const res = await fetch(`/api${path}`, { method, headers, body: body && JSON.stringify(body) })
   const data = await res.json().catch(() => null)
-  if (!res.ok) throw new Error(firstError(data) || `Request failed (${res.status})`)
+  if (!res.ok) throw Object.assign(new Error(firstError(data) || `Request failed (${res.status})`), { status: res.status })
   return data
 }
 
@@ -25,6 +25,3 @@ export const taka = (n) => `৳${Number(n).toLocaleString('en-IN')}`
 
 // Daraz CDN serves resized copies via a filename suffix.
 export const img = (url, size = 400) => `${url}_${size}x${size}q75.jpg`
-
-export const discount = (p) =>
-  p.original_price > p.price ? Math.round((1 - p.price / p.original_price) * 100) : 0
