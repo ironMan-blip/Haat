@@ -212,10 +212,12 @@ class ProductAdmin(admin.ModelAdmin):
 
 @admin.register(Comment)
 class CommentAdmin(admin.ModelAdmin):
-    list_display = ["created", "user", "product", "text"]
+    list_display = ["created", "user", "product", "text", "parent", "edited", "deleted"]
+    list_filter = ["deleted", "edited"]
     list_select_related = ["user", "product"]
     search_fields = ["text", "user__username", "product__name"]
-    readonly_fields = ["product", "user", "created"]  # staff may edit or delete abuse, not reassign it
+    readonly_fields = ["product", "user", "parent", "created"]  # staff may edit or delete abuse, not reassign it
+    exclude = ["likes"]
 
 
 class OrderItemInline(admin.TabularInline):

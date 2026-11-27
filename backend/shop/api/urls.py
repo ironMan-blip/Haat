@@ -8,6 +8,8 @@ urlpatterns = [
     path("products/", catalog.ProductList.as_view()),
     path("products/<slug:slug>/", catalog.ProductDetail.as_view()),
     path("products/<slug:slug>/comments/", catalog.ProductComments.as_view()),
+    path("comments/<int:pk>/", catalog.CommentDetail.as_view()),
+    path("comments/<int:pk>/like/", catalog.like_comment),
     path("cart/", checkout.cart),
     path("cart/<int:pk>/", checkout.cart_line),
     path("orders/", checkout.OrderListCreate.as_view()),

@@ -349,6 +349,31 @@ class ShopApiTests(APITestCase):
         self.assertEqual((listed["title"], [c["text"] for c in listed["results"]]), ("Comments (1)", ["Great phone"]))
         self.assertEqual(guest.get("/api/products/case/comments/").data["results"], [])
 
+    def test_comment_edit_delete_reply_and_like(self):
+        url = "/api/products/phone/comments/"
+        top = self.client.post(url, {"text": "Battery?"}, format="json").data["id"]
+        other = User.objects.create_user("karim", password="pass-1234-word")
+        karim = APIClient()
+        karim.force_authenticate(other)
+        reply = karim.post(url, {"text": "Lasts a day", "parent": top}, format="json").data["id"]
+        self.assertEqual(karim.post(url, {"text": "x", "parent": reply}, format="json").status_code, 400)  # one level
+        self.assertEqual(karim.post("/api/products/case/comments/", {"text": "x", "parent": top},
+                                    format="json").status_code, 400)  # another product's thread
+        self.assertEqual(karim.patch(f"/api/comments/{top}/", {"text": "hacked"}, format="json").status_code, 404)
+        self.assertEqual(karim.delete(f"/api/comments/{top}/").status_code, 404)
+        self.assertEqual(self.client.patch(f"/api/comments/{top}/", {"text": "Battery life?"}, format="json").status_code, 200)
+        for _ in range(2):  # liking twice still counts once
+            self.assertEqual(karim.post(f"/api/comments/{top}/like/").data["likes"], 1)
+        self.assertEqual(APIClient().post(f"/api/comments/{top}/like/").status_code, 401)
+        t = karim.get(url).data["results"][0]
+        self.assertEqual((t["text"], t["edited_label"], t["liked"], t["mine"]), ("Battery life?", "edited", True, False))
+        self.assertEqual([(r["text"], r["mine"]) for r in t["replies"]], [("Lasts a day", True)])
+        self.assertEqual(self.client.delete(f"/api/comments/{top}/").status_code, 204)  # has a reply: placeholder
+        t = karim.get(url).data["results"][0]
+        self.assertEqual((t["deleted"], t["author"], t["likes"], len(t["replies"])), (True, None, 0, 1))
+        self.assertEqual(karim.delete(f"/api/comments/{reply}/").status_code, 204)  # no replies: gone
+        self.assertEqual(karim.post(url, {"text": "x", "parent": top}, format="json").status_code, 400)  # deleted parent
+
     def test_config_lists_cities_and_sorts(self):
         c = self.client.get("/api/config/").data
         self.assertEqual(c["cities"][0], "Dhaka")  # the checkout's default

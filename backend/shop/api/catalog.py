@@ -3,10 +3,12 @@ from collections import defaultdict
 from django.conf import settings
 from django.contrib.auth.password_validation import password_validators_help_texts
 from django.db.models import Q
+from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
 from rest_framework import generics
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
-from rest_framework.decorators import api_view
+from rest_framework.exceptions import ValidationError
+from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
 from ..auth import AnonThrottle, CommentThrottle, UserThrottle
@@ -76,8 +78,10 @@ class ProductComments(generics.ListCreateAPIView):
         return get_object_or_404(Product, slug=self.kwargs["slug"])
 
     def get_queryset(self):
-        # shortcut: newest 100 only, no pagination; add CursorPagination once a product gets more.
-        return Comment.objects.filter(product=self.product()).select_related("user")[:100]
+        # shortcut: newest 100 threads only, no pagination; add CursorPagination once a product gets more.
+        replies = Comment.objects.select_related("user").prefetch_related("likes").order_by("created", "id")
+        return (Comment.objects.filter(product=self.product(), parent=None).select_related("user")
+                .prefetch_related("likes", Prefetch("replies", queryset=replies)))[:100]
 
     def list(self, request, *args, **kwargs):
         results = self.get_serializer(self.get_queryset(), many=True).data
@@ -86,11 +90,48 @@ class ProductComments(generics.ListCreateAPIView):
             "empty": "No comments yet. Be the first to share what you think.",
             "login_prompt": "Log in to leave a comment.",
             "placeholder": "What do you think of this product?",
+            "reply_placeholder": "Write a reply",
+            "delete_confirm": "Delete this comment? This can't be undone.",
             "results": results,
         })
 
     def perform_create(self, serializer):
-        serializer.save(product=self.product(), user=self.request.user)
+        product = self.product()
+        parent = serializer.validated_data.get("parent")
+        if parent and parent.product_id != product.pk:
+            raise ValidationError({"parent": "You can only reply to a comment on this product."})
+        serializer.save(product=product, user=self.request.user)
+
+
+class CommentDetail(generics.UpdateAPIView, generics.DestroyAPIView):
+    """Authors edit or delete their own comments; anyone else's is a 404."""
+    serializer_class = CommentSerializer
+    permission_classes = [IsAuthenticated]
+    http_method_names = ["patch", "delete"]
+
+    def get_queryset(self):
+        return Comment.objects.filter(user=self.request.user, deleted=False)
+
+    def perform_update(self, serializer):
+        serializer.validated_data.pop("parent", None)  # a comment can't be moved to another thread
+        serializer.save(edited=True)
+
+    def perform_destroy(self, c):
+        if c.replies.exists():  # keep other people's replies: leave a placeholder instead
+            c.text, c.deleted = "", True
+            c.save(update_fields=["text", "deleted"])
+            c.likes.clear()
+        else:
+            c.delete()
+
+
+@api_view(["POST", "DELETE"])
+@permission_classes([IsAuthenticated])
+def like_comment(request, pk):
+    """POST likes, DELETE unlikes; both are safe to repeat."""
+    c = get_object_or_404(Comment, pk=pk, deleted=False)
+    (c.likes.add if request.method == "POST" else c.likes.remove)(request.user)
+    return Response(CommentSerializer(c, context={"request": request}).data)
 
 
 def wall(products):

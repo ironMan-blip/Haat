@@ -92,7 +92,12 @@ class Comment(models.Model):
     """A signed-in customer's comment on a product page; staff remove abuse in the admin."""
     product = models.ForeignKey(Product, related_name="comments", on_delete=models.CASCADE)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="comments", on_delete=models.CASCADE)
-    text = models.TextField(max_length=1000)
+    parent = models.ForeignKey("self", related_name="replies", on_delete=models.CASCADE, null=True, blank=True,
+                               help_text="Set on replies; replies are one level deep")
+    text = models.TextField(max_length=1000, blank=True)  # blank only once deleted
+    likes = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name="liked_comments", blank=True)
+    edited = models.BooleanField(default=False)
+    deleted = models.BooleanField(default=False, help_text="Kept as a placeholder so its replies stay")
     created = models.DateTimeField(auto_now_add=True)
 
     class Meta:

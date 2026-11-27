@@ -56,12 +56,30 @@ class ProductDetailSerializer(ProductSerializer):
 
 
 class CommentSerializer(serializers.ModelSerializer):
+    text = serializers.CharField(max_length=1000)  # the model allows blank only for deleted placeholders
+    # Replies go one level deep, under a live top-level comment; the view checks it is on the same product.
+    parent = serializers.PrimaryKeyRelatedField(queryset=Comment.objects.filter(parent=None, deleted=False),
+                                                required=False, write_only=True)
+
     class Meta:
         model = Comment
-        fields = ["id", "text", "created"]
+        fields = ["id", "text", "created", "parent"]
 
     def to_representation(self, c):
-        return {**super().to_representation(c), "author": c.user.username, "date": day(c.created)}
+        me = self.context["request"].user.pk  # None for guests
+        likers = {u.pk for u in c.likes.all()}
+        return {
+            **super().to_representation(c),
+            "text": "This comment was deleted." if c.deleted else c.text,
+            "author": None if c.deleted else c.user.username,
+            "date": day(c.created),
+            "edited_label": "edited" if c.edited and not c.deleted else None,
+            "deleted": c.deleted,
+            "mine": c.user_id == me and not c.deleted,
+            "likes": len(likers),
+            "liked": me in likers,
+            "replies": None if c.parent_id else CommentSerializer(c.replies.all(), many=True, context=self.context).data,
+        }
 
 
 class RegisterSerializer(serializers.ModelSerializer):

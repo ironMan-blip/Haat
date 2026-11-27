@@ -376,9 +376,12 @@ select { min-height: 44px; padding: 0 12px; border: 1px solid var(--line); borde
 .orders { max-width: 900px; display: grid; gap: 20px; }
 .comments { display: grid; gap: 20px; max-width: 760px; }
 .comments .sec-head { margin-bottom: 0; }
-.comments .form .btn { justify-self: start; }
 .comment-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
-.comment-list li { padding: 16px 20px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-md); display: grid; gap: 6px; white-space: pre-line; overflow-wrap: anywhere; }
+.comment-list li { padding: 16px 20px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-md); display: grid; gap: 8px; white-space: pre-line; overflow-wrap: anywhere; }
+.comment-replies { margin-left: clamp(12px, 3vw, 32px); }
+.comment-replies li { background: transparent; }
+.comment-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; white-space: normal; }
+.comment-actions .link:disabled { cursor: default; text-decoration: none; color: var(--muted); }
 .order { background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 24px; display: grid; gap: 14px; }
 .order-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .order-head h2 { font-size: 1.25rem; }
