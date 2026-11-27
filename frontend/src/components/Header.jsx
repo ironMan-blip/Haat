@@ -27,7 +27,7 @@ export default function Header() {
             className="h-11 rounded-r-none border-r-0 border-border bg-page focus-visible:bg-background focus-visible:ring-0" />
           <Button className="h-11 rounded-l-none">Search</Button>
         </form>
-        <nav className="ml-auto flex items-center whitespace-nowrap md:ml-0 md:gap-1" aria-label="Main">
+        <nav className="ml-auto flex items-center whitespace-nowrap md:gap-1" aria-label="Main">
           <NavLink to="/shop" className={navLink}>Shop</NavLink>
           <NavLink to="/orders" className={navLink}>Orders</NavLink>{/* guests see the orders this session placed */}
           {auth ? (

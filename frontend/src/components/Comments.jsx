@@ -7,6 +7,7 @@ import Page from './Page'
 import Fail from './Fail'
 import { Button } from './ui/button'
 import { Label } from './ui/label'
+import { Skeleton } from './ui/skeleton'
 import { Textarea } from './ui/textarea'
 
 const danger = 'text-muted-foreground hover:text-destructive'
@@ -70,7 +71,12 @@ export default function Comments({ slug }) {
   })
 
   if (loadError) return <Page className="grid max-w-190 gap-5"><Fail>{loadError}</Fail></Page>
-  if (!page) return null // loading, or a stale token being dropped
+  if (!page) return ( // loading, or a stale token being dropped
+    <Page className="grid max-w-190 gap-3" aria-busy="true" aria-label="Loading comments">
+      <Skeleton className="mb-2 h-8 w-48" />
+      {[0, 1].map((i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
+    </Page>
+  )
   return (
     <Page className="grid max-w-190 gap-5">
       <h2>{page.title}</h2>
@@ -92,7 +98,7 @@ export default function Comments({ slug }) {
 
 function Comment({ c, ctx }) {
   const { page, auth } = ctx
-  const [mode, setMode] = useState(null) // 'edit' | 'reply' | null
+  const [mode, setMode] = useState(null) // 'edit' | 'reply' | 'delete' (asking to confirm) | null
   const [open, setOpen] = useState(false) // replies shown
   const url = `/comments/${c.id}/`
   const done = (ok) => { if (ok) setMode(null); return ok }
@@ -113,12 +119,18 @@ function Comment({ c, ctx }) {
             <Heart aria-hidden="true" strokeWidth={1.75} className={c.liked ? 'fill-current' : undefined} /> {c.likes}
           </Button>
           {auth && !c.is_reply && <Button type="button" variant="link" size="inline" onClick={() => setMode('reply')}>Reply</Button>}
-          {c.mine && (
+          {c.mine && mode !== 'delete' && (
             <>
               <Button type="button" variant="link" size="inline" onClick={() => setMode('edit')}>Edit</Button>
-              <Button type="button" variant="link" size="inline" className={danger}
-                onClick={() => window.confirm(page.delete_confirm) && ctx.remove(c)}>Delete</Button>
+              <Button type="button" variant="link" size="inline" className={danger} onClick={() => setMode('delete')}>Delete</Button>
             </>
+          )}
+          {mode === 'delete' && (
+            <span className="flex flex-wrap items-center gap-4 rounded-lg bg-sale-soft px-3 py-2" role="alert">
+              <span className="font-medium">{page.delete_confirm}</span>
+              <Button type="button" size="sm" className="bg-destructive text-white hover:bg-destructive/90" autoFocus onClick={() => ctx.remove(c).then(() => setMode(null))}>Delete</Button>
+              <Button type="button" variant="link" size="inline" onClick={() => setMode(null)}>Cancel</Button>
+            </span>
           )}
         </div>
       )}

@@ -11,7 +11,8 @@ import { Label } from '../components/ui/label'
 import { NativeSelect, NativeSelectOption } from '../components/ui/native-select'
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group'
 import { Textarea } from '../components/ui/textarea'
-import { checkoutGrid, checkoutHead, formCard, hint } from '../lib/styles'
+import { cn } from 'cn'
+import { checkoutGrid, checkoutHead, formCard, hint, textLink } from '../lib/styles'
 import { useStore } from '../useStore'
 
 export default function Checkout() {
@@ -49,9 +50,10 @@ export default function Checkout() {
 
   return (
     <Page className={checkoutGrid}>
-      <form className={formCard} onSubmit={submit}>
+      <form className={cn(formCard, 'max-w-none')} onSubmit={submit}>
+        <Link to="/cart" className={cn(textLink, 'justify-self-start text-small')}>← Back to cart</Link>
         <h1 className={checkoutHead}>Delivery details</h1>
-        {!auth && <p className="text-muted-foreground">Ordering as a guest. <Link to="/login?next=/checkout">Log in</Link> to track orders on any device.</p>}
+        {!auth && <p className="text-muted-foreground">Ordering as a guest. <Link to="/login?next=/checkout" className={textLink}>Log in</Link> to track orders on any device.</p>}
         <Label>Full name<Input className="font-normal" name="full_name" required autoComplete="name" /></Label>
         <Label>Mobile number
           <Input className="font-normal" name="phone" type="tel" required placeholder="01712345678" autoComplete="tel" />
@@ -73,7 +75,7 @@ export default function Checkout() {
           <legend className="mb-2 text-[0.9375rem] font-semibold">Payment</legend>
           <RadioGroup name="payment" defaultValue={config.payments[0]?.value}>
             {config.payments.map((m) => (
-              <Label key={m.value} className="flex items-center gap-3 rounded-lg border border-primary bg-secondary px-4 py-3.5 font-medium">
+              <Label key={m.value} className="flex items-center gap-3 rounded-lg border bg-background px-4 py-3.5 font-medium transition-colors hover:border-primary has-data-[state=checked]:border-primary has-data-[state=checked]:bg-secondary">
                 <RadioGroupItem value={m.value} className="size-5" /> {m.label} {m.hint && <span className={hint}>{m.hint}</span>}
               </Label>
             ))}
@@ -82,7 +84,7 @@ export default function Checkout() {
         {error && <Fail>{error}</Fail>}
         <Button className="w-full" disabled={busy}>{busy ? 'Placing order…' : 'Place order'}</Button>
       </form>
-      <Summary />
+      <Summary lines />
     </Page>
   )
 }

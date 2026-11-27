@@ -9,6 +9,7 @@ import Status from '../components/Status'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
 import { Card } from '../components/ui/card'
+import { textLink } from '../lib/styles'
 import { useStore } from '../useStore'
 
 const status = {
@@ -34,12 +35,12 @@ export default function Orders() {
       {!auth && (
         <p className="text-muted-foreground">
           Orders placed without an account show here on this device only, until you log out or the session ends.
-          {' '}<Link to="/login?next=/orders">Log in</Link> to see your account's orders.
+          {' '}<Link to="/login?next=/orders" className={textLink}>Log in</Link> to see your account's orders.
         </p>
       )}
       <Status {...state}>
         {state.data?.length === 0 && (
-          <EmptyState icon={<Package strokeWidth={1.5} />} title="No orders yet" action={<Button asChild><Link to="/shop">Start shopping</Link></Button>}>
+          <EmptyState heading="h2" icon={<Package strokeWidth={1.5} />} title="No orders yet" action={<Button asChild><Link to="/shop">Start shopping</Link></Button>}>
             When you place an order, you can track it here.
           </EmptyState>
         )}

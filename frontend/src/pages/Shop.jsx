@@ -48,7 +48,7 @@ export default function Shop() {
       </div>
       <Status loading={loading} error={error}>
         {data?.results.length ? <TileGrid products={data.results} key={qs} /> : (
-          <EmptyState icon={<SearchX strokeWidth={1.5} />} title="No products found" action={<Button asChild variant="outline"><Link to="/shop">Clear filters</Link></Button>}>
+          <EmptyState heading="h2" icon={<SearchX strokeWidth={1.5} />} title="No products found" action={<Button asChild variant="outline"><Link to="/shop">Clear filters</Link></Button>}>
             {data?.empty}
           </EmptyState>
         )}
