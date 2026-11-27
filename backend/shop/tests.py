@@ -185,38 +185,73 @@ class ShopApiTests(APITestCase):
         self.assertEqual(r.status_code, 400)
         self.assertIn("cart", r.data)
 
-    def test_product_options_are_picked_kept_per_line_and_snapshotted(self):
-        from urllib.parse import quote
+    def shirt(self):
         shirt = Product.objects.create(category=self.phone.category, name="Shirt", slug="shirt", price=500,
-                                       image="https://x.y/c.jpg", stock=3)
+                                       image="https://x.y/c.jpg")
         shirt.options.create(name="Size", values="S, M", position=0)
         shirt.options.create(name="Color", values="Red, Blue / Navy", position=1)
-        self.assertEqual(self.client.get("/api/products/shirt/").data["options"],
-                         [{"name": "Size", "values": ["S", "M"]}, {"name": "Color", "values": ["Red", "Blue / Navy"]}])
+        self.assertEqual(shirt.sync_variants(stock=2), 4)
+        return shirt
+
+    def test_product_options_pick_a_variant_with_its_own_stock_and_price(self):
+        from urllib.parse import quote
+        shirt = self.shirt()
+        self.assertEqual(shirt.stock, 8)  # the total of its 4 combinations
+        m_red = shirt.variants.get(key="Color=Red&Size=M")
+        m_red.price, m_red.stock = 650, 3
+        m_red.save()
+        shirt.sync_stock()
+        d = self.client.get("/api/products/shirt/").data
+        self.assertEqual(d["options"], [{"name": "Size", "values": ["S", "M"]}, {"name": "Color", "values": ["Red", "Blue / Navy"]}])
+        self.assertEqual({v["price_display"] for v in d["variants"] if v["choices"] == {"Size": "M", "Color": "Red"}}, {taka(650)})
         post = lambda opts, q=1: self.client.post("/api/cart/", {"product": shirt.pk, "quantity": q, "options": opts}, format="json")
         self.assertEqual(self.add(shirt, 1).status_code, 400)  # nothing picked
         self.assertEqual(post({"Size": "XL", "Color": "Red"}).status_code, 400)
         self.assertEqual(post({"Size": "S", "Color": "Red", "Fit": "Slim"}).status_code, 400)
-        post({"Size": "M", "Color": "Red"}, 2)
-        c = post({"Size": "S", "Color": "Blue / Navy"}, 2).data  # stock 3 is shared across the shirt's lines
-        self.assertEqual([(l["options_line"], l["quantity"]) for l in c["lines"]],
-                         [("Size: M · Color: Red", 2), ("Size: S · Color: Blue / Navy", 1)])
-        self.assertIn("Only 3 of Shirt", c["notice"])
+        post({"Size": "M", "Color": "Red"}, 3)
+        c = post({"Size": "S", "Color": "Blue / Navy"}, 5).data  # that combination has 2
+        self.assertEqual([(l["options_line"], l["quantity"], l["each_line"]) for l in c["lines"]],
+                         [("Size: M · Color: Red", 3, f"{taka(650)} each"), ("Size: S · Color: Blue / Navy", 2, f"{taka(500)} each")])
+        self.assertIn("Only 2 of Shirt (Size: S · Color: Blue / Navy)", c["notice"])
         blue = c["lines"][1]["id"]
         self.assertEqual(self.client.patch(f"/api/cart/{quote(blue, safe='')}/", {"quantity": 1}, format="json").status_code, 200)
         r = self.checkout()
         self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual(r.data["subtotal"], 3 * 650 + 500)
         self.assertEqual(sorted(i["options"] for i in r.data["items"]), ["Size: M · Color: Red", "Size: S · Color: Blue / Navy"])
         shirt.refresh_from_db()
-        self.assertEqual(shirt.stock, 0)
+        self.assertEqual((shirt.stock, shirt.variants.get(pk=m_red.pk).stock), (5, 0))
+        self.assertEqual(post({"Size": "M", "Color": "Red"}).status_code, 400)  # that combination sold out
+        # Cancelling puts stock back on the variants it came from, and the product total follows.
+        order = Order.objects.get(pk=r.data["id"])
+        order.status = "cancelled"
+        order.save()
+        shirt.refresh_from_db()
+        self.assertEqual((shirt.stock, shirt.variants.get(pk=m_red.pk).stock), (9, 3))
         # Staff drop a choice someone has in their cart: the line goes, with a note.
-        shirt.stock = 5
-        shirt.save()
         post({"Size": "M", "Color": "Red"})
         shirt.options.filter(name="Color").update(values="Blue / Navy")
+        shirt.sync_variants()
+        self.assertEqual(shirt.variants.count(), 2)
         c = self.client.get("/api/cart/").data
         self.assertEqual(c["lines"], [])
         self.assertIn("choices for Shirt changed", c["notice"])
+
+    def test_stock_of_a_product_with_options_is_not_edited_directly(self):
+        shirt = self.shirt()
+        shirt.stock = 50
+        with self.assertRaises(DjangoValidationError):
+            shirt.full_clean()
+
+    def test_seed_keeps_options_staff_edited(self):
+        call_command("seed", stdout=io.StringIO())
+        p = Product.objects.filter(options__name="Size").first()
+        p.options.filter(name="Size").update(values="Free size")
+        p.sync_variants()
+        call_command("seed", stdout=io.StringIO())
+        self.assertEqual(list(p.options.values_list("name", "values")), [("Size", "Free size"), ("Color", "Black, White, Navy, Maroon")])
+        p.refresh_from_db()
+        self.assertEqual(p.stock, sum(p.variants.values_list("stock", flat=True)))
 
     def test_cart_totals_meter_and_clamping(self):
         self.client.force_authenticate(None)  # guests can use the cart
@@ -710,6 +745,7 @@ class AdminPanelTests(TestCase):
         form = {"name": p.name, "slug": p.slug, "category": p.category_id, "description": "", "price": p.price,
                 "original_price": "", "stock": p.stock, "image": "https://example.com/a.jpg", "rating": "0", "reviews": 0,
                 "photos-TOTAL_FORMS": 0, "photos-INITIAL_FORMS": 0, "options-TOTAL_FORMS": 0, "options-INITIAL_FORMS": 0,
+                "variants-TOTAL_FORMS": 0, "variants-INITIAL_FORMS": 0,
                 "comments-TOTAL_FORMS": len(shown), "comments-INITIAL_FORMS": len(shown)}
         for i, c in enumerate(shown):
             form.update({f"comments-{i}-id": c.pk, f"comments-{i}-product": p.pk, f"comments-{i}-text": c.text})
@@ -719,6 +755,19 @@ class AdminPanelTests(TestCase):
         self.assertEqual(self.post(f"/admin/shop/product/{p.pk}/change/", form).status_code, 302)
         self.assertEqual(Comment.objects.get(pk=shown[0].pk).text, "fixed by staff")
         self.assertFalse(Comment.objects.filter(pk=shown[1].pk).exists())
+
+    def test_saving_options_makes_their_combinations(self):
+        p = self.phone
+        form = {"name": p.name, "slug": p.slug, "category": p.category_id, "description": "", "price": p.price,
+                "original_price": "", "stock": p.stock, "image": "https://example.com/a.jpg", "rating": "0", "reviews": 0,
+                "photos-TOTAL_FORMS": 0, "photos-INITIAL_FORMS": 0, "variants-TOTAL_FORMS": 0, "variants-INITIAL_FORMS": 0,
+                "comments-TOTAL_FORMS": 0, "comments-INITIAL_FORMS": 0,
+                "options-TOTAL_FORMS": 1, "options-INITIAL_FORMS": 0,
+                "options-0-name": "Color", "options-0-values": "Black, Blue", "options-0-position": 0}
+        self.assertEqual(self.post(f"/admin/shop/product/{p.pk}/change/", form).status_code, 302)
+        p.refresh_from_db()
+        self.assertEqual(sorted(v.label for v in p.variants.all()), ["Color: Black", "Color: Blue"])
+        self.assertEqual(p.stock, 0)  # new combinations start empty until staff set their stock
 
     def test_lists_show_status_pills_and_theme(self):
         self.assertContains(self.get("/admin/shop/order/"), 'haat-badge haat-pending')

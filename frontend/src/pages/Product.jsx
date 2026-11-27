@@ -38,6 +38,10 @@ function ProductPage({ slug }) {
   const [qty, setQty] = useState(1) // Qty stops at max_qty; the server caps it again
   const [shown, setShown] = useState(0) // index into p.gallery
   const [chosen, setChosen] = useState({}) // {Size: 'M'}; the server says what is still missing
+  // Once every option is picked, that combination's price and stock replace the product's.
+  const picked = p?.variants.find((x) => p.options.every((o) => x.choices[o.name] === chosen[o.name]))
+  const item = picked ?? p
+  const n = Math.min(qty, item?.max_qty ?? qty) // a smaller combination may hold less than was set
 
   return (
     <Status loading={loading} error={error}>
@@ -72,32 +76,32 @@ function ProductPage({ slug }) {
               <h1>{p.name}</h1>
               <Rating p={p} />
               <p className="pdp-price">
-                {p.price_display}
-                {p.original_price_display && <> <s>{p.original_price_display}</s> <span className="off">{p.discount_label}</span></>}
+                {item.price_display}
+                {item.original_price_display && <> <s>{item.original_price_display}</s> <span className="off">{item.discount_label}</span></>}
               </p>
-              {p.stock_level !== 'out' ? (
-                <>
-                  <p className={p.stock_level === 'low' ? 'stock stock--low' : 'stock'}>{p.stock_label}</p>
-                  {p.options.map((o) => (
-                    <fieldset key={o.name} className="pdp-opt">
-                      <legend>{o.name}{chosen[o.name] && <span className="soft">: {chosen[o.name]}</span>}</legend>
-                      {o.values.map((v) => (
-                        <button key={v} type="button" aria-pressed={chosen[o.name] === v}
-                          onClick={() => setChosen({ ...chosen, [o.name]: v })}>{v}</button>
-                      ))}
-                    </fieldset>
+              {p.stock_level !== 'out' && p.options.map((o) => (
+                <fieldset key={o.name} className="pdp-opt">
+                  <legend>{o.name}{chosen[o.name] && <span className="soft">: {chosen[o.name]}</span>}</legend>
+                  {o.values.map((v) => (
+                    <button key={v} type="button" aria-pressed={chosen[o.name] === v}
+                      onClick={() => setChosen({ ...chosen, [o.name]: v })}>{v}</button>
                   ))}
+                </fieldset>
+              ))}
+              {item.stock_level !== 'out' ? (
+                <>
+                  <p className={item.stock_level === 'low' ? 'stock stock--low' : 'stock'}>{item.stock_label}</p>
                   <div className="pdp-buy">
-                    <Qty value={qty} max={p.max_qty} onChange={setQty} label="Quantity" />
-                    <button className="btn" onClick={() => add(p, qty, chosen)}>Add to cart</button>
-                    <button className="btn btn--line" onClick={() => add(p, qty, chosen).then((ok) => ok && navigate('/cart'))}>Buy now</button>
+                    <Qty value={n} max={item.max_qty} onChange={setQty} label="Quantity" />
+                    <button className="btn" onClick={() => add(p, n, chosen)}>Add to cart</button>
+                    <button className="btn btn--line" onClick={() => add(p, n, chosen).then((ok) => ok && navigate('/cart'))}>Buy now</button>
                   </div>
                   <ul className="perks">
                     {config?.perks.map((t) => <li key={t}>{t}</li>)}
                   </ul>
                 </>
               ) : (
-                <p className="stock stock--out">{p.stock_label}</p>
+                <p className="stock stock--out">{item.stock_label}</p>
               )}
               {p.specs.length > 0 && (
                 <ul className="pdp-spec">

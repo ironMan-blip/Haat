@@ -18,7 +18,7 @@ from django_otp.admin import OTPAdminSite
 
 from .auth import client_ident, locked_out, login_fail_keys, record_login_failure
 from .display import cdn, taka
-from .models import COMMENT_PAGE, LOW_STOCK, Category, Comment, Order, OrderItem, Product, ProductImage, ProductOption
+from .models import COMMENT_PAGE, LOW_STOCK, Category, Comment, Order, OrderItem, Product, ProductImage, ProductOption, ProductVariant
 
 log = logging.getLogger("shop.security")
 
@@ -172,6 +172,23 @@ class ProductOptionInline(admin.TabularInline):
     verbose_name_plural = "Options the buyer picks when ordering (e.g. Size: S, M, L)"
 
 
+class ProductVariantInline(admin.TabularInline):
+    """Every combination of the options above, made on save; staff set each one's stock and price here."""
+    model = ProductVariant
+    extra = 0
+    can_delete = False  # change the options instead: combinations follow them
+    fields = ["combination", "price", "stock"]
+    readonly_fields = ["combination"]
+    verbose_name_plural = "Stock and price per combination (the product's stock is their total)"
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    @admin.display(description="Combination")
+    def combination(self, obj):
+        return obj.label
+
+
 class CommentInline(admin.TabularInline):
     """Customers' comments on this product, newest first. Staff fix or remove abuse; deleting a comment
     also deletes its replies. Comments are written by customers, so staff can't add them here."""
@@ -220,7 +237,7 @@ class CommentInline(admin.TabularInline):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    inlines = [ProductImageInline, ProductOptionInline, CommentInline]
+    inlines = [ProductImageInline, ProductOptionInline, ProductVariantInline, CommentInline]
     list_display = ["thumb", "name", "category", "price", "original_price", "discount_badge", "stock",
                     "stock_status", "rating", "created"]
     list_display_links = ["thumb", "name"]
@@ -254,6 +271,17 @@ class ProductAdmin(admin.ModelAdmin):
             '<span class="haat-frame haat-preview"><img src="{}" alt="Product image preview"></span>'
             '<a class="haat-original" href="{}" target="_blank" rel="noopener"{}>Open full size</a>',
             cdn(obj.image, 600), obj.image, "" if obj.image else " hidden")
+
+    def get_readonly_fields(self, request, obj=None):
+        # With options, stock is the total of the combinations below; Product.clean() guards the list page too.
+        has_variants = obj is not None and obj.variants.exists()
+        return [*self.readonly_fields, "stock"] if has_variants else self.readonly_fields
+
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        if added := form.instance.sync_variants():
+            self.message_user(request, f"{added} new option combination(s) start with 0 stock: set their stock below.",
+                              messages.WARNING)
 
     @admin.display(description="Discount", ordering="original_price")
     def discount_badge(self, obj):

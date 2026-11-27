@@ -36,7 +36,7 @@ def cart(request):
     if request.method == "POST":  # add to cart
         line = CartLineSerializer(data=request.data)
         line.is_valid(raise_exception=True)
-        c.add(line.validated_data["product"], line.validated_data["options"], line.validated_data["quantity"])
+        c.add(line.validated_data["product"], line.validated_data["variant"], line.validated_data["quantity"])
         if not c.notes:
             c.notes.append(f"Added to cart: {line.validated_data['product'].name}")
     return Response(c.data())
@@ -56,7 +56,7 @@ def cart_line(request, key):
         pk, chosen = parse_key(key)
         line = CartLineSerializer(data={"product": pk, "options": chosen, "quantity": body.get("quantity")})
         line.is_valid(raise_exception=True)
-        c.set(line.validated_data["product"], line.validated_data["options"], line.validated_data["quantity"])
+        c.set(line.validated_data["product"], line.validated_data["variant"], line.validated_data["quantity"])
     return Response(c.data())
 
 

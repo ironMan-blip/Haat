@@ -42,9 +42,12 @@ class Command(BaseCommand):
                 "price": row["price"], "original_price": row["original_price"], "image": row["image"],
                 "rating": row["rating"], "reviews": row["reviews"], "stock": row["stock"],
             })
-            product.options.all().delete()  # the file owns sample products' options, like their other fields
-            ProductOption.objects.bulk_create(ProductOption(product=product, name=opt, values=", ".join(vals), position=n)
-                                              for n, (opt, vals) in enumerate(row.get("options", {}).items()))
+            # Options are sample data only until staff edit them: never overwrite options a product already has.
+            if row.get("options") and not product.options.exists():
+                ProductOption.objects.bulk_create(ProductOption(product=product, name=opt, values=", ".join(vals), position=n)
+                                                  for n, (opt, vals) in enumerate(row["options"].items()))
+                product.sync_variants(stock=row["stock"])  # each sample combination gets the listing's stock
+            product.sync_stock()  # with variants, stock is their total, not the file's number
         # Drop old seed products that are gone from the file, unless someone ordered them.
         stale = Product.objects.exclude(slug__in=slugs).filter(orderitem__isnull=True)
         removed = stale.count()

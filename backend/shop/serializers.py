@@ -5,11 +5,12 @@ from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.validators import ASCIIUsernameValidator
 from django.db import IntegrityError, connection, transaction
+from django.db.models import F
 from rest_framework import serializers
 
-from .cart import Cart, delivery_fee, options_line, pick
+from .cart import Cart, delivery_fee, describe, max_qty, pick, unit_price
 from .display import cdn, day, images, num, taka
-from .models import COMMENT_PAGE, MAX_QTY, Category, Comment, Order, OrderItem, Product
+from .models import COMMENT_PAGE, LOW_STOCK, MAX_QTY, Category, Comment, Order, OrderItem, Product, ProductVariant, percent_off
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -51,11 +52,22 @@ class ProductDetailSerializer(ProductSerializer):
         gallery = [images(url) for url in [p.image, *(ph.url for ph in p.photos.all())]]  # main photo first
         return {**super().to_representation(p), "discount_label": f"{p.discount}% off" if p.discount else None,
                 "gallery": [{**g, "alt": f"{p.name}, photo {i} of {len(gallery)}"} for i, g in enumerate(gallery, 1)],
-                "options": [{"name": o.name, "values": o.choices} for o in p.options.all()]}
+                "options": [{"name": o.name, "values": o.choices} for o in p.options.all()],
+                # The page shows the picked combination's price and stock once every option is chosen.
+                "variants": [variant_data(p, v) for v in p.variants.all()]}
 
     def get_related(self, p):
         others = Product.objects.select_related("category").prefetch_related("options").filter(category=p.category_id).exclude(pk=p.pk)[:7]
         return ProductSerializer(others, many=True).data
+
+
+def variant_data(p, v):
+    price, off = v.unit_price, percent_off(v.unit_price, p.original_price)
+    return {"choices": v.choices, "price_display": taka(price),
+            "original_price_display": taka(p.original_price) if off else None,
+            "discount_label": f"{off}% off" if off else None, "max_qty": v.max_qty,
+            "stock_level": "out" if not v.stock else "low" if v.stock < LOW_STOCK else "in",
+            "stock_label": "Sold out" if not v.stock else f"Only {v.stock} left" if v.stock < LOW_STOCK else "In stock"}
 
 
 class CommentSerializer(serializers.ModelSerializer):
@@ -141,12 +153,12 @@ class OrderItemSerializer(serializers.ModelSerializer):
 
 
 class CartLineSerializer(serializers.Serializer):
-    product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all())
+    product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.prefetch_related("options", "variants"))
     quantity = serializers.IntegerField(min_value=1, max_value=MAX_QTY)
     options = serializers.DictField(child=serializers.CharField(max_length=100), required=False, default=dict)
 
     def validate(self, attrs):
-        attrs["options"] = pick(attrs["product"], attrs["options"])
+        attrs["variant"] = pick(attrs["product"], attrs["options"])
         return attrs
 
 
@@ -197,18 +209,21 @@ class OrderSerializer(serializers.ModelSerializer):
         if not lines:  # keep the notes: "X sold out" says more than "empty"
             raise serializers.ValidationError({"cart": " ".join([*cart.notes, "Your cart is empty."])})
         subtotal = 0
-        for _, p, _, qty, _ in lines:
-            if p.stock < qty:
-                raise serializers.ValidationError({"cart": f"Only {p.stock} left of {p.name}."})
-            subtotal += p.price * qty  # price from DB, never from client
+        for _, p, v, qty in lines:
+            if max_qty(p, v) < qty:
+                raise serializers.ValidationError({"cart": f"Only {max_qty(p, v)} left of {describe(p, v)}."})
+            subtotal += unit_price(p, v) * qty  # price from DB, never from client
         fee = delivery_fee(subtotal)
         if subtotal + fee != expected:  # another tab, a price edit or a stock drop changed the cart
             raise serializers.ValidationError({"cart": " ".join(
                 [*cart.notes, "Your cart changed since you opened checkout. Check the new total and place the order again."])})
         order = Order.objects.create(subtotal=subtotal, delivery_fee=fee, total=subtotal + fee, **data)
-        for _, p, chosen, qty, _ in lines:  # lines() keeps each product's lines within its stock together
-            OrderItem.objects.create(order=order, product=p, name=p.name, price=p.price, quantity=qty,
-                                     options=options_line(p, chosen))
-            p.stock -= qty
+        for _, p, v, qty in lines:
+            OrderItem.objects.create(order=order, product=p, variant=v, name=p.name, price=unit_price(p, v),
+                                     quantity=qty, options=v.label if v else "")
+            # Variant rows aren't locked (only products are): take its stock only if it is still there.
+            if v and not ProductVariant.objects.filter(pk=v.pk, stock__gte=qty).update(stock=F("stock") - qty):
+                raise serializers.ValidationError({"cart": f"{describe(p, v)} just sold out. Check your cart and try again."})
+            p.stock -= qty  # the product's total, so it stays the sum of its variants
             p.save(update_fields=["stock"])
         return order
