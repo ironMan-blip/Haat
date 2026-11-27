@@ -79,6 +79,9 @@ class Product(models.Model):
 
     class Meta:
         ordering = ["-created", "id"]
+        # Parts of "change product", each given alone on the Staff page; change_product gives them all.
+        permissions = [("edit_product_details", "Edit details and photos"), ("edit_product_price", "Change prices"),
+                       ("edit_product_stock", "Change stock"), ("moderate_product_comments", "Moderate comments")]
 
     def __str__(self):
         return self.name
@@ -266,6 +269,9 @@ class Order(models.Model):
 
     class Meta:
         ordering = ["-created"]
+        # Parts of "change order", each given alone on the Staff page; change_order gives them all.
+        permissions = [("ship_order", "Mark shipped or delivered"), ("cancel_order", "Cancel"),
+                       ("edit_order_delivery", "Fix delivery details")]
 
     def __str__(self):
         return f"Order #{self.pk}"

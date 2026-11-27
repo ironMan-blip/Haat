@@ -9,9 +9,18 @@
           <span class="haat-info"><button type="button" class="haat-info-btn" aria-label="What {{ cell.action }} {{ row.label|lower }} allows" aria-describedby="perm-tip-{{ cell.pk }}">i</button><span role="tooltip" id="perm-tip-{{ cell.pk }}">{{ cell.help }}</span></span>{% else %}<span class="haat-muted" aria-label="Not available">-</span>{% endif %}</td>
       {% endfor %}
     </tr>
+    {% if row.parts %}
+    <tr class="haat-perm-parts">
+      <td class="haat-muted">Or only part of Change:</td>
+      <td colspan="4">{% for part in row.parts %}
+        <span class="haat-perm-part"><label><input type="checkbox" name="perms" value="{{ part.pk }}"{% if part.checked %} checked{% endif %}> {{ part.label }}</label>
+          <span class="haat-info"><button type="button" class="haat-info-btn" aria-label="What {{ part.action }} on {{ row.label|lower }} allows" aria-describedby="perm-tip-{{ part.pk }}">i</button><span role="tooltip" id="perm-tip-{{ part.pk }}">{{ part.help }}</span></span></span>
+      {% endfor %}</td>
+    </tr>
+    {% endif %}
   {% empty %}
     <tr><td colspan="5">You have no permissions to hand out.</td></tr>
   {% endfor %}
   </tbody>
 </table>
-<p class="help">Hover or focus the (i) beside a box to see what it allows. View = see the list. Add = make new ones. Change = edit. Delete = remove. "Users: change" lets someone manage staff too, but only with the permissions they hold themselves.</p>
+<p class="help">Hover or focus the (i) beside a box to see what it allows. View = see the list. Add = make new ones. Change = edit everything; or tick only the parts of it they need on the line underneath. Delete = remove. "Users: change" lets someone manage staff too, but only with the permissions they hold themselves.</p>

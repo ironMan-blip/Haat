@@ -1301,11 +1301,78 @@ class OwnerAndStaffTests(TestCase):
         from .staff import GENERIC_HELP, PERM_HELP
         self.as_owner()
         page = self.client.get("/admin/staff/")
-        boxes = [c for row in page.context["grid"] for c in row["cells"] if c]
+        boxes = [c for row in page.context["grid"] for c in [*row["cells"], *row["parts"]] if c]
         self.assertTrue(boxes)
         self.assertFalse([c for c in boxes if c["help"] in GENERIC_HELP.values()])  # every section has its own text
         self.assertContains(page, 'role="tooltip"', count=len(boxes))
         self.assertContains(page, PERM_HELP[("shop", "order")]["delete"])
+        orders = next(r for r in page.context["grid"] if r["label"] == "Orders")
+        self.assertEqual([c["label"] for c in orders["parts"]], ["Mark shipped or delivered", "Cancel", "Fix delivery details"])
+
+    # Parts of "change": each can be given alone
+
+    def as_staff_with(self, *codes):
+        self.clerk.user_permissions.set([perm(c) for c in codes])
+        self.as_clerk()
+
+    def test_shipping_only_staff_ship_but_cannot_cancel_or_edit_delivery(self):
+        self.as_staff_with("shop.view_order", "shop.ship_order")
+        url = f"/admin/shop/order/{self.order.pk}/change/"
+        form = self.client.get(url).context["adminform"].form
+        self.assertNotIn("address", form.fields)
+        self.assertEqual([k for k, _ in form.fields["status"].choices], ["pending", "shipped", "delivered"])
+        self.assertContains(self.client.post(url, self.order_form(status="cancelled")), "Select a valid choice")
+        act = lambda a: self.client.post("/admin/shop/order/", {"action": a, "_selected_action": [self.order.pk]})
+        act("mark_cancelled")  # not offered to them: refused
+        self.assertEqual(Order.objects.get(pk=self.order.pk).status, "pending")
+        act("mark_shipped")
+        self.assertEqual(Order.objects.get(pk=self.order.pk).status, "shipped")
+
+    def test_cancel_only_staff_can_only_cancel(self):
+        self.as_staff_with("shop.view_order", "shop.cancel_order")
+        url = f"/admin/shop/order/{self.order.pk}/change/"
+        form = self.client.get(url).context["adminform"].form
+        self.assertEqual([k for k, _ in form.fields["status"].choices], ["pending", "cancelled"])
+        self.assertEqual(self.client.post(url, self.order_form(status="cancelled")).status_code, 302)
+        self.assertEqual(Order.objects.get(pk=self.order.pk).status, "cancelled")
+
+    def test_delivery_only_staff_fix_the_address_but_not_the_status(self):
+        self.as_staff_with("shop.edit_order_delivery")
+        url = f"/admin/shop/order/{self.order.pk}/change/"
+        self.assertNotIn("status", self.client.get(url).context["adminform"].form.fields)
+        self.assertEqual(self.client.post(url, self.order_form(address="New road 9")).status_code, 302)
+        self.assertEqual(Order.objects.get(pk=self.order.pk).address, "New road 9")
+
+    def test_staff_who_see_orders_see_their_items(self):
+        p = Product.objects.create(category=Category.objects.create(name="C", slug="c"), name="P", slug="p",
+                                   price=50, image="https://x.y/a.jpg", stock=3)
+        self.order.items.create(product=p, name="P", price=50, quantity=2)
+        self.as_staff_with("shop.view_order")
+        self.assertContains(self.client.get(f"/admin/shop/order/{self.order.pk}/change/"), "Line total")
+
+    def test_price_only_staff_change_prices_and_nothing_else(self):
+        p = Product.objects.create(category=Category.objects.create(name="C", slug="c"), name="P", slug="p",
+                                   price=50, image="https://x.y/a.jpg", stock=3)
+        self.as_staff_with("shop.view_product", "shop.edit_product_price")
+        page = self.client.get(f"/admin/shop/product/{p.pk}/change/")
+        self.assertEqual(set(page.context["adminform"].form.fields), {"price", "original_price"})
+        inlines = {f.formset.prefix: f for f in page.context["inline_admin_formsets"]}
+        self.assertFalse(inlines["photos"].has_change_permission)
+        self.assertFalse(inlines["comments"].has_delete_permission)
+        self.assertTrue(inlines["variants"].has_change_permission)
+        mgmt = {f"{k}-{n}": 0 for k in ("photos", "options", "variants", "comments") for n in ("TOTAL_FORMS", "INITIAL_FORMS")}
+        r = self.client.post(f"/admin/shop/product/{p.pk}/change/", {**mgmt, "price": 40, "name": "Hacked"})
+        self.assertEqual(r.status_code, 302)
+        p.refresh_from_db()
+        self.assertEqual((p.price, p.name, p.stock), (40, "P", 3))
+        r = self.client.post("/admin/shop/product/", {"form-TOTAL_FORMS": 1, "form-INITIAL_FORMS": 1, "form-0-id": p.pk,
+                                                      "form-0-price": 30, "form-0-stock": 99, "_save": "Save"})
+        p.refresh_from_db()
+        self.assertEqual((p.price, p.stock), (30, 3))  # the list page's stock column is locked too
+
+    def test_part_shows_in_the_staff_list(self):
+        self.as_staff_with("shop.view_order", "shop.cancel_order", "auth.change_user")
+        self.assertContains(self.client.get("/admin/staff/"), "Orders: view, cancel")
 
     def test_invite_by_email_then_accept_makes_staff_with_those_permissions(self):
         self.as_owner()

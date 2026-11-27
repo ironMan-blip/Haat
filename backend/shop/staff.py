@@ -41,15 +41,25 @@ PERM_HELP = {
     ("shop", "order"): {
         "view": "Sees every order: the buyer's name, phone, email, address, items and totals.",
         "add": "Does nothing for staff: orders only come from checkout. Only the owner can add one by hand.",
-        "change": "Can move orders between statuses, one at a time or many from the list (cancelling puts the "
-                  "stock back), and fix delivery details. Prices, totals, payment and buyer stay locked.",
+        "change": "Everything in the three boxes below: ship, cancel and fix delivery details. Prices, totals, "
+                  "payment and buyer stay locked.",
+        "ship_order": "Can mark orders shipped, then delivered, one at a time or many from the list. A shipped "
+                      "order can't go back to pending.",
+        "cancel_order": "Can cancel pending or shipped orders. Cancelling a pending order puts its stock back on "
+                        "sale, and a cancelled order can't be reopened.",
+        "edit_order_delivery": "Can fix the buyer's name, phone, email, address and city on an order.",
         "delete": "Does nothing for staff: they cancel orders instead, so the history stays. Only the owner can delete.",
     },
     ("shop", "product"): {
         "view": "Sees every product with its price, stock, images, options and reviews.",
         "add": "Can put new products in the shop. They show to customers as soon as they're saved.",
-        "change": "Can edit names, prices, discounts, stock, images and options, and edit or delete customer "
-                  "comments. Customers see the changes straight away.",
+        "change": "Everything in the four boxes below. Customers see the changes straight away.",
+        "edit_product_details": "Can edit the name, web address, category, description, images, extra photos, "
+                                "options and review numbers.",
+        "edit_product_price": "Can change prices and the before-discount price, also per option combination.",
+        "edit_product_stock": "Can change how many are in stock, also per option combination. Orders take stock "
+                              "on their own.",
+        "moderate_product_comments": "Can edit or delete customers' comments. Deleting one also deletes its replies.",
         "delete": "Can remove a product for good, with its images, options and comments. Products already "
                   "in an order can't be deleted.",
     },
@@ -86,6 +96,17 @@ PERM_HELP = {
         "delete": "Can remove a staff authenticator, so that person can't log in until it's set up again.",
     },
 }
+
+
+def may(user, model, *parts):
+    """True when `user` may do any of `parts` (permission codenames) on shop `model`. The model's own change
+    permission gives every part, so staff who had it before parts existed keep everything."""
+    return user.has_perm(f"shop.change_{model}") or any(user.has_perm(f"shop.{p}") for p in parts)
+
+
+def parts(model):
+    """The part permissions a shop model declares in its Meta."""
+    return [codename for codename, _ in model._meta.permissions]
 
 
 def grantable(user):
@@ -175,21 +196,26 @@ class StaffViews:
         return TemplateResponse(request, template, {**self.site.each_context(request), **context})
 
     def perm_grid(self, editor, checked=()):
-        """Rows of view/add/change/delete checkboxes, one row per section of the admin the editor may hand out."""
+        """Rows of view/add/change/delete checkboxes, one row per section of the admin the editor may hand out,
+        each with the parts of "change" its model declares underneath."""
         allowed = {p.pk: p for p in grantable(editor).filter(
             content_type__in=[ContentType.objects.get_for_model(m) for m in self.site._registry])}
         rows = {}
         for p in allowed.values():
-            action = p.codename.split("_", 1)[0]
-            if action in ACTIONS:
-                model = p.content_type.model_class()
-                row = rows.setdefault(p.content_type_id, {"label": str(model._meta.verbose_name_plural).capitalize(),
-                                                          "app": str(model._meta.app_config.verbose_name),
-                                                          "cells": {}})
-                ct = p.content_type
+            action, ct = p.codename.split("_", 1)[0], p.content_type
+            model = ct.model_class()
+            row = rows.setdefault(p.content_type_id, {"label": str(model._meta.verbose_name_plural).capitalize(),
+                                                      "app": str(model._meta.app_config.verbose_name),
+                                                      "cells": {}, "parts": []})
+            help_ = PERM_HELP.get((ct.app_label, ct.model), {})
+            if p.codename in parts(model):
+                row["parts"].append({"pk": p.pk, "checked": p.pk in checked, "action": p.name.lower(),
+                                     "label": p.name, "help": help_[p.codename]})
+            elif action in ACTIONS:
                 row["cells"][action] = {"pk": p.pk, "checked": p.pk in checked, "action": action,
-                                        "help": PERM_HELP.get((ct.app_label, ct.model), GENERIC_HELP)[action]}
-        return [{**r, "cells": [r["cells"].get(a) for a in ACTIONS]}
+                                        "help": help_.get(action, GENERIC_HELP[action])}
+        return [{**r, "cells": [r["cells"].get(a) for a in ACTIONS],
+                 "parts": sorted(r["parts"], key=lambda c: c["pk"])}  # pk order = the order Meta declares them
                 for r in sorted(rows.values(), key=lambda r: (r["app"], r["label"]))]
 
     def picked(self, request):
@@ -239,7 +265,7 @@ class StaffViews:
             action = p.codename.split("_", 1)[0]
             model = p.content_type.model_class()
             name = str(model._meta.verbose_name_plural).capitalize() if model else p.content_type.model
-            by_model.setdefault(name, []).append(action if action in ACTIONS else p.name)
+            by_model.setdefault(name, []).append(action if action in ACTIONS else p.name.lower())
         return " · ".join(f"{m}: {', '.join(sorted(a, key=lambda x: ACTIONS.index(x) if x in ACTIONS else 9))}"
                           for m, a in sorted(by_model.items())) or "Nothing yet"
 

@@ -452,7 +452,11 @@ input[type=submit], .button, .submit-row input { text-transform: none; }
 .haat-staff > form, .haat-staff > p, .haat-staff > h3 { padding: 0 16px; }
 .haat-staff table { width: 100%; }
 .haat-perms td { text-align: center; }
-.haat-perms input[type=checkbox] { width: 18px; height: 18px; }
+.haat-perms input[type=checkbox] { width: 18px; height: 18px; vertical-align: middle; }
+.haat-perm-parts td { padding-top: 0; font-size: .85rem; }
+.haat-perm-parts td:last-child { text-align: left; }
+.haat-perm-part { display: inline-flex; align-items: center; margin: 0 18px 4px 0; white-space: nowrap; }
+.haat-perm-part label { display: inline; padding: 0; font-weight: 400; }
 .haat-muted { color: var(--haat-muted); font-weight: 400; }
 .haat-info { position: relative; display: inline-block; vertical-align: middle; margin-left: 4px; }
 .haat-info-btn { width: 18px; height: 18px; padding: 0; border-radius: 50%; border: 1px solid var(--haat-muted); background: transparent;

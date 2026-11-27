@@ -19,7 +19,7 @@ from django_otp.admin import OTPAdminSite
 
 from .auth import client_ident, locked_out, login_fail_keys, record_login_failure
 from .display import cdn, taka
-from .staff import StaffViews, grantable, hold, outranks
+from .staff import StaffViews, grantable, hold, may, outranks, parts
 from .models import COMMENT_PAGE, LOW_STOCK, Category, Comment, Order, OrderItem, Product, ProductImage, ProductOption, ProductVariant, options_error, variant_keys
 
 log = logging.getLogger("shop.security")
@@ -163,7 +163,27 @@ class StockFilter(admin.SimpleListFilter):
                 "in": queryset.filter(stock__gte=LOW_STOCK)}.get(self.value(), queryset)
 
 
-class ProductImageInline(admin.TabularInline):
+class PartInline(admin.TabularInline):
+    """An inline whose rights follow its parent's permissions, not its own model's (those are never handed out):
+    seen by whoever sees the parent, edited by whoever may add the parent or holds one of `parts` of changing it."""
+    parts = ()
+
+    def parent(self):
+        return self.parent_model._meta.model_name
+
+    def has_view_permission(self, request, obj=None):
+        m = self.parent()
+        return request.user.has_perm(f"shop.view_{m}") or may(request.user, m, *parts(self.parent_model))
+
+    def has_change_permission(self, request, obj=None):
+        return (obj is None and request.user.has_perm(f"shop.add_{self.parent()}")) or \
+            may(request.user, self.parent(), *self.parts)
+
+    has_add_permission = has_delete_permission = has_change_permission
+
+
+class ProductImageInline(PartInline):
+    parts = ["edit_product_details"]
     model = ProductImage
     extra = 1
     fields = ["thumb", "url", "position"]
@@ -195,7 +215,8 @@ class OptionFormSet(forms.BaseInlineFormSet):
                 "and the product's price.")
 
 
-class ProductOptionInline(admin.TabularInline):
+class ProductOptionInline(PartInline):
+    parts = ["edit_product_details"]
     model = ProductOption
     formset = OptionFormSet
     extra = 1
@@ -211,8 +232,9 @@ def stock_field(field, db_field):
     return field
 
 
-class ProductVariantInline(admin.TabularInline):
+class ProductVariantInline(PartInline):
     """Every combination of the options above, made on save; staff set each one's stock and price here."""
+    parts = ["edit_product_price", "edit_product_stock"]
     model = ProductVariant
     extra = 0
     can_delete = False  # change the options instead: combinations follow them
@@ -223,6 +245,9 @@ class ProductVariantInline(admin.TabularInline):
     def has_add_permission(self, request, obj=None):
         return False
 
+    def get_readonly_fields(self, request, obj=None):
+        return [*self.readonly_fields, *ProductAdmin.locked(request.user, ["price", "stock"])]
+
     def formfield_for_dbfield(self, db_field, request, **kwargs):
         return stock_field(super().formfield_for_dbfield(db_field, request, **kwargs), db_field)
 
@@ -231,9 +256,10 @@ class ProductVariantInline(admin.TabularInline):
         return obj.label
 
 
-class CommentInline(admin.TabularInline):
+class CommentInline(PartInline):
     """Customers' comments on this product, newest first. Staff fix or remove abuse; deleting a comment
     also deletes its replies. Comments are written by customers, so staff can't add them here."""
+    parts = ["moderate_product_comments"]
     model = Comment
     fk_name = "product"
     extra = 0
@@ -314,10 +340,27 @@ class ProductAdmin(admin.ModelAdmin):
             '<a class="haat-original" href="{}" target="_blank" rel="noopener"{}>Open full size</a>',
             cdn(obj.image, 600), obj.image, "" if obj.image else " hidden")
 
+    # Which fields each part of "change product" unlocks. Adding a product needs none of them.
+    PART_FIELDS = {"edit_product_details": ["name", "slug", "category", "description", "image", "rating", "reviews"],
+                   "edit_product_price": ["price", "original_price"], "edit_product_stock": ["stock"]}
+
+    @classmethod
+    def locked(cls, user, fields=None):
+        """The fields (of `fields`, else all part fields) that `user` may not change on an existing product."""
+        out = [f for part, fs in cls.PART_FIELDS.items() if not may(user, "product", part) for f in fs]
+        return [f for f in out if fields is None or f in fields]
+
+    def has_change_permission(self, request, obj=None):
+        return may(request.user, "product", *parts(Product))
+
     def get_readonly_fields(self, request, obj=None):
         # With options, stock is the total of the combinations below; Product.clean() guards the list page too.
         has_variants = obj is not None and obj.variants.exists()
-        return [*self.readonly_fields, "stock"] if has_variants else self.readonly_fields
+        ro = [*self.readonly_fields, *(self.locked(request.user) if obj else [])]
+        return [*ro, "stock"] if has_variants and "stock" not in ro else ro
+
+    def get_prepopulated_fields(self, request, obj=None):
+        return {} if obj and "slug" in self.locked(request.user) else self.prepopulated_fields
 
     def get_queryset(self, request):
         return super().get_queryset(request).annotate(has_variants=Exists(ProductVariant.objects.filter(product=OuterRef("pk"))))
@@ -329,6 +372,9 @@ class ProductAdmin(admin.ModelAdmin):
                 # A stale stock number from the list page would fail Product.clean() or overwrite a sale.
                 if getattr(self.instance, "has_variants", False):
                     self.fields["stock"].disabled = True
+                for f in locked:  # list-page columns this person's parts don't cover
+                    self.fields[f].disabled = True
+        locked = self.locked(request.user, self.list_editable)
         return Form
 
     def formfield_for_dbfield(self, db_field, request, **kwargs):
@@ -379,7 +425,7 @@ class OwnerItemFormSet(forms.BaseInlineFormSet):
             raise ValidationError("Changing an order's items needs the \"I understand\" tick at the bottom.")
 
 
-class OrderItemInline(admin.TabularInline):
+class OrderItemInline(PartInline):
     # Items are what the buyer ordered and what stock was taken for: only the owner edits them, after a warning.
     model = OrderItem
     extra = 0
@@ -424,7 +470,7 @@ class OwnerOrderForm(forms.ModelForm):
 def set_status(status):
     """Bulk action. Saves each order one by one so Order.save() puts cancelled stock back."""
 
-    @admin.action(description=f"Mark selected orders {status}", permissions=["change"])
+    @admin.action(description=f"Mark selected orders {status}", permissions=["cancel" if status == "cancelled" else "ship"])
     def action(modeladmin, request, queryset):
         done, refused = 0, []
         for order in queryset.exclude(status=status):
@@ -504,13 +550,42 @@ class OrderAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return request.user.is_superuser
 
+    DELIVERY = ["full_name", "phone", "email", "address", "city"]
+
+    def has_change_permission(self, request, obj=None):
+        return may(request.user, "order", *parts(Order))
+
+    def has_ship_permission(self, request):  # read by the bulk actions
+        return may(request.user, "order", "ship_order")
+
+    def has_cancel_permission(self, request):
+        return may(request.user, "order", "cancel_order")
+
+    def statuses(self, request):
+        """The statuses this person may move an order to."""
+        return ({"pending", "shipped", "delivered"} if self.has_ship_permission(request) else set()) | \
+            ({"cancelled"} if self.has_cancel_permission(request) else set())
+
     def get_readonly_fields(self, request, obj=None):
-        return ["progress", "created"] if request.user.is_superuser else self.readonly_fields
+        if request.user.is_superuser:
+            return ["progress", "created"]
+        return [*self.readonly_fields, *([] if self.statuses(request) else ["status"]),
+                *([] if may(request.user, "order", "edit_order_delivery") else self.DELIVERY)]
 
     def get_form(self, request, obj=None, **kwargs):
         if request.user.is_superuser:
             kwargs["form"] = OwnerOrderForm
-        return super().get_form(request, obj, **kwargs)
+        form = super().get_form(request, obj, **kwargs)
+        if request.user.is_superuser or "status" not in form.base_fields:
+            return form
+        allowed = self.statuses(request)
+
+        class StaffForm(form):  # the status list offers only moves this person may make; posting another is refused
+            def __init__(self, *args, **kw):
+                super().__init__(*args, **kw)
+                self.fields["status"].choices = [(k, label) for k, label in Order.STATUS
+                                                 if k in allowed or k == self.instance.status]
+        return StaffForm
 
     def get_fieldsets(self, request, obj=None):
         if not request.user.is_superuser:
