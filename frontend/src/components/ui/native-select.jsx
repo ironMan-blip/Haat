@@ -1,4 +1,3 @@
-import * as React from "react"
 import { cn } from "cn"
 import { ChevronDownIcon } from "lucide-react"
 
@@ -40,17 +39,4 @@ function NativeSelectOption({
   )
 }
 
-function NativeSelectOptGroup({
-  className,
-  ...props
-}) {
-  return (
-    <optgroup
-      data-slot="native-select-optgroup"
-      className={cn("bg-[Canvas] text-[CanvasText]", className)}
-      {...props}
-    />
-  )
-}
-
-export { NativeSelect, NativeSelectOptGroup, NativeSelectOption }
+export { NativeSelect, NativeSelectOption }

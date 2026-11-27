@@ -68,6 +68,8 @@ DATABASES = {'default': {
     'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
     'HOST': os.environ.get('POSTGRES_HOST', ''),  # empty = local Unix socket
     'PORT': os.environ.get('POSTGRES_PORT', ''),
+    'CONN_MAX_AGE': 60,  # reuse a worker's connection across requests instead of reconnecting each time
+    'CONN_HEALTH_CHECKS': True,  # drop a connection the server closed before reusing it
 }}
 
 AUTH_PASSWORD_VALIDATORS = [
