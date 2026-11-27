@@ -8,6 +8,7 @@ from django.db.models import F
 
 MAX_QTY = 20  # most of one product per cart line or order
 LOW_STOCK = 10  # below this the shop says "only N left"
+COMMENT_PAGE = 10  # comments, and replies per comment, sent per page
 
 
 class Category(models.Model):

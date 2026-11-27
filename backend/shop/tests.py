@@ -368,12 +368,30 @@ class ShopApiTests(APITestCase):
         t = karim.get(url).data["results"][0]
         self.assertEqual((t["text"], t["edited_label"], t["liked"], t["mine"]), ("Battery life?", "edited", True, False))
         self.assertEqual([(r["text"], r["mine"]) for r in t["replies"]], [("Lasts a day", True)])
-        self.assertEqual(self.client.delete(f"/api/comments/{top}/").status_code, 204)  # has a reply: placeholder
+        gone = self.client.delete(f"/api/comments/{top}/").data  # has a reply: placeholder
+        self.assertEqual((gone["removed"], gone["comment"]["deleted"]), ([], True))
         t = karim.get(url).data["results"][0]
         self.assertEqual((t["deleted"], t["author"], t["likes"], len(t["replies"])), (True, None, 0, 1))
-        self.assertEqual(karim.delete(f"/api/comments/{reply}/").status_code, 204)  # no replies: gone
+        self.assertEqual(karim.delete(f"/api/comments/{reply}/").data["removed"], [reply, top])  # placeholder too
         self.assertEqual(karim.post(url, {"text": "x", "parent": top}, format="json").status_code, 400)  # deleted parent
         self.assertEqual(karim.get(url).data["results"], [])  # last reply gone: the placeholder goes too
+
+    def test_comments_and_replies_come_ten_at_a_time(self):
+        top = [Comment.objects.create(product=self.phone, user=self.user, text=f"c{i}").pk for i in range(12)]
+        for i in range(12):
+            Comment.objects.create(product=self.phone, user=self.user, parent_id=top[-1], text=f"r{i}")
+        url = "/api/products/phone/comments/"
+        first = self.client.get(url).data
+        self.assertEqual(([c["text"] for c in first["results"]], first["title"]),
+                         ([f"c{i}" for i in range(11, 1, -1)], "Comments (12)"))  # newest first, no cap
+        newest = first["results"][0]
+        self.assertEqual([r["text"] for r in newest["replies"]], [f"r{i}" for i in range(10)])  # oldest first
+        Comment.objects.create(product=self.phone, user=self.user, text="new")  # arrives mid-paging
+        second = self.client.get(f"{url}?before={first['next']}").data
+        self.assertEqual(([c["text"] for c in second["results"]], second["next"]), (["c1", "c0"], None))
+        more = self.client.get(f"/api/comments/{newest['id']}/replies/?after={newest['replies_next']}").data
+        self.assertEqual(([r["text"] for r in more["results"]], more["next"]), (["r10", "r11"], None))
+        self.assertEqual(self.client.get(f"{url}?before=x").status_code, 400)
 
     def test_comment_edits_and_likes_are_throttled(self):
         c = self.client.post("/api/products/phone/comments/", {"text": "Hi"}, format="json").data["id"]

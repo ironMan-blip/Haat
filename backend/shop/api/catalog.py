@@ -1,4 +1,5 @@
 from collections import defaultdict
+from functools import cached_property
 
 from django.conf import settings
 from django.contrib.auth.password_validation import password_validators_help_texts
@@ -13,7 +14,7 @@ from rest_framework.response import Response
 
 from ..auth import AnonThrottle, CommentActionThrottle, CommentThrottle, UserThrottle
 from ..display import cdn, items, num, taka
-from ..models import Category, Comment, Order, Product
+from ..models import COMMENT_PAGE, Category, Comment, Order, Product
 from ..serializers import CategorySerializer, CommentSerializer, ProductDetailSerializer, ProductSerializer
 
 PAYMENT_HINTS = {"cod": "Pay the rider when it arrives"}
@@ -68,39 +69,87 @@ class ProductDetail(generics.RetrieveAPIView):
     lookup_field = "slug"
 
 
+def cursor(request, name):
+    """A page cursor from the query string: the id of the last comment the client has, or None."""
+    value = request.query_params.get(name)
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        raise ValidationError({name: "Must be a comment id."}) from None
+
+
+def page(rows):
+    """Split one-past-the-page rows into (this page, cursor for the next one or None)."""
+    return rows[:COMMENT_PAGE], rows[COMMENT_PAGE - 1].pk if len(rows) > COMMENT_PAGE else None
+
+
+def comments_title(product):
+    n = product.comments.filter(parent=None).count()
+    return f"Comments ({num(n)})" if n else "Comments"
+
+
+def live(qs):
+    return qs.select_related("user").prefetch_related("likes")
+
+
 class ProductComments(generics.ListCreateAPIView):
-    """Anyone reads a product's comments; only signed-in customers post (token auth, so no CSRF)."""
+    """Anyone reads a product's comments, newest first, COMMENT_PAGE threads at a time (`?before=<id>` for
+    the next page). Only signed-in customers post (token auth, so no CSRF)."""
     serializer_class = CommentSerializer
     permission_classes = [IsAuthenticatedOrReadOnly]
     throttle_classes = [AnonThrottle, UserThrottle, CommentThrottle]
 
+    @cached_property
     def product(self):
         return get_object_or_404(Product, slug=self.kwargs["slug"])
 
     def get_queryset(self):
-        # shortcut: newest 100 threads only, no pagination; add CursorPagination once a product gets more.
-        replies = Comment.objects.select_related("user").prefetch_related("likes").order_by("created", "id")
-        return (Comment.objects.filter(product=self.product(), parent=None).select_related("user")
-                .prefetch_related("likes", Prefetch("replies", queryset=replies)))[:100]
+        # Ids only grow, so paging by id never repeats or skips a comment when new ones arrive.
+        replies = live(Comment.objects.order_by("id"))[:COMMENT_PAGE + 1]
+        qs = live(Comment.objects.filter(product=self.product, parent=None)).order_by("-id") \
+            .prefetch_related(Prefetch("replies", queryset=replies, to_attr="first_replies"))
+        if (before := cursor(self.request, "before")) is not None:
+            qs = qs.filter(pk__lt=before)
+        return qs[:COMMENT_PAGE + 1]
 
     def list(self, request, *args, **kwargs):
-        results = self.get_serializer(self.get_queryset(), many=True).data
+        rows, nxt = page(list(self.get_queryset()))
         return Response({
-            "title": f"Comments ({num(len(results))})" if results else "Comments",
+            "title": comments_title(self.product),
             "empty": "No comments yet. Be the first to share what you think.",
             "login_prompt": "Log in to leave a comment.",
             "placeholder": "What do you think of this product?",
             "reply_placeholder": "Write a reply",
             "delete_confirm": "Delete this comment? This can't be undone.",
-            "results": results,
+            "more_label": "See more comments",
+            "more_replies_label": "See more replies",
+            "results": CommentSerializer(rows, many=True, context={**self.get_serializer_context(), "threads": True}).data,
+            "next": nxt,
         })
 
+    def create(self, request, *args, **kwargs):
+        response = super().create(request, *args, **kwargs)
+        response.data["title"] = comments_title(self.product)  # the count went up
+        return response
+
     def perform_create(self, serializer):
-        product = self.product()
         parent = serializer.validated_data.get("parent")
-        if parent and parent.product_id != product.pk:
+        if parent and parent.product_id != self.product.pk:
             raise ValidationError({"parent": "You can only reply to a comment on this product."})
-        serializer.save(product=product, user=self.request.user)
+        serializer.save(product=self.product, user=self.request.user)
+
+
+@api_view(["GET"])
+def comment_replies(request, pk):
+    """A comment's replies, oldest first, COMMENT_PAGE at a time after the reply with id `?after=`."""
+    parent = get_object_or_404(Comment, pk=pk, parent=None)
+    qs = live(parent.replies.order_by("id"))
+    if (after := cursor(request, "after")) is not None:
+        qs = qs.filter(pk__gt=after)
+    rows, nxt = page(list(qs[:COMMENT_PAGE + 1]))
+    return Response({"results": CommentSerializer(rows, many=True, context={"request": request}).data, "next": nxt})
 
 
 class CommentDetail(generics.UpdateAPIView, generics.DestroyAPIView):
@@ -117,16 +166,23 @@ class CommentDetail(generics.UpdateAPIView, generics.DestroyAPIView):
         serializer.validated_data.pop("parent", None)  # a comment can't be moved to another thread
         serializer.save(edited=True)
 
-    def perform_destroy(self, c):
+    def destroy(self, request, *args, **kwargs):
+        """Says what changed, so the page can update the comments it has loaded without reloading them."""
+        c = self.get_object()
+        removed, placeholder = [], None
         if c.replies.exists():  # keep other people's replies: leave a placeholder instead
             c.text, c.deleted = "", True
             c.save(update_fields=["text", "deleted"])
             c.likes.clear()
+            placeholder = self.get_serializer(c).data
         else:
-            c.delete()
+            removed.append(c.pk)
             parent = c.parent
+            c.delete()
             if parent and parent.deleted and not parent.replies.exists():  # its last reply went: drop the placeholder
+                removed.append(parent.pk)
                 parent.delete()
+        return Response({"removed": removed, "comment": placeholder, "title": comments_title(c.product)})
 
 
 @api_view(["POST", "DELETE"])

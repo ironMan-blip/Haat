@@ -9,7 +9,7 @@ from rest_framework import serializers
 
 from .cart import Cart, delivery_fee
 from .display import cdn, day, images, num, taka
-from .models import MAX_QTY, Category, Comment, Order, OrderItem, Product
+from .models import COMMENT_PAGE, MAX_QTY, Category, Comment, Order, OrderItem, Product
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -68,7 +68,7 @@ class CommentSerializer(serializers.ModelSerializer):
     def to_representation(self, c):
         me = self.context["request"].user.pk  # None for guests
         likers = {u.pk for u in c.likes.all()}
-        return {
+        data = {
             **super().to_representation(c),
             "text": "This comment was deleted." if c.deleted else c.text,
             "author": None if c.deleted else c.user.username,
@@ -78,8 +78,13 @@ class CommentSerializer(serializers.ModelSerializer):
             "mine": c.user_id == me and not c.deleted,
             "likes": len(likers),
             "liked": me in likers,
-            "replies": None if c.parent_id else CommentSerializer(c.replies.all(), many=True, context=self.context).data,
+            "is_reply": bool(c.parent_id),
         }
+        if self.context.get("threads") and not c.parent_id:  # a thread list: first page of replies too
+            rs = c.first_replies  # prefetched by the view, one past the page to tell if there are more
+            data["replies"] = CommentSerializer(rs[:COMMENT_PAGE], many=True, context=self.context).data
+            data["replies_next"] = rs[COMMENT_PAGE - 1].pk if len(rs) > COMMENT_PAGE else None
+        return data
 
 
 class RegisterSerializer(serializers.ModelSerializer):
