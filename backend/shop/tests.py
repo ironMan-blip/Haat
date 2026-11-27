@@ -725,6 +725,15 @@ class AdminSecurityTests(TestCase):
         self.assertEqual(self.login().status_code, 200)  # password alone: form shown again
         self.assertEqual(self.login(code=self.code()).status_code, 302)
 
+    def test_admin_login_uses_the_only_device_without_a_pick(self):
+        r = self.client.post("/admin/login/", {"username": "boss", "password": "pass-1234-word", "otp_token": self.code()})
+        self.assertEqual(r.status_code, 302)
+
+    def test_admin_login_explains_a_missing_authenticator(self):
+        User.objects.create_user("newstaff", password="pass-1234-word", is_staff=True)
+        r = self.client.post("/admin/login/", {"username": "newstaff", "password": "pass-1234-word", "otp_token": "123456"})
+        self.assertContains(r, "manage.py admin_totp newstaff")
+
     def test_admin_locks_out_after_failed_logins(self):
         codes = [self.login(password="wrong").status_code for _ in range(6)]
         self.assertEqual(codes, [200] * 5 + [429])

@@ -15,7 +15,8 @@ from django.db.models.functions import TruncDate
 from django.http import HttpResponse
 from django.utils import timezone
 from django.utils.html import format_html, format_html_join
-from django_otp.admin import OTPAdminSite
+from django_otp import devices_for_user
+from django_otp.admin import OTPAdminAuthenticationForm, OTPAdminSite
 
 from .auth import client_ident, locked_out, login_fail_keys, record_login_failure
 from .display import cdn, taka
@@ -25,10 +26,28 @@ from .models import COMMENT_PAGE, LOW_STOCK, Category, Comment, Order, OrderItem
 log = logging.getLogger("shop.security")
 
 
+class HaatLoginForm(OTPAdminAuthenticationForm):
+    """django-otp lists devices only after a correct password, so the first submit has none to pick.
+    With one device (the usual case) use it; with none, say so instead of 'Please select a device'."""
+
+    def _chosen_device(self, user):
+        device = super()._chosen_device(user)  # an explicit pick, checked to belong to this user
+        if device is None:
+            devices = list(devices_for_user(user, for_verify=True))  # locked: clean_otp runs in a transaction
+            if not devices:
+                raise ValidationError(f"No authenticator app is set up for this account. "
+                                      f"Ask the owner to run: manage.py admin_totp {user.get_username()}")
+            if len(devices) == 1:
+                device = devices[0]
+        return device
+
+
 class HaatAdminSite(OTPAdminSite):
     """Admin login needs the password and an authenticator-app code (`manage.py admin_totp <user>`),
     and locks an IP or a username out after repeated failures. DRF throttles don't cover the admin.
     Tradeoff: anyone who knows an admin username can lock it out for a while; the hidden path limits that."""
+
+    login_form = HaatLoginForm
 
     def login(self, request, extra_context=None):
         if request.method != "POST":
