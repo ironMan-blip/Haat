@@ -159,3 +159,5 @@ LOGIN_MAX_FAILS_PER_ACCOUNT = 50
 LOGIN_LOCKOUT_SECONDS = 15 * 60
 
 ADMIN_PATH = os.environ.get('DJANGO_ADMIN_PATH', 'admin/')  # use a non-default path in production
+# Admin "View site" link. In dev the shop runs on the Vite server, not on Django's port.
+SITE_URL = os.environ.get('DJANGO_SITE_URL', 'http://localhost:5173/' if DEBUG else '/')

@@ -2,6 +2,7 @@ import logging
 from datetime import timedelta
 
 from django import forms
+from django.conf import settings
 from django.contrib import admin, messages
 from django.contrib.auth.admin import GroupAdmin, UserAdmin
 from django.contrib.auth.forms import AdminUserCreationForm, UserChangeForm
@@ -51,6 +52,7 @@ class HaatAdminSite(OTPAdminSite):
 
     index_template = "admin/haat_index.html"  # own name: shop's templates load after django.contrib.admin's
     site_header = site_title = "Haat admin"
+    site_url = settings.SITE_URL
     index_title = "Dashboard"
 
     def index(self, request, extra_context=None):
