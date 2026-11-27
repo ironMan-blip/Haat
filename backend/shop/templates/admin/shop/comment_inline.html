@@ -1,0 +1,5 @@
+{% include "admin/edit_inline/tabular.html" %}
+{% with more=inline_admin_formset.opts.more_url %}{% if more %}
+<p class="haat-more"><a class="button" href="{{ more }}">Show {{ inline_admin_formset.opts.page_size }} more comments</a>
+  <span class="help">Save your changes first: unsaved edits are lost.</span></p>
+{% endif %}{% endwith %}

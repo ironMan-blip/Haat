@@ -17,7 +17,7 @@ from django_otp.admin import OTPAdminSite
 
 from .auth import client_ident, locked_out, login_fail_keys, record_login_failure
 from .display import cdn, taka
-from .models import LOW_STOCK, Category, Comment, Order, OrderItem, Product, ProductImage
+from .models import COMMENT_PAGE, LOW_STOCK, Category, Comment, Order, OrderItem, Product, ProductImage
 
 log = logging.getLogger("shop.security")
 
@@ -174,9 +174,27 @@ class CommentInline(admin.TabularInline):
     readonly_fields = ["created", "user", "reply_to", "like_count", "edited", "deleted"]
     formfield_overrides = {models.TextField: {"widget": forms.Textarea(attrs={"rows": 2, "cols": 60})}}
     verbose_name_plural = "Customer comments (deleting one also deletes its replies)"
+    ordering = ["-id"]
+    template = "admin/shop/comment_inline.html"  # the stock table plus a "Show more" link
+    more_url = None
+    page_size = COMMENT_PAGE
 
     def get_queryset(self, request):
-        return super().get_queryset(request).select_related("user", "parent").annotate(n_likes=Count("likes"))
+        qs = super().get_queryset(request).select_related("user", "parent").annotate(n_likes=Count("likes"))
+        if request.method != "GET":  # saving: every comment the page showed must be found, even if new ones came
+            return qs
+        # Viewing: the newest COMMENT_PAGE, and COMMENT_PAGE more each time staff click "Show more" (?comments=N).
+        try:
+            shown = max(int(request.GET.get("comments", COMMENT_PAGE)), COMMENT_PAGE)
+        except ValueError:
+            shown = COMMENT_PAGE
+        product = request.resolver_match.kwargs.get("object_id")
+        ids = list(Comment.objects.filter(product_id=product).order_by("-id").values_list("pk", flat=True)[:shown + 1])
+        if len(ids) > shown:  # Django makes a fresh inline per request, so this is per page view
+            params = request.GET.copy()
+            params["comments"] = shown + COMMENT_PAGE
+            self.more_url = f"?{params.urlencode()}#comments-group"
+        return qs.filter(pk__in=ids[:shown])
 
     def has_add_permission(self, request, obj=None):
         return False

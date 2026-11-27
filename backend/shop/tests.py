@@ -626,6 +626,36 @@ class AdminPanelTests(TestCase):
         self.assertContains(r, "boss: Battery lasts all day")  # the reply says what it answers
         self.assertEqual(self.get("/admin/shop/comment/").status_code, 404)  # no separate comments page
 
+    def test_product_page_shows_comments_ten_at_a_time(self):
+        for i in range(12):
+            Comment.objects.create(product=self.phone, user=self.admin, text=f"note-{i:02}")
+        page = lambda q="": self.get(f"/admin/shop/product/{self.phone.pk}/change/{q}").content.decode()
+        first = page()
+        self.assertEqual([f"note-{i:02}" in first for i in range(12)], [False] * 2 + [True] * 10)  # newest 10
+        self.assertIn("?comments=20#comments-group", first)
+        rest = page("?comments=20")
+        self.assertTrue(all(f"note-{i:02}" in rest for i in range(12)))
+        self.assertNotIn("Show 10 more", rest)
+        self.assertIn("note-11", page("?comments=junk"))  # a bad count falls back to the first page
+
+    def test_staff_edit_and_delete_comments_from_the_product_page(self):
+        cs = [Comment.objects.create(product=self.phone, user=self.admin, text=f"note-{i}") for i in range(12)]
+        shown = cs[:1:-1]  # the 10 newest, as the page lists them
+        Comment.objects.create(product=self.phone, user=self.admin, text="arrived while editing")
+        p = self.phone
+        form = {"name": p.name, "slug": p.slug, "category": p.category_id, "description": "", "price": p.price,
+                "original_price": "", "stock": p.stock, "image": "https://example.com/a.jpg", "rating": "0", "reviews": 0,
+                "photos-TOTAL_FORMS": 0, "photos-INITIAL_FORMS": 0,
+                "comments-TOTAL_FORMS": len(shown), "comments-INITIAL_FORMS": len(shown)}
+        for i, c in enumerate(shown):
+            form.update({f"comments-{i}-id": c.pk, f"comments-{i}-product": p.pk, f"comments-{i}-text": c.text})
+        form["comments-0-text"] = "fixed by staff"
+        form["comments-1-DELETE"] = "on"
+        # A comment arrived after the page loaded, so the 10 newest changed: saving must still find every row.
+        self.assertEqual(self.post(f"/admin/shop/product/{p.pk}/change/", form).status_code, 302)
+        self.assertEqual(Comment.objects.get(pk=shown[0].pk).text, "fixed by staff")
+        self.assertFalse(Comment.objects.filter(pk=shown[1].pk).exists())
+
     def test_lists_show_status_pills_and_theme(self):
         self.assertContains(self.get("/admin/shop/order/"), 'haat-badge haat-pending')
         r = self.get("/admin/shop/product/")
