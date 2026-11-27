@@ -3,9 +3,8 @@ from functools import cached_property
 
 from django.conf import settings
 from django.contrib.auth.password_validation import password_validators_help_texts
-from django.db.models import Count, Min, Q
+from django.db.models import Count, Min, Prefetch, Q
 from django.db.models.functions import Coalesce
-from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
 from rest_framework import generics
 from rest_framework.exceptions import ValidationError
