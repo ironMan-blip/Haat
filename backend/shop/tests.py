@@ -1218,6 +1218,17 @@ class OwnerAndStaffTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertNotIn("email", r.context["adminform"].form.fields)
 
+    def test_owner_password_cannot_be_changed_on_the_site(self):
+        self.as_owner()
+        self.assertNotContains(self.client.get("/admin/"), "/admin/password_change/")
+        self.assertEqual(self.client.get("/admin/password_change/").status_code, 403)
+        self.assertEqual(self.client.get(f"/admin/auth/user/{self.owner.pk}/password/").status_code, 403)
+        self.assertNotContains(self.client.get(f"/admin/auth/user/{self.owner.pk}/change/"), "../password/")
+        self.assertContains(self.client.get(f"/admin/auth/user/{self.clerk.pk}/change/"), "../password/")
+        self.assertEqual(self.client.get(f"/admin/auth/user/{self.clerk.pk}/password/").status_code, 200)
+        self.as_clerk()  # staff keep their own change-password page
+        self.assertEqual(self.client.get("/admin/password_change/").status_code, 200)
+
     def test_only_one_owner_can_exist(self):
         with self.assertRaises(DjangoValidationError):
             User.objects.create_superuser("second", "s@x.com", "pass-1234-word")
@@ -1233,7 +1244,7 @@ class OwnerAndStaffTests(TestCase):
         self.assertTrue(rafi.is_superuser and rafi.is_staff and rafi.check_password("a-long-owner-pass-77"))
         self.assertEqual(rafi.email, "rafi@x.com")
         self.assertFalse(User.objects.get(username="boss").is_superuser)
-        # Run again with a new password: kept unless --reset-password, so a password changed on the site survives.
+        # Run again with a new password: kept unless --reset-password, so OWNER_PASSWORD can leave .env after setup.
         with mock.patch.dict("os.environ", {**env, "OWNER_PASSWORD": "another-owner-pass-88"}):
             call_command("sync_owner", stdout=io.StringIO())
             self.assertTrue(User.objects.get(username="rafi").check_password("a-long-owner-pass-77"))

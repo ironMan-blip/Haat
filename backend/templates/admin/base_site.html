@@ -15,4 +15,10 @@
 <div id="site-name"><a href="{% url 'admin:index' %}" class="haat-brand"><span class="haat-mark" aria-hidden="true">H</span><span><b>Haat</b> admin</span></a></div>
 {% endblock %}
 
-{% block userlinks %}{% if perms.auth.change_user %}<a href="{% url 'admin:staff' %}">Staff</a> / {% endif %}{{ block.super }}{% endblock %}
+{# Django's userlinks, minus "Change password" for the owner: their password comes from .env (sync_owner). #}
+{% block userlinks %}{% if perms.auth.change_user %}<a href="{% url 'admin:staff' %}">Staff</a> / {% endif %}
+{% if site_url %}<a href="{{ site_url }}">View site</a> /{% endif %}
+{% if user.has_usable_password and not user.is_superuser %}<a href="{% url 'admin:password_change' %}">Change password</a> /{% endif %}
+<form id="logout-form" method="post" action="{% url 'admin:logout' %}">{% csrf_token %}<button type="submit">Log out</button></form>
+{% include "admin/color_theme_toggle.html" %}
+{% endblock %}

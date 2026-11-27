@@ -8,7 +8,7 @@ from django.contrib.auth.admin import GroupAdmin, UserAdmin
 from django.contrib.auth.forms import AdminUserCreationForm, UserChangeForm
 from django.contrib.auth.models import Group, User
 from django.core.cache import cache
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import models, transaction
 from django.db.models import Count, Exists, F, OuterRef, Sum
 from django.db.models.functions import TruncDate
@@ -54,6 +54,11 @@ class HaatAdminSite(OTPAdminSite):
     site_header = site_title = "Haat admin"
     site_url = settings.SITE_URL
     index_title = "Dashboard"
+
+    def password_change(self, request, extra_context=None):
+        if request.user.is_superuser:  # the owner's password is set from .env: `manage.py sync_owner --reset-password`
+            raise PermissionDenied
+        return super().password_change(request, extra_context)
 
     def index(self, request, extra_context=None):
         now = timezone.localtime()
@@ -597,8 +602,14 @@ class HaatUserAdmin(UserAdmin):
 
     # Who may change whom: see shop/staff.py. The owner is set only from .env (manage.py sync_owner).
     def get_fieldsets(self, request, obj=None):
-        return [(name, {**opts, "fields": [f for f in opts["fields"] if f != "is_superuser"]})
+        hidden = {"is_superuser", "password"} if obj and obj.is_superuser else {"is_superuser"}  # owner: .env only
+        return [(name, {**opts, "fields": [f for f in opts["fields"] if f not in hidden]})
                 for name, opts in super().get_fieldsets(request, obj)]
+
+    def user_change_password(self, request, id, form_url=""):
+        if User.objects.filter(pk=id, is_superuser=True).exists():  # the owner's password is set from .env only
+            raise PermissionDenied
+        return super().user_change_password(request, id, form_url)
 
     def get_readonly_fields(self, request, obj=None):
         ro = list(super().get_readonly_fields(request, obj))
