@@ -17,7 +17,7 @@ from django_otp.admin import OTPAdminSite
 
 from .auth import client_ident, locked_out, login_fail_keys, record_login_failure
 from .display import cdn, taka
-from .models import LOW_STOCK, Category, Order, OrderItem, Product, ProductImage
+from .models import LOW_STOCK, Category, Comment, Order, OrderItem, Product, ProductImage
 
 log = logging.getLogger("shop.security")
 
@@ -208,6 +208,14 @@ class ProductAdmin(admin.ModelAdmin):
     @admin.display(description="Availability", ordering="stock")
     def stock_status(self, obj):
         return badge(obj.stock_label, obj.stock_level)
+
+
+@admin.register(Comment)
+class CommentAdmin(admin.ModelAdmin):
+    list_display = ["created", "user", "product", "text"]
+    list_select_related = ["user", "product"]
+    search_fields = ["text", "user__username", "product__name"]
+    readonly_fields = ["product", "user", "created"]  # staff may edit or delete abuse, not reassign it
 
 
 class OrderItemInline(admin.TabularInline):

@@ -3,13 +3,16 @@ from collections import defaultdict
 from django.conf import settings
 from django.contrib.auth.password_validation import password_validators_help_texts
 from django.db.models import Q
+from django.shortcuts import get_object_or_404
 from rest_framework import generics
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
+from ..auth import AnonThrottle, CommentThrottle, UserThrottle
 from ..display import cdn, items, num, taka
-from ..models import Category, Order, Product
-from ..serializers import CategorySerializer, ProductDetailSerializer, ProductSerializer
+from ..models import Category, Comment, Order, Product
+from ..serializers import CategorySerializer, CommentSerializer, ProductDetailSerializer, ProductSerializer
 
 PAYMENT_HINTS = {"cod": "Pay the rider when it arrives"}
 SORTS = {"": "Newest", "price": "Price, low to high", "-price": "Price, high to low", "-rating": "Best rated"}
@@ -61,6 +64,33 @@ class ProductDetail(generics.RetrieveAPIView):
     queryset = Product.objects.select_related("category").prefetch_related("photos")
     serializer_class = ProductDetailSerializer
     lookup_field = "slug"
+
+
+class ProductComments(generics.ListCreateAPIView):
+    """Anyone reads a product's comments; only signed-in customers post (token auth, so no CSRF)."""
+    serializer_class = CommentSerializer
+    permission_classes = [IsAuthenticatedOrReadOnly]
+    throttle_classes = [AnonThrottle, UserThrottle, CommentThrottle]
+
+    def product(self):
+        return get_object_or_404(Product, slug=self.kwargs["slug"])
+
+    def get_queryset(self):
+        # shortcut: newest 100 only, no pagination; add CursorPagination once a product gets more.
+        return Comment.objects.filter(product=self.product()).select_related("user")[:100]
+
+    def list(self, request, *args, **kwargs):
+        results = self.get_serializer(self.get_queryset(), many=True).data
+        return Response({
+            "title": f"Comments ({num(len(results))})" if results else "Comments",
+            "empty": "No comments yet. Be the first to share what you think.",
+            "login_prompt": "Log in to leave a comment.",
+            "placeholder": "What do you think of this product?",
+            "results": results,
+        })
+
+    def perform_create(self, serializer):
+        serializer.save(product=self.product(), user=self.request.user)
 
 
 def wall(products):

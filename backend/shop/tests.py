@@ -336,6 +336,19 @@ class ShopApiTests(APITestCase):
         self.assertTrue(o["meta_line"].startswith(day(Order.objects.get(pk=o["id"]).created) + " · "))
         self.assertEqual(self.client.get("/api/home/").data["wall"][0][0].keys(), {"tag", "field"})
 
+    def test_comments_need_login_to_post_but_anyone_reads(self):
+        url = "/api/products/phone/comments/"
+        r = self.client.post(url, {"text": "  Great phone  "}, format="json")
+        self.assertEqual((r.status_code, r.data["author"], r.data["text"]), (201, "rahim", "Great phone"))
+        self.assertEqual(self.client.post(url, {"text": "   "}, format="json").status_code, 400)
+        self.assertEqual(self.client.post(url, {"text": "x" * 1001}, format="json").status_code, 400)
+        self.assertEqual(self.client.post("/api/products/nope/comments/", {"text": "hi"}, format="json").status_code, 404)
+        guest = APIClient()
+        self.assertEqual(guest.post(url, {"text": "spam"}, format="json").status_code, 401)
+        listed = guest.get(url).data
+        self.assertEqual((listed["title"], [c["text"] for c in listed["results"]]), ("Comments (1)", ["Great phone"]))
+        self.assertEqual(guest.get("/api/products/case/comments/").data["results"], [])
+
     def test_config_lists_cities_and_sorts(self):
         c = self.client.get("/api/config/").data
         self.assertEqual(c["cities"][0], "Dhaka")  # the checkout's default

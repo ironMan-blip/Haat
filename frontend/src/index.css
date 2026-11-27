@@ -374,6 +374,11 @@ select { min-height: 44px; padding: 0 12px; border: 1px solid var(--line); borde
 .pw .link { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); min-height: 40px; padding: 0 12px; font-size: var(--step-small); }
 
 .orders { max-width: 900px; display: grid; gap: 20px; }
+.comments { display: grid; gap: 20px; max-width: 760px; }
+.comments .sec-head { margin-bottom: 0; }
+.comments .form .btn { justify-self: start; }
+.comment-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.comment-list li { padding: 16px 20px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-md); display: grid; gap: 6px; white-space: pre-line; overflow-wrap: anywhere; }
 .order { background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 24px; display: grid; gap: 14px; }
 .order-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .order-head h2 { font-size: 1.25rem; }

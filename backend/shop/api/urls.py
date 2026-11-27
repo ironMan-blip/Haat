@@ -7,6 +7,7 @@ urlpatterns = [
     path("home/", catalog.home),
     path("products/", catalog.ProductList.as_view()),
     path("products/<slug:slug>/", catalog.ProductDetail.as_view()),
+    path("products/<slug:slug>/comments/", catalog.ProductComments.as_view()),
     path("cart/", checkout.cart),
     path("cart/<int:pk>/", checkout.cart_line),
     path("orders/", checkout.OrderListCreate.as_view()),

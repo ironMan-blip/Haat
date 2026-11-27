@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useFetch } from '../api'
+import Comments from '../components/Comments'
 import Qty from '../components/Qty'
 import Rating from '../components/Rating'
 import Status from '../components/Status'
@@ -95,6 +96,7 @@ function ProductPage({ slug }) {
               )}
             </div>
           </section>
+          <Comments slug={slug} />
           {p.related.length > 0 && (
             <section className="page">
               <div className="sec-head"><h2>More in {p.category.name}</h2></div>

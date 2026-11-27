@@ -9,7 +9,7 @@ from rest_framework import serializers
 
 from .cart import Cart, delivery_fee
 from .display import cdn, day, images, num, taka
-from .models import MAX_QTY, Category, Order, OrderItem, Product
+from .models import MAX_QTY, Category, Comment, Order, OrderItem, Product
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -53,6 +53,15 @@ class ProductDetailSerializer(ProductSerializer):
     def get_related(self, p):
         others = Product.objects.select_related("category").filter(category=p.category_id).exclude(pk=p.pk)[:7]
         return ProductSerializer(others, many=True).data
+
+
+class CommentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Comment
+        fields = ["id", "text", "created"]
+
+    def to_representation(self, c):
+        return {**super().to_representation(c), "author": c.user.username, "date": day(c.created)}
 
 
 class RegisterSerializer(serializers.ModelSerializer):

@@ -88,6 +88,20 @@ class ProductImage(models.Model):
         return self.url
 
 
+class Comment(models.Model):
+    """A signed-in customer's comment on a product page; staff remove abuse in the admin."""
+    product = models.ForeignKey(Product, related_name="comments", on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="comments", on_delete=models.CASCADE)
+    text = models.TextField(max_length=1000)
+    created = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created", "-id"]
+
+    def __str__(self):
+        return f"{self.user} on {self.product}"
+
+
 class Order(models.Model):
     PAYMENTS = [("cod", "Cash on delivery")]  # MVP: cash on delivery only
     STATUS = [("pending", "Pending"), ("shipped", "Shipped"), ("delivered", "Delivered"), ("cancelled", "Cancelled")]
