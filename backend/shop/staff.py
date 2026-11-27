@@ -1,7 +1,6 @@
 """Who may change whose access, and the Staff page where the owner (or staff allowed to change users) adds staff
 by email, picks what each may do, and removes them. Rule everywhere: you can only hand out permissions you hold
 yourself, and only change people who hold nothing you don't. The owner holds everything."""
-import base64
 import hashlib
 import logging
 import secrets
@@ -27,8 +26,6 @@ from django.urls import path, reverse
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_protect
-from django_otp.oath import TOTP
-from django_otp.plugins.otp_totp.models import TOTPDevice, default_key
 
 from .models import StaffInvite
 
@@ -90,12 +87,6 @@ PERM_HELP = {
         "change": "Can edit login tokens.",
         "delete": "Can delete login tokens, which signs that customer out of the shop.",
     },
-    ("otp_totp", "totpdevice"): {
-        "view": "Sees staff authenticator apps, including the secret that makes their codes.",
-        "add": "Can add an authenticator to an account, which can let someone else make its login codes.",
-        "change": "Can edit staff authenticators, which can lock a person out or let someone else in.",
-        "delete": "Can remove a staff authenticator, so that person can't log in until it's set up again.",
-    },
 }
 
 
@@ -142,11 +133,10 @@ class AcceptForm(forms.Form):
     username = forms.CharField(max_length=150, validators=[User.username_validator])
     password1 = forms.CharField(label="Password", widget=forms.PasswordInput, strip=False)
     password2 = forms.CharField(label="Password again", widget=forms.PasswordInput, strip=False)
-    code = forms.CharField(label="6-digit code from the app", max_length=8)
 
-    def __init__(self, *args, email, totp_key, **kwargs):
+    def __init__(self, *args, email, **kwargs):
         super().__init__(*args, **kwargs)
-        self.email, self.totp_key = email, totp_key
+        self.email = email
 
     def clean_username(self):
         username = self.cleaned_data["username"]
@@ -155,12 +145,6 @@ class AcceptForm(forms.Form):
         if User.objects.filter(username__iexact=username).exists():
             raise ValidationError("That username is taken.")
         return username
-
-    def clean_code(self):
-        code, t = self.cleaned_data["code"].strip(), TOTPDevice(key=self.totp_key)
-        if not code.isdigit() or not TOTP(t.bin_key, t.step, t.t0, t.digits).verify(int(code), tolerance=1):
-            raise ValidationError("That code is wrong or too old. Type the code the app shows now.")
-        return code
 
     def clean(self):
         data = super().clean()
@@ -233,7 +217,6 @@ class StaffViews:
             send_mail("You're invited to help run Haat",
                       f"{request.user.get_username()} invited you to join the Haat shop team.\n\n"
                       f"Open this link within {StaffInvite.DAYS} days to choose a username and password:\n\n{link}\n\n"
-                      "You'll also need an authenticator app (like Google Authenticator) on your phone.\n"
                       "If you weren't expecting this, ignore this email.",
                       None, [invite.email])
             return True
@@ -290,8 +273,7 @@ class StaffViews:
                 user.save(update_fields=["is_staff"])
                 user.user_permissions.set(perms)
             log_change(request, user, CHANGE, f"Made staff from the Staff page with: {self.describe(perms)}")
-            messages.success(request, f"{user.get_username()} ({email}) is staff now. If they haven't got the "
-                                      f"authenticator app set up, run: manage.py admin_totp {user.get_username()}")
+            messages.success(request, f"{user.get_username()} ({email}) is staff now.")
         elif settings.DEBUG:  # development: skip the invite email and make the account straight away
             base = email.split("@", 1)[0][:140] or "staff"
             username, n = base, 1
@@ -303,8 +285,7 @@ class StaffViews:
                 user = User.objects.create_user(username, email, password, is_staff=True)
                 user.user_permissions.set(perms)
             log_change(request, user, ADDITION, f"Added as staff from the Staff page with: {self.describe(perms)}")
-            messages.success(request, f"{username} ({email}) is staff now with password {password} (shown once). "
-                                      f"Set up their authenticator app with: manage.py admin_totp {username}")
+            messages.success(request, f"{username} ({email}) is staff now with password {password} (shown once).")
         elif StaffInvite.objects.filter(email=email).exists():
             messages.error(request, f"{email} is already invited. Use Resend below if they lost the email.")
         else:
@@ -360,11 +341,7 @@ class StaffViews:
         if not invite or invite.sent < timezone.now() - timedelta(days=StaffInvite.DAYS):
             return TemplateResponse(request, "admin/staff/accept.html", {
                 **self.site.each_context(request), "title": "Invite link not valid", "invalid": True}, status=404)
-        # The authenticator secret lives in the session until they prove the app shows its codes.
-        saved = request.session.get("staff_invite")
-        if not saved or saved.get("invite") != invite.pk:
-            saved = request.session["staff_invite"] = {"invite": invite.pk, "key": default_key()}
-        form = AcceptForm(request.POST or None, email=invite.email, totp_key=saved["key"])
+        form = AcceptForm(request.POST or None, email=invite.email)
         if request.method == "POST" and form.is_valid():
             if User.objects.filter(email__iexact=invite.email).exists():
                 form.add_error(None, "An account with this email was made meanwhile. Ask whoever invited you to "
@@ -374,14 +351,9 @@ class StaffViews:
                     user = User.objects.create_user(form.cleaned_data["username"], invite.email,
                                                     form.cleaned_data["password1"], is_staff=True)
                     user.user_permissions.set(invite.permissions.all())
-                    TOTPDevice.objects.create(user=user, key=saved["key"], name="authenticator", confirmed=True)
                     invite.delete()
-                del request.session["staff_invite"]
                 log.info("staff invite accepted: %s as %s", invite.email, user.username)
-                messages.success(request, "You're in. Log in with your username, password and a code from the app.")
+                messages.success(request, "You're in. Log in with your username and password.")
                 return redirect("admin:login")
-        device = TOTPDevice(user=User(username=invite.email), key=saved["key"])
         return TemplateResponse(request, "admin/staff/accept.html", {
-            **self.site.each_context(request), "title": "Join the Haat team", "form": form, "invite": invite,
-            "config_url": device.config_url,
-            "secret": base64.b32encode(device.bin_key).decode()})  # for typing into the app by hand
+            **self.site.each_context(request), "title": "Join the Haat team", "form": form, "invite": invite})

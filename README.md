@@ -28,17 +28,15 @@ A simple general store for Bangladesh. React (Vite, Tailwind CSS, shadcn/ui) fro
 **Sellers**
 - Admin dashboard: pending orders, sales today / last 30 days with a sales chart, order progress, recent orders, low stock
 - Manage products (inline price/stock edits, stock filter, image preview), categories, orders
-  (search by id/name/phone, bulk mark shipped/delivered/cancelled), users with their orders, API tokens, 2FA devices
-- Admin 2FA (authenticator app) with lockout after 5 failures
+  (search by id/name/phone, bulk mark shipped/delivered/cancelled), users with their orders, API tokens
+- Admin login lockout after 5 failures
 - Cancelling a pending order restores stock once; cancelled orders can't be reopened; orders can't be deleted
 - Live image preview when editing a product; product options, variant stock/price and extra photos inline
 - Admin product saves refuse to overwrite stock sold since the page loaded
 - Remove abusive comments
 - `seed` command loads 47 cleaned Daraz products; `scripts/fetch_daraz.py` re-pulls them
-- `admin_totp` command sets up or resets a seller's authenticator
 - One owner (the only superuser), set from `backend/.env` by `sync_owner`; a second superuser is refused
-- Staff page (`/admin/staff/`): add staff by email (existing account, or an invite link valid 3 days that also
-  sets up their authenticator), tick what each may do, remove them. Anyone with "change user" can use it, but
+- Staff page (`/admin/staff/`): add staff by email (existing account, or an invite link valid 3 days), tick what each may do, remove them. Anyone with "change user" can use it, but
   only hands out permissions they hold and only changes people who hold nothing more
 - The owner may add or delete orders, edit their money and items, or reopen cancelled ones, after ticking a
   warning; staff never can. Deleting a pending order puts its stock back first
@@ -66,7 +64,6 @@ createdb haat                                # PostgreSQL; local socket by defau
 DJANGO_DEBUG=1 .venv/bin/python manage.py demo_data  # demo users, orders, comments, stock edge cases (password: see --help)
 cp .env.example .env                         # then fill in OWNER_USERNAME / OWNER_EMAIL / OWNER_PASSWORD
 .venv/bin/python manage.py sync_owner       # makes that account the shop's only owner (superuser)
-.venv/bin/python manage.py admin_totp <username>  # admin needs an authenticator-app code; scan the printed URL
 .venv/bin/python manage.py runserver 127.0.0.1:8000
 
 # frontend (Node 20+)
@@ -131,7 +128,7 @@ backend/   Django 5.2 LTS + DRF, one app: shop
   shop/serializers.py order creation from the cart: DB prices, stock lock
   shop/api/           REST layer: catalog.py (config, home, products), checkout.py (cart, orders),
                       accounts.py (register, login, logout), errors.py (one `message` per error), urls.py
-  shop/admin.py       dashboard, 2FA admin site, product/order/user admin
+  shop/admin.py       dashboard, admin site with lockout, product/order/user admin
   shop/management/commands/seed.py  loads + cleans shop/fixtures/daraz_products.json
   scripts/fetch_daraz.py            re-pulls that fixture from Daraz search
 ```
@@ -171,10 +168,8 @@ are revoked on logout and on any password change. Cart changes need Django's CSR
 reads it from the `csrftoken` cookie that `GET /api/cart/` sets).
 
 Sellers manage products and order status in Django admin (`/admin`, or `DJANGO_ADMIN_PATH`). Admin login
-needs the password plus an authenticator code (log in with the password first, then pick the device and
-enter the code); 5 failures lock that IP and that username out for 15 minutes. Orders can't be deleted
-or have items edited in admin: cancel them instead, which puts the stock back. Lost phone:
-`manage.py admin_totp <username> --reset`.
+needs the password; 5 failures lock that IP and that username out for 15 minutes. Orders can't be deleted
+or have items edited in admin: cancel them instead, which puts the stock back.
 
 ## Production settings
 

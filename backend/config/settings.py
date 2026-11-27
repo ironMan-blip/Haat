@@ -32,8 +32,6 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework.authtoken',
-    'django_otp',
-    'django_otp.plugins.otp_totp',  # admin 2FA: authenticator-app codes
     'shop',
 ]
 
@@ -43,7 +41,6 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django_otp.middleware.OTPMiddleware',  # marks admin sessions that passed 2FA
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -107,7 +104,6 @@ LOGGING = {
     },
 }
 
-OTP_TOTP_ISSUER = 'Haat admin'
 
 # Mail carries the links that add a guest order to the account with its email. Dev prints them to the console.
 if DEBUG:

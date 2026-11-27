@@ -4,7 +4,7 @@ from django.urls import include, path
 
 from shop.admin import HaatAdminSite
 
-admin.site.__class__ = HaatAdminSite  # 2FA + lockout on the one admin site, as django-otp documents
+admin.site.__class__ = HaatAdminSite  # lockout on the one admin site
 
 urlpatterns = [
     path(settings.ADMIN_PATH, admin.site.urls),

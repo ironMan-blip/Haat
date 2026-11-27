@@ -9,14 +9,9 @@
   <form method="post">{% csrf_token %}
     {% if form.non_field_errors %}<p class="errornote">{{ form.non_field_errors|join:" " }}</p>{% endif %}
     <h3>1. Choose your login</h3>
-    {% for field in form %}{% if field.name != "code" %}
+    {% for field in form %}
       <p>{{ field.label_tag }}<br>{{ field }}{% for e in field.errors %}<br><span class="errornote">{{ e }}</span>{% endfor %}</p>
-    {% endif %}{% endfor %}
-    <h3>2. Set up the authenticator app</h3>
-    <p>Install an authenticator app (Google Authenticator, Microsoft Authenticator, 2FAS…) on your phone. On the phone, tap <a href="{{ config_url }}">this link</a>, or add an account in the app by hand with this key:</p>
-    <p><code class="haat-secret">{{ secret }}</code></p>
-    <p class="help">Keep this key private. Anyone who has it can make your codes.</p>
-    <p>{{ form.code.label_tag }}<br>{{ form.code }}{% for e in form.code.errors %}<br><span class="errornote">{{ e }}</span>{% endfor %}</p>
+    {% endfor %}
     <div class="submit-row"><input type="submit" class="default" value="Join"></div>
   </form>
 {% endif %}

@@ -467,7 +467,6 @@ input[type=submit], .button, .submit-row input { text-transform: none; }
   color: var(--haat-ink); font-size: .82rem; line-height: 1.4; text-align: left; box-shadow: 0 6px 18px rgb(0 0 0 / .15); }
 .haat-info:hover [role=tooltip], .haat-info-btn:focus-visible + [role=tooltip] { display: block; }
 .haat-inline { display: inline-flex; gap: 6px; }
-.haat-secret { font-size: 1.1em; letter-spacing: .08em; user-select: all; }
 .haat-danger { border-color: var(--haat-bad-fg); }
 fieldset.haat-danger .description, .haat-danger > p { color: var(--haat-bad-fg); background: var(--haat-bad-bg); border-radius: var(--haat-r-sm); padding: 10px 12px; }
 .button.haat-danger-btn, button.haat-danger-btn { background: var(--haat-bad-fg); color: #fff; }

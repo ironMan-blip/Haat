@@ -59,4 +59,4 @@ class Command(BaseCommand):
         if demoted:
             self.stdout.write(f"No longer owner or staff (add them on the Staff page to let them back in):{', '.join(demoted)}.")
         if new:
-            self.stdout.write(f"Next: manage.py admin_totp {username}, then you may delete OWNER_PASSWORD from .env.")
+            self.stdout.write("Next: you may delete OWNER_PASSWORD from .env.")

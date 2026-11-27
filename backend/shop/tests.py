@@ -13,8 +13,6 @@ from django.db import IntegrityError, transaction
 from django.conf import settings
 from django.test import TestCase, override_settings
 from django.utils import timezone
-from django_otp.oath import TOTP
-from django_otp.plugins.otp_totp.models import TOTPDevice
 from rest_framework.authtoken.models import Token
 from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIClient, APITestCase
@@ -710,60 +708,34 @@ class AdminSecurityTests(TestCase):
     def setUp(self):
         cache.clear()
         self.admin = User.objects.create_superuser("boss", password="pass-1234-word")
-        call_command("admin_totp", "boss", stdout=io.StringIO())
-        self.device = TOTPDevice.objects.get(user=self.admin)
 
-    def login(self, password="pass-1234-word", code=None):
-        return self.client.post("/admin/login/", {"username": "boss", "password": password, "otp_token": code or "",
-                                                  "otp_device": self.device.persistent_id})
+    def login(self, password="pass-1234-word"):
+        return self.client.post("/admin/login/", {"username": "boss", "password": password})
 
-    def code(self):
-        d = self.device
-        return format(TOTP(d.bin_key, d.step, d.t0, d.digits).token(), f"0{d.digits}d")
-
-    def test_admin_needs_authenticator_code(self):
-        self.assertEqual(self.login().status_code, 200)  # password alone: form shown again
-        self.assertEqual(self.login(code=self.code()).status_code, 302)
-
-    def test_admin_login_uses_the_only_device_without_a_pick(self):
-        r = self.client.post("/admin/login/", {"username": "boss", "password": "pass-1234-word", "otp_token": self.code()})
-        self.assertEqual(r.status_code, 302)
-
-    def test_admin_login_explains_a_missing_authenticator(self):
-        User.objects.create_user("newstaff", password="pass-1234-word", is_staff=True)
-        r = self.client.post("/admin/login/", {"username": "newstaff", "password": "pass-1234-word", "otp_token": "123456"})
-        self.assertContains(r, "manage.py admin_totp newstaff")
+    def test_admin_logs_in_with_password(self):
+        self.assertEqual(self.login(password="wrong").status_code, 200)
+        self.assertEqual(self.login().status_code, 302)
 
     def test_admin_locks_out_after_failed_logins(self):
         codes = [self.login(password="wrong").status_code for _ in range(6)]
         self.assertEqual(codes, [200] * 5 + [429])
-        self.assertEqual(self.login(code=self.code()).status_code, 429)  # even the right password waits
+        self.assertEqual(self.login().status_code, 429)  # even the right password waits
 
     def test_api_login_cannot_guess_admin_passwords_past_the_lockout(self):
         api = APIClient()
         for i in range(5):
             api.post("/api/auth/login/", {"username": "boss", "password": "wrong"}, REMOTE_ADDR=f"10.0.0.{i}")
-        self.assertEqual(self.login(code=self.code()).status_code, 429)  # admin login shares the count
+        self.assertEqual(self.login().status_code, 429)  # admin login shares the count
         r = api.post("/api/auth/login/", {"username": "boss", "password": "pass-1234-word"}, REMOTE_ADDR="10.0.1.1")
         self.assertEqual(r.status_code, 429)  # no oracle: the right password isn't confirmed either
 
-
-    def test_admin_totp_refuses_to_replace_a_device_silently(self):
-        with self.assertRaises(CommandError):
-            call_command("admin_totp", "boss", stdout=io.StringIO())
-        call_command("admin_totp", "boss", "--reset", stdout=io.StringIO())
-        self.assertNotEqual(TOTPDevice.objects.get(user=self.admin).key, self.device.key)
 
 
 class AdminPanelTests(TestCase):
     def setUp(self):
         self.admin = User.objects.create_superuser("boss", password="pass-1234-word")
         cache.clear()
-        call_command("admin_totp", "boss", stdout=io.StringIO())
-        d = TOTPDevice.objects.get(user=self.admin)
-        code = format(TOTP(d.bin_key, d.step, d.t0, d.digits).token(), f"0{d.digits}d")
-        self.client.post("/admin/login/", {"username": "boss", "password": "pass-1234-word", "otp_token": code,
-                                           "otp_device": d.persistent_id})
+        admin_login(self.client, self.admin)
         self.get, self.post = self.client.get, self.client.post
         cat = Category.objects.create(name="Mobiles", slug="mobiles")
         self.phone = Product.objects.create(category=cat, name="Phone", slug="phone", price=100,
@@ -1190,11 +1162,8 @@ class GuestCheckoutTests(APITestCase):
 
 
 def admin_login(client, user, password="pass-1234-word"):
-    """Logs `user` in to the admin with password and authenticator code, giving them a device if needed."""
-    d = TOTPDevice.objects.filter(user=user).first() or TOTPDevice.objects.create(user=user, name="a", confirmed=True)
-    code = format(TOTP(d.bin_key, d.step, d.t0, d.digits).token(), f"0{d.digits}d")
-    r = client.post("/admin/login/", {"username": user.username, "password": password, "otp_token": code,
-                                      "otp_device": d.persistent_id})
+    """Logs `user` in to the admin with their password."""
+    r = client.post("/admin/login/", {"username": user.username, "password": password})
     assert r.status_code == 302, "admin login failed"
 
 
@@ -1409,19 +1378,16 @@ class OwnerAndStaffTests(TestCase):
         self.client.logout()
         page = self.client.get(link)
         self.assertContains(page, "new@x.com")
-        key = self.client.session["staff_invite"]["key"]
-        t = TOTPDevice(key=key)
-        code = format(TOTP(t.bin_key, t.step, t.t0, t.digits).token(), "06d")
         form = {"username": "newbie", "password1": "a-good-pass-1234", "password2": "a-good-pass-1234"}
-        self.assertContains(self.client.post(link, {**form, "code": "000000" if code != "000000" else "111111"}), "wrong")
-        r = self.client.post(link, {**form, "code": code})
+        self.assertContains(self.client.post(link, {**form, "password2": "other-pass-1234"}), "match")
+        r = self.client.post(link, form)
         self.assertEqual(r.status_code, 302)
         newbie = User.objects.get(username="newbie")
         self.assertTrue(newbie.is_staff and not newbie.is_superuser)
         self.assertEqual(newbie.get_all_permissions(), {"shop.view_product"})
         self.assertFalse(StaffInvite.objects.exists())
         self.assertEqual(self.client.get(link).status_code, 404)  # single use
-        admin_login(self.client, newbie, "a-good-pass-1234")  # the device from the invite works
+        admin_login(self.client, newbie, "a-good-pass-1234")
 
     def test_invite_link_expires(self):
         self.as_owner()
