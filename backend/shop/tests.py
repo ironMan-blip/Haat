@@ -386,6 +386,7 @@ class ShopApiTests(APITestCase):
                          ([f"c{i}" for i in range(11, 1, -1)], "Comments (12)"))  # newest first, no cap
         newest = first["results"][0]
         self.assertEqual([r["text"] for r in newest["replies"]], [f"r{i}" for i in range(10)])  # oldest first
+        self.assertEqual((newest["reply_count"], first["results"][1]["reply_count"]), (12, 0))
         Comment.objects.create(product=self.phone, user=self.user, text="new")  # arrives mid-paging
         second = self.client.get(f"{url}?before={first['next']}").data
         self.assertEqual(([c["text"] for c in second["results"]], second["next"]), (["c1", "c0"], None))

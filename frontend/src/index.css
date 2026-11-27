@@ -380,6 +380,7 @@ select { min-height: 44px; padding: 0 12px; border: 1px solid var(--line); borde
 .comment-list li { padding: 16px 20px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-md); display: grid; gap: 8px; white-space: pre-line; overflow-wrap: anywhere; }
 .comment-replies { margin-left: clamp(12px, 3vw, 32px); }
 .comment-more { justify-self: start; white-space: normal; }
+.comment-toggle { justify-self: start; }
 .comment-replies li { background: transparent; }
 .comment-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; white-space: normal; }
 .comment-actions .link:disabled { cursor: default; text-decoration: none; color: var(--muted); }

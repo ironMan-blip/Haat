@@ -84,6 +84,7 @@ class CommentSerializer(serializers.ModelSerializer):
             rs = c.first_replies  # prefetched by the view, one past the page to tell if there are more
             data["replies"] = CommentSerializer(rs[:COMMENT_PAGE], many=True, context=self.context).data
             data["replies_next"] = rs[COMMENT_PAGE - 1].pk if len(rs) > COMMENT_PAGE else None
+            data["reply_count"] = c.reply_count  # annotated by the view; the dropdown shows it while closed
         return data
 
 

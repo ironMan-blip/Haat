@@ -3,7 +3,7 @@ from functools import cached_property
 
 from django.conf import settings
 from django.contrib.auth.password_validation import password_validators_help_texts
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
 from rest_framework import generics
@@ -109,7 +109,7 @@ class ProductComments(generics.ListCreateAPIView):
         # Ids only grow, so paging by id never repeats or skips a comment when new ones arrive.
         replies = live(Comment.objects.order_by("id"))[:COMMENT_PAGE + 1]
         qs = live(Comment.objects.filter(product=self.product, parent=None)).order_by("-id") \
-            .prefetch_related(Prefetch("replies", queryset=replies, to_attr="first_replies"))
+            .annotate(reply_count=Count("replies")).prefetch_related(Prefetch("replies", queryset=replies, to_attr="first_replies"))
         if (before := cursor(self.request, "before")) is not None:
             qs = qs.filter(pk__lt=before)
         return qs[:COMMENT_PAGE + 1]
@@ -125,6 +125,8 @@ class ProductComments(generics.ListCreateAPIView):
             "delete_confirm": "Delete this comment? This can't be undone.",
             "more_label": "See more comments",
             "more_replies_label": "See more replies",
+            "show_replies_label": "View replies ({n})",
+            "hide_replies_label": "Hide replies",
             "results": CommentSerializer(rows, many=True, context={**self.get_serializer_context(), "threads": True}).data,
             "next": nxt,
         })
