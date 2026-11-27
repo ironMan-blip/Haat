@@ -7,7 +7,8 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.management import CommandError, call_command
 from django.db import IntegrityError, transaction
-from django.test import TestCase
+from django.conf import settings
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from django_otp.oath import TOTP
 from django_otp.plugins.otp_totp.models import TOTPDevice
@@ -21,7 +22,7 @@ from .display import cdn, day, num, taka
 from .models import Category, Comment, Order, Product, ProductImage
 from .serializers import RegisterSerializer
 from .api.accounts import SignupThrottle
-from .auth import CommentActionThrottle, GuestOrderThrottle
+from .auth import CommentActionThrottle, GuestOrderThrottle, ScopedThrottle
 
 ADDR = {"full_name": "Rahim", "phone": "01712345678", "address": "House 1, Road 2", "city": "Dhaka"}
 
@@ -548,10 +549,24 @@ class SecurityTests(APITestCase):
         return self.client.post("/api/auth/login/", {"username": username, "password": password}, REMOTE_ADDR=ip)
 
     def test_login_locks_the_account_whatever_ip_guesses(self):
-        codes = [self.login("wrong", f"10.0.0.{i}").status_code for i in range(5)]
-        self.assertEqual(codes, [400] * 5)  # each IP is under its own per-minute throttle
-        self.assertEqual(self.login("pass-1234-word", "10.0.1.1").status_code, 429)  # even the right password waits
-        self.assertEqual(self.login("pass-1234-word", "10.0.1.2", username="RAHIM").status_code, 429)
+        n = settings.LOGIN_MAX_FAILS_PER_ACCOUNT
+        codes = [self.login("wrong", f"10.0.{i // 250}.{i % 250}").status_code for i in range(n)]
+        self.assertEqual(codes, [400] * n)  # each IP is under its own per-minute throttle
+        self.assertEqual(self.login("pass-1234-word", "10.1.0.1").status_code, 429)  # even the right password waits
+        self.assertEqual(self.login("pass-1234-word", "10.1.0.2", username="RAHIM").status_code, 429)
+
+    @mock.patch.dict(ScopedThrottle.THROTTLE_RATES, {"auth": "100/min"})  # only the lockout may refuse here
+    def test_one_ip_cannot_lock_a_customer_out(self):
+        codes = [self.login("wrong", "10.0.0.1").status_code for _ in range(6)]
+        self.assertEqual(codes, [400] * 5 + [429])
+        self.assertEqual(self.login("pass-1234-word", "10.0.0.1").status_code, 429)
+        self.assertEqual(self.login("pass-1234-word", "10.0.1.1").status_code, 200)  # the owner, elsewhere
+
+    def test_staff_lock_after_few_failures_from_anywhere(self):
+        User.objects.filter(pk=self.user.pk).update(is_staff=True)
+        for i in range(settings.LOGIN_MAX_FAILS):
+            self.login("wrong", f"10.0.0.{i}")
+        self.assertEqual(self.login("pass-1234-word", "10.0.1.1").status_code, 429)
 
     def test_successful_login_resets_the_failure_count(self):
         for i in range(4):
@@ -559,6 +574,7 @@ class SecurityTests(APITestCase):
         self.assertEqual(self.login("pass-1234-word", "10.0.1.1").status_code, 200)
         self.assertEqual(self.login("wrong", "10.0.1.2").status_code, 400)  # counting starts again
 
+    @override_settings(LOGIN_MAX_FAILS_PER_ACCOUNT=5)  # one counter per account, whatever the spelling
     def test_padded_or_unicode_spellings_share_the_lockout(self):
         # Both logins strip spaces (and the admin applies NFKC) before checking, so these all guess "rahim".
         for i, name in enumerate([" rahim", "rahim ", "\trahim", "ｒａｈｉｍ", "  rahim  "]):
@@ -583,6 +599,7 @@ class SecurityTests(APITestCase):
         self.assertEqual(self.client.get("/api/cart/").data["count"], MAX_LINES)
         self.assertEqual(self.client.post("/api/cart/", {"product": p.pk - 1, "quantity": 1}, format="json").status_code, 200)  # more of a line already in
 
+    @override_settings(LOGIN_MAX_FAILS_PER_ACCOUNT=5)  # one counter per account, whatever the spelling
     def test_numeric_username_shares_the_lockout(self):
         User.objects.create_user("12345", password="pass-1234-word")
         for i in range(5):

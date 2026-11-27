@@ -127,6 +127,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         return value
 
     def validate_email(self, value):
+        # Tradeoff, accepted: this tells anyone whether an email has an account; the signup throttles slow bulk checks.
         value = value.lower()
         if User.objects.filter(email__iexact=value).exists():
             raise serializers.ValidationError("An account with that email already exists.")

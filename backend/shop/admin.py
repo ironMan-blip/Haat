@@ -33,13 +33,13 @@ class HaatAdminSite(OTPAdminSite):
             return super().login(request, extra_context)
         username = request.POST.get("username", "")[:150]
         ip = client_ident(request)
-        keys = login_fail_keys(username, request)  # user counter shared with the API login
+        keys = login_fail_keys(username, request, ip_lock=True)  # user counters shared with the API login
         if locked_out(keys):
             log.warning("admin login locked out: ip=%s username=%r", ip, username)
             return HttpResponse("Too many failed logins. Try again later.", status=429, content_type="text/plain")
         response = super().login(request, extra_context)
         if response.status_code == 302:  # logged in
-            cache.delete_many(login_fail_keys(username))
+            cache.delete_many(login_fail_keys(username, request))  # the IP counter stays: other names it guessed
         else:
             log.warning("admin login failed: ip=%s username=%r", ip, username)
             record_login_failure(keys)
@@ -446,6 +446,13 @@ def clean_unique_email(form):
     return email
 
 
+def no_at_sign(username):
+    """Admin twin of RegisterSerializer.validate_username's "@" rule."""
+    if "@" in username:
+        raise ValidationError("A username can't contain @.")
+    return username
+
+
 class HaatUserCreationForm(AdminUserCreationForm):
     class Meta(AdminUserCreationForm.Meta):
         fields = ["username", "email"]
@@ -456,6 +463,9 @@ class HaatUserCreationForm(AdminUserCreationForm):
 
     clean_email = clean_unique_email
 
+    def clean_username(self):
+        return no_at_sign(super().clean_username())
+
 
 class HaatUserChangeForm(UserChangeForm):
     def __init__(self, *args, **kwargs):
@@ -463,6 +473,9 @@ class HaatUserChangeForm(UserChangeForm):
         self.fields["email"].required = True  # older accounts without one get it filled on next edit
 
     clean_email = clean_unique_email
+
+    def clean_username(self):
+        return no_at_sign(self.cleaned_data["username"])
 
 
 class HaatUserAdmin(UserAdmin):

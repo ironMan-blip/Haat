@@ -79,7 +79,9 @@ class OrderListCreate(generics.ListCreateAPIView):
         return response
 
     def perform_create(self, serializer):
-        user = self.request.user if self.request.user.is_authenticated else None
+        # shortcut: guest phones are never verified, so a script rotating IPs and phones can hoard stock with
+        # fake COD orders; require sign-in or an SMS code before deploying.
+        user =self.request.user if self.request.user.is_authenticated else None
         order = serializer.save(user=user)
         Cart(self.request).clear()
         if not user:

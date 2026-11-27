@@ -138,11 +138,13 @@ FREE_DELIVERY_MIN = 299  # taka; Cartup-style free delivery threshold
 DELIVERY_FEE = 60
 MAX_PENDING_ORDERS = 5  # per buyer and per phone number; COD orders cost nothing, so this stops stock hoarding
 TOKEN_TTL_DAYS = 30  # API tokens die after this; logging in again issues a fresh one
-# Failed logins, then locked out for LOGIN_LOCKOUT_SECONDS. Per username on the API and admin logins
-# together (else the API is a password oracle for admin accounts), and also per IP on the admin login.
-# Tradeoff: anyone can lock a known username out for a while. Mobile carriers share IPs, so the API
-# login keeps only its per-minute IP throttle, not an IP lockout.
+# Failed logins, then locked out for LOGIN_LOCKOUT_SECONDS (see shop.auth.login_fail_keys). Counted on
+# the API and admin logins together (else the API is a password oracle for admin accounts): per username
+# and IP, per username from anywhere, and per IP on the admin login. Mobile carriers share IPs, so the
+# API login keeps only its per-minute IP throttle, not an IP lockout.
+# Tradeoff: locking a customer out takes failures from ~10 IPs, not one; staff stay at LOGIN_MAX_FAILS.
 LOGIN_MAX_FAILS = 5
+LOGIN_MAX_FAILS_PER_ACCOUNT = 50
 LOGIN_LOCKOUT_SECONDS = 15 * 60
 
 ADMIN_PATH = os.environ.get('DJANGO_ADMIN_PATH', 'admin/')  # use a non-default path in production

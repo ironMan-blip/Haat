@@ -34,7 +34,7 @@ class Login(ObtainAuthToken):
             user = User.objects.filter(email__iexact=username.strip()).first()
             if user:
                 data["username"] = username = user.username  # same lockout counter as logging in by name
-        keys = login_fail_keys(username)  # the admin login counts into the same per-user counter
+        keys = login_fail_keys(username, request)  # the admin login counts into the same per-user counter
         if locked_out(keys):
             raise Throttled(detail="Too many failed logins for this account. Try again in 15 minutes.")
         serializer = self.serializer_class(data=data, context={"request": request})
