@@ -180,7 +180,7 @@ class OrderSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Order
-        fields = ["id", "full_name", "phone", "address", "city", "subtotal", "delivery_fee", "total",
+        fields = ["id", "full_name", "phone", "email", "address", "city", "subtotal", "delivery_fee", "total",
                   "payment", "status", "status_display", "created", "items", "expected_total"]
         read_only_fields = ["subtotal", "delivery_fee", "total", "payment", "status", "created"]
 
@@ -196,6 +196,9 @@ class OrderSerializer(serializers.ModelSerializer):
         if not re.fullmatch(r"(\+?88)?01[3-9][0-9]{8}", value):
             raise serializers.ValidationError("Enter a Bangladeshi mobile number, e.g. 01712345678.")
         return value[-11:]  # one spelling per number, so the per-phone cap can't be dodged with +88
+
+    def validate_email(self, value):
+        return value.lower()  # one spelling, like account emails
 
     @transaction.atomic
     def create(self, data):

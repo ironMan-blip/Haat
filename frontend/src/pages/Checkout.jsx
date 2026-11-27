@@ -57,6 +57,12 @@ export default function Checkout() {
           <Input className="font-normal" name="phone" type="tel" required placeholder="01712345678" autoComplete="tel" />
           <span className={hint}>The rider will call this number before delivery.</span>
         </Label>
+        {!auth && (
+          <Label>Email (optional)
+            <Input className="font-normal" name="email" type="email" autoComplete="email" />
+            <span className={hint}>Sign up or log in with this email later and the order moves to your account.</span>
+          </Label>
+        )}
         <Label>City
           <NativeSelect className="w-full font-normal" name="city" required>
             {config.cities.map((c) => <NativeSelectOption key={c}>{c}</NativeSelectOption>)}

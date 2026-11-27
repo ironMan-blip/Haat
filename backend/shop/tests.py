@@ -1056,16 +1056,31 @@ class GuestCheckoutTests(APITestCase):
         self.login()
         self.assertEqual(Order.objects.get(pk=r.data["id"]).user, None)
 
-    def test_new_account_claims_this_sessions_guest_orders(self):
-        r = self.order()
-        Order.objects.create(full_name="X", phone="01812345678", address="A", city="Dhaka",
-                             subtotal=100, delivery_fee=60, total=160)  # another session's guest order
-        reg = self.client.post("/api/auth/register/", {"username": "karim", "email": "karim@x.com", "password": "pass-1234-word"}, format="json")
-        self.assertEqual(reg.status_code, 201, reg.data)
-        karim = User.objects.get(username="karim")
-        self.assertEqual(list(karim.orders.values_list("pk", flat=True)), [r.data["id"]])
-        self.client.credentials(HTTP_AUTHORIZATION=f"Token {reg.data['token']}")
-        self.assertEqual([o["id"] for o in self.client.get("/api/orders/").data], [r.data["id"]])
+    def register(self, email):
+        r = self.client.post("/api/auth/register/", {"username": "karim", "email": email, "password": "pass-1234-word"},
+                             format="json")
+        self.assertEqual(r.status_code, 201, r.data)
+        return User.objects.get(username="karim")
+
+    def test_new_account_claims_guest_orders_with_its_email(self):
+        mine = self.order(email="Karim@X.com").data["id"]
+        other = self.order(email="someone@x.com").data["id"]  # another person on this browser
+        blank = self.order().data["id"]  # no email, and a new account has no past phone
+        karim = self.register("karim@x.com")
+        self.assertEqual(list(karim.orders.values_list("pk", flat=True)), [mine])
+        self.assertEqual(Order.objects.filter(pk__in=[other, blank], user=None).count(), 2)
+
+    def test_login_claims_guest_orders_with_the_accounts_email(self):
+        self.user.email = "rahim@x.com"
+        self.user.save()
+        r = self.order(email="rahim@x.com")
+        self.login()
+        self.assertEqual(Order.objects.get(pk=r.data["id"]).user, self.user)
+
+    def test_blank_account_email_matches_no_blank_order_email(self):
+        r = self.order()  # self.user has no email, the order none either
+        self.login()
+        self.assertEqual(Order.objects.get(pk=r.data["id"]).user, None)
 
     def test_login_rotates_session_key(self):
         self.client.get("/api/cart/")

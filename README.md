@@ -17,7 +17,7 @@ A simple general store for Bangladesh. React (Vite, Tailwind CSS, shadcn/ui) fro
 - Phone numbers typed in Bengali digits (০১৭…) are accepted and stored as ASCII
 - Cart auto-fixes itself (sold out, less stock, max qty) and tells the buyer why; header shows "Cart, N items"
 - Payment options and their hints come from `/api/config/` (cash on delivery for now)
-- Order history (own orders only) with status badges; guest orders from the same browser move to a new account on sign-up, or to an existing one on login when the phone matches a past order
+- Order history (own orders only) with status badges; guest orders from the same browser move to the account on login or sign-up when their optional email is the account's, or the phone matches a past order
 - Toast messages, empty states, scroll-reveal animations, star rating labels
 - Responsive product images (200/400/800px copies from the Daraz CDN)
 - Every price, date, badge and label comes pre-formatted from the API (taka, Indian digit grouping)
@@ -132,7 +132,7 @@ backend/   Django 5.2 LTS + DRF, one app: shop
 | `/api/cart/` | GET, POST | - | session cart with totals; POST `{product, quantity}` adds |
 | `/api/cart/<id>/` | PATCH, DELETE | - | set `{quantity}` or remove a line |
 | `/api/auth/register/` | POST | - | returns token, username, safe `next` path |
-| `/api/auth/login/` | POST | - | returns token, username, safe `next` path; claims matching guest orders (`/api/auth/register/` claims all of the session's) |
+| `/api/auth/login/` | POST | - | returns token, username, safe `next` path; claims matching guest orders (sign-up too) |
 | `/api/auth/logout/` | POST | Token | revokes the token and wipes the session (cart, guest orders) |
 | `/api/orders/` | GET, POST | optional | account's orders, or a guest's orders from this session; POST (CSRF) takes the address and `expected_total`, and orders the session cart |
 
@@ -144,9 +144,8 @@ and decremented in one transaction; delivery is free at ৳299 and above, otherw
 cash on delivery; phone must be a Bangladeshi mobile number; city must be a listed city; a buyer can
 have at most 5 pending orders, and so can a phone number across all accounts and guests. Guest orders
 are throttled to 30 per hour per IP, rotate the session key, and are listed only to the session that
-placed them. On login they move to the account only if it has ordered to the same phone before (so a shared
-browser never hands one person's address to another); a new account claims all of them (tradeoff: on a shared
-browser it can take someone else's guest order), and the session key rotates.
+placed them. On login or sign-up they move to the account only if they give the account's email or a phone it has
+ordered to before (so a shared browser never hands one person's address to another), and the session key rotates.
 If checkout's `expected_total` no longer matches the server total, the order is refused. Product price is at
 least ৳1. Deleting a user keeps their orders (user set to null). Login and register are
 throttled to 5 per minute per IP, and sign-ups to 50 per day per IP. Login tokens expire after 30 days and

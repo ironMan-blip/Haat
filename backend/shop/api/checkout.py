@@ -1,6 +1,7 @@
 import logging
 from collections.abc import Mapping
 
+from django.db.models import Q
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import generics
 from rest_framework.decorators import api_view, permission_classes
@@ -17,17 +18,16 @@ GUEST_ORDERS = "guest_orders"  # session key: ids of the orders this session pla
 GUEST_ORDERS_KEPT = 20  # bounds the session row
 
 
-def claim_guest_orders(request, user, new=False):
-    """On sign-in, this session's guest orders move to the account, so they don't vanish from its list.
-    Logging in claims only orders to a phone the account has ordered to before: on a shared browser, another
-    person's guest orders (their name, phone, address) must not become this account's. A new account claims
-    them all. Tradeoff, chosen by the owner: on a shared browser that can take someone else's guest order."""
+def claim_guest_orders(request, user):
+    """On login or sign-up, this session's guest orders move to the account, so they don't vanish from its list.
+    Only orders that give the account's email, or a phone the account has ordered to before: on a shared
+    browser, another person's guest orders (their name, phone, address) must not become this account's."""
     ids = request.session.pop(GUEST_ORDERS, [])
     if ids:
-        orders = Order.objects.filter(user=None, pk__in=ids)
-        if not new:
-            orders = orders.filter(phone__in=Order.objects.filter(user=user).values("phone"))
-        orders.update(user=user)
+        mine = Q(phone__in=Order.objects.filter(user=user).values("phone"))
+        if user.email:  # a blank email must not match every order that left it blank
+            mine |= Q(email__iexact=user.email)
+        Order.objects.filter(user=None, pk__in=ids).filter(mine).update(user=user)
     request.session.cycle_key()  # a session cookie planted before sign-in no longer reads this cart
 
 

@@ -254,6 +254,7 @@ class Order(models.Model):
                              null=True, blank=True)
     full_name = models.CharField(max_length=120)
     phone = models.CharField(max_length=20)
+    email = models.EmailField(max_length=254, blank=True)  # optional; lets a guest order join the account with this email
     address = models.TextField(max_length=300)
     city = models.CharField(max_length=60, choices=CITIES)
     subtotal = models.PositiveIntegerField()

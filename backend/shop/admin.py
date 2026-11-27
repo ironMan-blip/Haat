@@ -410,7 +410,7 @@ class OrderAdmin(admin.ModelAdmin):
     inlines = [OrderItemInline]
     fieldsets = [
         (None, {"fields": ["progress", "status", "user", "created"]}),
-        ("Delivery", {"fields": ["full_name", "phone", "address", "city"]}),
+        ("Delivery", {"fields": ["full_name", "phone", "email", "address", "city"]}),
         ("Payment", {"fields": ["payment", "subtotal", "delivery_fee", "total"]}),
     ]
     # Money and buyer are what the order was placed with; stock was taken for these amounts.
