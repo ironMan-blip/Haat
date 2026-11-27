@@ -284,10 +284,17 @@ select { min-height: 44px; padding: 0 12px; border: 1px solid var(--line); borde
 /* Product detail */
 .pdp { display: grid; grid-template-columns: 7fr 5fr; gap: clamp(24px, 4vw, 64px); align-items: start; }
 .pdp .crumbs { grid-column: 1 / -1; margin-bottom: 0; }
-.pdp-media { display: grid; gap: 12px; position: sticky; top: 88px; }
-.pdp-pic { background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-lg); display: grid; place-items: center; aspect-ratio: 1; overflow: hidden; cursor: zoom-in; }
-.pdp-pic img { width: 86%; mix-blend-mode: multiply; transform-origin: var(--zx, 50%) var(--zy, 50%); transition: transform .2s ease; }
-.pdp-pic:hover img { transform: scale(2); }
+.pdp-media { display: grid; gap: 12px; position: sticky; top: 88px; z-index: 2; }
+.pdp-pic { position: relative; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-lg); display: grid; place-items: center; aspect-ratio: 1; }
+.pdp-pic img { width: 86%; mix-blend-mode: multiply; }
+/* Side zoom: lens on the image, magnified pane over the info column. Mouse + wide screens only. */
+.pdp-lens, .pdp-zoom { display: none; position: absolute; pointer-events: none; }
+@media (hover: hover) and (min-width: 761px) {
+  .pdp-pic { cursor: crosshair; }
+  .pdp-pic:hover .pdp-lens, .pdp-pic:hover .pdp-zoom { display: block; }
+  .pdp-lens { left: var(--lx); top: var(--ly); width: var(--lw); aspect-ratio: 1; background: color-mix(in srgb, var(--accent) 12%, transparent); border: 1px solid var(--accent); border-radius: var(--r-sm); }
+  .pdp-zoom { top: -1px; left: calc(100% + clamp(24px, 4vw, 64px)); width: 72%; /* ~ the 5fr info column */ aspect-ratio: 1; background: var(--bg) no-repeat; background-size: 250%; background-position: var(--bx) var(--by); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: 0 12px 40px rgb(0 0 0 / .12); }
+}
 .pdp-thumbs { display: flex; gap: 8px; overflow-x: auto; }
 .pdp-thumbs button { flex: 0 0 72px; aspect-ratio: 1; padding: 4px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-sm); cursor: pointer; }
 .pdp-thumbs button[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }

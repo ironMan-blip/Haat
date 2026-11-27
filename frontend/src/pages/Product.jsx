@@ -7,6 +7,23 @@ import Status from '../components/Status'
 import TileGrid from '../components/TileGrid'
 import { useStore } from '../useStore'
 
+const ZOOM = 2.5 // must match background-size in .pdp-zoom
+
+// Places the lens over the image and pans the side pane to the same spot, via CSS vars.
+function moveZoom(box, x, y) {
+  const img = box.querySelector('img')
+  const r = img.getBoundingClientRect()
+  const h = 1 / (2 * ZOOM) // half the lens, as a fraction of the image
+  const cx = Math.min(Math.max((x - r.left) / r.width, h), 1 - h)
+  const cy = Math.min(Math.max((y - r.top) / r.height, h), 1 - h)
+  const s = box.style
+  s.setProperty('--lw', `${r.width / ZOOM}px`)
+  s.setProperty('--lx', `${img.offsetLeft + (cx - h) * r.width}px`)
+  s.setProperty('--ly', `${img.offsetTop + (cy - h) * r.height}px`)
+  s.setProperty('--bx', `${((cx - h) * ZOOM * 100) / (ZOOM - 1)}%`)
+  s.setProperty('--by', `${((cy - h) * ZOOM * 100) / (ZOOM - 1)}%`)
+}
+
 // Keyed by slug so moving to a related product starts fresh (quantity back to 1).
 export default function Product() {
   const { slug } = useParams()
@@ -32,14 +49,11 @@ function ProductPage({ slug }) {
             <div className="pdp-media">
               <div
                 className="pdp-pic"
-                // Zoom toward the cursor: CSS reads --zx/--zy as the transform origin.
-                onMouseMove={(e) => {
-                  const r = e.currentTarget.getBoundingClientRect()
-                  e.currentTarget.style.setProperty('--zx', `${((e.clientX - r.left) / r.width) * 100}%`)
-                  e.currentTarget.style.setProperty('--zy', `${((e.clientY - r.top) / r.height) * 100}%`)
-                }}
+                onMouseMove={(e) => moveZoom(e.currentTarget, e.clientX, e.clientY)}
               >
                 <img src={p.gallery[shown].image_large} alt={p.gallery[shown].alt} width="800" height="800" />
+                <span className="pdp-lens" aria-hidden="true" />
+                <div className="pdp-zoom" aria-hidden="true" style={{ backgroundImage: `url(${p.gallery[shown].image_large})` }} />
               </div>
               {p.gallery.length > 1 && (
                 <div className="pdp-thumbs">
