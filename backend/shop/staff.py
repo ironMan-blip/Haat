@@ -43,7 +43,7 @@ PERM_HELP = {
                   "totals, payment and buyer stay locked.",
         "mark_order_shipped": "Can mark pending orders shipped, one at a time or many from the list. A shipped order "
                               "can't go back to pending.",
-        "mark_order_delivered": "Can mark orders delivered, one at a time or many from the list.",
+        "mark_order_delivered": "Can mark pending or shipped orders delivered, one at a time or many from the list.",
         "cancel_order": "Can cancel pending or shipped orders. Cancelling a pending order puts its stock back on "
                         "sale, and a cancelled order can't be reopened.",
         "edit_order_contact": "Can fix the buyer's name, phone and email on an order.",

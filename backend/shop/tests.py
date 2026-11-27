@@ -1383,6 +1383,17 @@ class OwnerAndStaffTests(TestCase):
         self.client.post("/admin/shop/order/", {"action": "mark_shipped", "_selected_action": [self.order.pk]})
         self.assertEqual(Order.objects.get(pk=self.order.pk).status, "pending")
 
+    def test_staff_cannot_undo_a_delivery(self):
+        Order.objects.filter(pk=self.order.pk).update(status="delivered")
+        url = f"/admin/shop/order/{self.order.pk}/change/"
+        for code, action in [("shop.mark_order_shipped", "mark_shipped"), ("shop.cancel_order", "mark_cancelled")]:
+            self.as_staff_with("shop.view_order", code)
+            self.assertEqual([k for k, _ in self.client.get(url).context["adminform"].form.fields["status"].choices],
+                             ["delivered"])
+            self.client.post("/admin/shop/order/", {"action": action, "_selected_action": [self.order.pk]})
+            self.assertEqual(Order.objects.get(pk=self.order.pk).status, "delivered")
+            self.client.logout()
+
     def test_comment_edit_and_delete_are_given_apart(self):
         p = Product.objects.create(category=Category.objects.create(name="C", slug="c"), name="P", slug="p",
                                    price=50, image="https://x.y/a.jpg", stock=3)
@@ -1554,3 +1565,23 @@ class PermissionSplitMigrationTests(TransactionTestCase):
         self.assertEqual(set(Group.objects.get(name="shippers").permissions.values_list("codename", flat=True)),
                          {"mark_order_shipped", "mark_order_delivered"})
         self.assertFalse(Permission.objects.filter(codename__in=["edit_product_details", "ship_order"]).exists())
+
+    def test_undoing_gives_old_permissions_only_to_who_held_every_part(self):
+        perm = lambda c: Permission.objects.get(content_type__app_label="shop", codename=c)
+        full, half = User.objects.create(username="full"), User.objects.create(username="half")
+        full.user_permissions.add(perm("edit_product_price"), perm("edit_product_discount"), perm("mark_order_shipped"),
+                                  perm("mark_order_delivered"))
+        half.user_permissions.add(perm("edit_product_price"), perm("mark_order_shipped"))
+
+        MigrationExecutor(connection).migrate([("shop", "0016_staff_permission_parts")])
+        codes = lambda u: set(u.user_permissions.values_list("codename", flat=True))
+        self.assertEqual(codes(full), {"edit_product_price", "ship_order"})
+        self.assertEqual(codes(half), set())  # price alone must not come back as price and discount
+        self.assertEqual(Permission.objects.get(codename="edit_product_price").name, "Change prices")
+        self.assertFalse(Permission.objects.filter(codename__in=["edit_product_discount", "mark_order_shipped"]).exists())
+
+        executor = MigrationExecutor(connection)
+        executor.loader.build_graph()
+        executor.migrate(executor.loader.graph.leaf_nodes())
+        self.assertEqual(codes(full), {"edit_product_price", "edit_product_discount", "mark_order_shipped",
+                                       "mark_order_delivered"})

@@ -25,13 +25,45 @@ def split(apps, schema_editor):
                 continue
             new = [Permission.objects.get_or_create(content_type=old.content_type, codename=c,
                                                     defaults={"name": names[c]})[0] for c in new_codes]
-            for holder in [*old.user_set.all(), *old.group_set.all(), *StaffInvite.objects.filter(permissions=old)]:
-                rel = holder.user_permissions if hasattr(holder, "user_permissions") else holder.permissions
-                rel.add(*new)
+            for holder in holders(old, StaffInvite):
+                rel(holder).add(*new)
             if old_code in new_codes:
                 Permission.objects.filter(pk=old.pk).update(name=names[old_code])  # post_migrate never renames
             else:
                 old.delete()
+
+
+# The names the old permissions had in 0016, for undoing this migration.
+OLD_NAMES = {"edit_product_details": "Edit details and photos", "edit_product_price": "Change prices",
+             "moderate_product_comments": "Moderate comments", "ship_order": "Mark shipped or delivered",
+             "edit_order_delivery": "Fix delivery details"}
+
+
+def merge(apps, schema_editor):
+    """Undo split: only who holds every finer part gets the old permission back, so nobody gains a right."""
+    Permission = apps.get_model("auth", "Permission")
+    StaffInvite = apps.get_model("shop", "StaffInvite")
+    for olds in SPLIT.values():
+        for old_code, new_codes in olds.items():
+            new = list(Permission.objects.filter(content_type__app_label="shop", codename__in=new_codes))
+            if not new:
+                continue
+            ids = [p.pk for p in new]
+            everyone = {h for p in new for h in holders(p, StaffInvite)}
+            full = {h for h in everyone if rel(h).filter(pk__in=ids).count() == len(new_codes)}
+            old = Permission.objects.update_or_create(content_type=new[0].content_type, codename=old_code,
+                                                      defaults={"name": OLD_NAMES[old_code]})[0]
+            for h in everyone:  # removing matters when the old permission kept its codename (edit_product_price)
+                rel(h).add(old) if h in full else rel(h).remove(old)
+            Permission.objects.filter(pk__in=ids).exclude(pk=old.pk).delete()
+
+
+def holders(perm, StaffInvite):
+    return [*perm.user_set.all(), *perm.group_set.all(), *StaffInvite.objects.filter(permissions=perm)]
+
+
+def rel(holder):
+    return holder.user_permissions if hasattr(holder, "user_permissions") else holder.permissions
 
 
 class Migration(migrations.Migration):
@@ -49,5 +81,5 @@ class Migration(migrations.Migration):
             name='product',
             options={'ordering': ['-created', 'id'], 'permissions': [('edit_product_name', 'Rename and change web address'), ('edit_product_category', 'Change category'), ('edit_product_description', 'Edit description'), ('edit_product_photos', 'Change photos'), ('edit_product_options', 'Change buyer options'), ('edit_product_price', 'Change price'), ('edit_product_discount', 'Change before-discount price'), ('edit_product_stock', 'Change stock'), ('edit_product_reviews', 'Change rating and review count'), ('edit_product_comments', 'Edit comments'), ('delete_product_comments', 'Delete comments')]},
         ),
-        migrations.RunPython(split, migrations.RunPython.noop),
+        migrations.RunPython(split, merge),
     ]

@@ -491,6 +491,9 @@ def set_status(status):
     def action(modeladmin, request, queryset):
         done, refused = 0, []
         for order in queryset.exclude(status=status):
+            if not request.user.is_superuser and order.status not in OrderAdmin.STAFF_FROM[status]:
+                refused.append(str(order))
+                continue
             order.status = status
             try:
                 order.save(update_fields=["status"])
@@ -568,6 +571,9 @@ class OrderAdmin(admin.ModelAdmin):
         return request.user.is_superuser
 
     CONTACT, ADDRESS = ["full_name", "phone", "email"], ["address", "city"]
+    # The statuses staff may move an order from, per target: only forward, so shipping a delivered order or
+    # cancelling one can't undo someone else's work. The owner is held only by Order.refusal().
+    STAFF_FROM = {"shipped": {"pending"}, "delivered": {"pending", "shipped"}, "cancelled": {"pending", "shipped"}}
 
     def has_change_permission(self, request, obj=None):
         return may(request.user, "order", *parts(Order))
@@ -599,13 +605,14 @@ class OrderAdmin(admin.ModelAdmin):
         form = super().get_form(request, obj, **kwargs)
         if request.user.is_superuser or "status" not in form.base_fields:
             return form
-        allowed = self.statuses(request)
+        allowed, came_from = self.statuses(request), self.STAFF_FROM
 
         class StaffForm(form):  # the status list offers only moves this person may make; posting another is refused
             def __init__(self, *args, **kw):
                 super().__init__(*args, **kw)
+                now = self.instance.status
                 self.fields["status"].choices = [(k, label) for k, label in Order.STATUS
-                                                 if k in allowed or k == self.instance.status]
+                                                 if k == now or (k in allowed and now in came_from[k])]
         return StaffForm
 
     def get_fieldsets(self, request, obj=None):
