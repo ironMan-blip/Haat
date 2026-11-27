@@ -8,10 +8,10 @@ from django.shortcuts import get_object_or_404
 from rest_framework import generics
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
 
-from ..auth import AnonThrottle, CommentThrottle, UserThrottle
+from ..auth import AnonThrottle, CommentActionThrottle, CommentThrottle, UserThrottle
 from ..display import cdn, items, num, taka
 from ..models import Category, Comment, Order, Product
 from ..serializers import CategorySerializer, CommentSerializer, ProductDetailSerializer, ProductSerializer
@@ -107,6 +107,7 @@ class CommentDetail(generics.UpdateAPIView, generics.DestroyAPIView):
     """Authors edit or delete their own comments; anyone else's is a 404."""
     serializer_class = CommentSerializer
     permission_classes = [IsAuthenticated]
+    throttle_classes = [UserThrottle, CommentActionThrottle]
     http_method_names = ["patch", "delete"]
 
     def get_queryset(self):
@@ -123,10 +124,14 @@ class CommentDetail(generics.UpdateAPIView, generics.DestroyAPIView):
             c.likes.clear()
         else:
             c.delete()
+            parent = c.parent
+            if parent and parent.deleted and not parent.replies.exists():  # its last reply went: drop the placeholder
+                parent.delete()
 
 
 @api_view(["POST", "DELETE"])
 @permission_classes([IsAuthenticated])
+@throttle_classes([UserThrottle, CommentActionThrottle])
 def like_comment(request, pk):
     """POST likes, DELETE unlikes; both are safe to repeat."""
     c = get_object_or_404(Comment, pk=pk, deleted=False)

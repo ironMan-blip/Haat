@@ -64,6 +64,11 @@ class CommentThrottle(UserThrottle):
         return request.method != "POST" or super().allow_request(request, view)
 
 
+class CommentActionThrottle(UserThrottle):
+    """Edits, deletes, likes and unlikes per account, so a script can't hammer them."""
+    scope = "comment_action"
+
+
 def login_fail_keys(username, request=None):
     """Failure counters shared by the API and admin logins, so neither is a way round the other's lockout.
     Usernames can't differ only by case (see RegisterSerializer), so one counter per lowercased name.

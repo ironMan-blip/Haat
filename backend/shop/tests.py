@@ -20,7 +20,7 @@ from .display import cdn, day, num, taka
 from .models import Category, Order, Product, ProductImage
 from .serializers import RegisterSerializer
 from .api.accounts import SignupThrottle
-from .auth import GuestOrderThrottle
+from .auth import CommentActionThrottle, GuestOrderThrottle
 
 ADDR = {"full_name": "Rahim", "phone": "01712345678", "address": "House 1, Road 2", "city": "Dhaka"}
 
@@ -373,6 +373,14 @@ class ShopApiTests(APITestCase):
         self.assertEqual((t["deleted"], t["author"], t["likes"], len(t["replies"])), (True, None, 0, 1))
         self.assertEqual(karim.delete(f"/api/comments/{reply}/").status_code, 204)  # no replies: gone
         self.assertEqual(karim.post(url, {"text": "x", "parent": top}, format="json").status_code, 400)  # deleted parent
+        self.assertEqual(karim.get(url).data["results"], [])  # last reply gone: the placeholder goes too
+
+    def test_comment_edits_and_likes_are_throttled(self):
+        c = self.client.post("/api/products/phone/comments/", {"text": "Hi"}, format="json").data["id"]
+        with mock.patch.object(CommentActionThrottle, "THROTTLE_RATES", {"comment_action": "2/hour"}):
+            self.assertEqual(self.client.post(f"/api/comments/{c}/like/").status_code, 200)
+            self.assertEqual(self.client.patch(f"/api/comments/{c}/", {"text": "Hey"}, format="json").status_code, 200)
+            self.assertEqual(self.client.delete(f"/api/comments/{c}/like/").status_code, 429)
 
     def test_config_lists_cities_and_sorts(self):
         c = self.client.get("/api/config/").data

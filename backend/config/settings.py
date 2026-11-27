@@ -127,7 +127,8 @@ REST_FRAMEWORK = {
     # Mobile carriers put many people behind one IP (CGNAT), so this stays loose.
     # guest_order: orders without an account, per IP; loose for CGNAT, the per-phone cap is the real limit.
     'DEFAULT_THROTTLE_RATES': {'anon': '120/min', 'user': '300/min', 'auth': '5/min', 'signup': '50/day',
-                               'guest_order': '30/hour', 'comment': '20/hour'},
+                               'guest_order': '30/hour', 'comment': '20/hour',
+                               'comment_action': '120/hour'},
     # Client IP comes from REMOTE_ADDR, so a forged X-Forwarded-For can't dodge throttles.
     # Set to the number of reverse proxies in front of Django when deployed behind one.
     'NUM_PROXIES': int(os.environ.get('DJANGO_NUM_PROXIES', '0')),
