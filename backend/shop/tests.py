@@ -17,7 +17,7 @@ from rest_framework.test import APIClient, APITestCase
 
 from .admin import change
 from .display import cdn, day, num, taka
-from .models import Category, Order, Product, ProductImage
+from .models import Category, Comment, Order, Product, ProductImage
 from .serializers import RegisterSerializer
 from .api.accounts import SignupThrottle
 from .auth import CommentActionThrottle, GuestOrderThrottle
@@ -598,6 +598,15 @@ class AdminPanelTests(TestCase):
         self.order.status = "cancelled"
         self.order.save()
         self.assertContains(self.get(f"/admin/shop/order/{self.order.pk}/change/"), 'class="is-now">Cancelled')
+
+    def test_product_page_lists_its_comments(self):
+        top = Comment.objects.create(product=self.phone, user=self.admin, text="Battery lasts all day")
+        top.likes.add(self.admin)
+        Comment.objects.create(product=self.phone, user=self.admin, parent=top, text="Agreed")
+        r = self.get(f"/admin/shop/product/{self.phone.pk}/change/")
+        self.assertContains(r, "Battery lasts all day")
+        self.assertContains(r, "boss: Battery lasts all day")  # the reply says what it answers
+        self.assertEqual(self.get("/admin/shop/comment/").status_code, 404)  # no separate comments page
 
     def test_lists_show_status_pills_and_theme(self):
         self.assertContains(self.get("/admin/shop/order/"), 'haat-badge haat-pending')

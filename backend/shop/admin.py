@@ -164,9 +164,37 @@ class ProductImageInline(admin.TabularInline):
                            cdn(obj.url, 120)) if obj.url else "-"
 
 
+class CommentInline(admin.TabularInline):
+    """Customers' comments on this product, newest first. Staff fix or remove abuse; deleting a comment
+    also deletes its replies. Comments are written by customers, so staff can't add them here."""
+    model = Comment
+    fk_name = "product"
+    extra = 0
+    fields = ["created", "user", "reply_to", "text", "like_count", "edited", "deleted"]
+    readonly_fields = ["created", "user", "reply_to", "like_count", "edited", "deleted"]
+    formfield_overrides = {models.TextField: {"widget": forms.Textarea(attrs={"rows": 2, "cols": 60})}}
+    verbose_name_plural = "Customer comments (deleting one also deletes its replies)"
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related("user", "parent").annotate(n_likes=Count("likes"))
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    @admin.display(description="Reply to")
+    def reply_to(self, obj):
+        if not obj.parent:
+            return "-"
+        return "(deleted comment)" if obj.parent.deleted else f"{obj.parent.user}: {obj.parent.text[:40]}"
+
+    @admin.display(description="Likes")
+    def like_count(self, obj):
+        return obj.n_likes
+
+
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    inlines = [ProductImageInline]
+    inlines = [ProductImageInline, CommentInline]
     list_display = ["thumb", "name", "category", "price", "original_price", "discount_badge", "stock",
                     "stock_status", "rating", "created"]
     list_display_links = ["thumb", "name"]
@@ -208,16 +236,6 @@ class ProductAdmin(admin.ModelAdmin):
     @admin.display(description="Availability", ordering="stock")
     def stock_status(self, obj):
         return badge(obj.stock_label, obj.stock_level)
-
-
-@admin.register(Comment)
-class CommentAdmin(admin.ModelAdmin):
-    list_display = ["created", "user", "product", "text", "parent", "edited", "deleted"]
-    list_filter = ["deleted", "edited"]
-    list_select_related = ["user", "product"]
-    search_fields = ["text", "user__username", "product__name"]
-    readonly_fields = ["product", "user", "parent", "created"]  # staff may edit or delete abuse, not reassign it
-    exclude = ["likes"]
 
 
 class OrderItemInline(admin.TabularInline):
