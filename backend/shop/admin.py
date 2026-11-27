@@ -192,6 +192,14 @@ class ProductOptionInline(admin.TabularInline):
     verbose_name_plural = "Options the buyer picks when ordering (e.g. Size: S, M, L)"
 
 
+def stock_field(field, db_field):
+    """Posts back the stock the page showed, so `changed_data` tells a staff edit from orders placed since
+    (Django's own initial is read again on save). Without it, saving the page would undo those sales."""
+    if db_field.name == "stock" and field:
+        field.show_hidden_initial = True
+    return field
+
+
 class ProductVariantInline(admin.TabularInline):
     """Every combination of the options above, made on save; staff set each one's stock and price here."""
     model = ProductVariant
@@ -203,6 +211,9 @@ class ProductVariantInline(admin.TabularInline):
 
     def has_add_permission(self, request, obj=None):
         return False
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        return stock_field(super().formfield_for_dbfield(db_field, request, **kwargs), db_field)
 
     @admin.display(description="Combination")
     def combination(self, obj):
@@ -309,9 +320,26 @@ class ProductAdmin(admin.ModelAdmin):
                     self.fields["stock"].disabled = True
         return Form
 
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        return stock_field(super().formfield_for_dbfield(db_field, request, **kwargs), db_field)
+
     def save_model(self, request, obj, form, change):
-        super().save_model(request, obj, form, change)
+        # The form's stock is what the page read; orders placed since lowered it. Write it only if staff changed it.
+        if change and "stock" not in form.changed_data:
+            obj.save(update_fields=[f.name for f in obj._meta.concrete_fields if not f.primary_key and f.name != "stock"])
+            obj.refresh_from_db(fields=["stock"])
+        else:
+            super().save_model(request, obj, form, change)
         obj.sync_stock()  # the save wrote the stock read before any order placed meanwhile; re-total it
+
+    def save_formset(self, request, form, formset, change):
+        if formset.model is not ProductVariant:
+            return super().save_formset(request, form, formset, change)
+        formset.new_objects, formset.changed_objects, formset.deleted_objects = [], [], []  # read by the change log
+        for f in formset.forms:  # same as save_model: a price edit must not write back the stock the page read
+            if fields := [n for n in ("price", "stock") if n in f.changed_data]:
+                f.instance.save(update_fields=fields)
+                formset.changed_objects.append((f.instance, fields))
 
     def save_related(self, request, form, formsets, change):
         super().save_related(request, form, formsets, change)

@@ -19,7 +19,7 @@ from rest_framework.test import APIClient, APITestCase
 from .admin import change
 from .cart import MAX_LINES
 from .display import cdn, day, num, taka
-from .models import Category, Comment, Order, Product, ProductImage
+from .models import Category, Comment, Order, Product, ProductImage, ProductVariant
 from .serializers import RegisterSerializer
 from .api.accounts import SignupThrottle
 from .auth import CommentActionThrottle, GuestOrderThrottle, ScopedThrottle
@@ -882,6 +882,47 @@ class AdminPanelTests(TestCase):
         self.assertEqual(self.post("/admin/shop/product/", form).status_code, 302)
         p.refresh_from_db()
         self.assertEqual((p.price, p.stock), (price, 6))  # the price changed; the typed stock was ignored
+
+    def test_editing_a_product_keeps_stock_sold_since_the_page_loaded(self):
+        p = self.phone  # the page showed stock 2
+        form = {"name": "Phone v2", "slug": p.slug, "category": p.category_id, "description": "", "price": p.price,
+                "original_price": "", "stock": 2, "initial-stock": 2, "image": "https://example.com/a.jpg", "rating": "0",
+                "reviews": 0, "photos-TOTAL_FORMS": 0, "photos-INITIAL_FORMS": 0, "options-TOTAL_FORMS": 0,
+                "options-INITIAL_FORMS": 0, "variants-TOTAL_FORMS": 0, "variants-INITIAL_FORMS": 0,
+                "comments-TOTAL_FORMS": 0, "comments-INITIAL_FORMS": 0}
+        Product.objects.filter(pk=p.pk).update(stock=1)  # a buyer took one meanwhile
+        self.assertEqual(self.post(f"/admin/shop/product/{p.pk}/change/", form).status_code, 302)
+        p.refresh_from_db()
+        self.assertEqual((p.name, p.stock), ("Phone v2", 1))
+        self.assertContains(self.get(f"/admin/shop/product/{p.pk}/change/"), 'name="initial-stock"')
+        self.post(f"/admin/shop/product/{p.pk}/change/", {**form, "stock": 9})  # staff restock: that one is written
+        p.refresh_from_db()
+        self.assertEqual(p.stock, 9)
+        list_form = {"form-TOTAL_FORMS": 1, "form-INITIAL_FORMS": 1, "form-0-id": p.pk, "form-0-price": p.price + 1,
+                     "form-0-original_price": "", "form-0-stock": 2, "initial-form-0-stock": 2,
+                     "_save": "Save"}  # a stale list page
+        Product.objects.filter(pk=p.pk).update(stock=0)
+        self.assertEqual(self.post("/admin/shop/product/", list_form).status_code, 302)
+        p.refresh_from_db()
+        self.assertEqual((p.price, p.stock), (101, 0))
+
+    def test_editing_a_combinations_price_keeps_stock_sold_since_the_page_loaded(self):
+        p = self.phone
+        p.options.create(name="Color", values="Black")
+        p.sync_variants(stock=3)
+        v = p.variants.get()
+        form = {"name": p.name, "slug": p.slug, "category": p.category_id, "description": "", "price": p.price,
+                "original_price": "", "image": "https://example.com/a.jpg", "rating": "0", "reviews": 0,
+                "photos-TOTAL_FORMS": 0, "photos-INITIAL_FORMS": 0, "comments-TOTAL_FORMS": 0, "comments-INITIAL_FORMS": 0,
+                "options-TOTAL_FORMS": 1, "options-INITIAL_FORMS": 1, "options-0-id": p.options.get().pk,
+                "options-0-product": p.pk, "options-0-name": "Color", "options-0-values": "Black", "options-0-position": 0,
+                "variants-TOTAL_FORMS": 1, "variants-INITIAL_FORMS": 1, "variants-0-id": v.pk,
+                "variants-0-product": p.pk, "variants-0-price": 150, "variants-0-stock": 3, "initial-variants-0-stock": 3}
+        ProductVariant.objects.filter(pk=v.pk).update(stock=2)  # a buyer took one meanwhile
+        self.assertEqual(self.post(f"/admin/shop/product/{p.pk}/change/", form).status_code, 302)
+        v.refresh_from_db()
+        p.refresh_from_db()
+        self.assertEqual((v.price, v.stock, p.stock), (150, 2, 2))
 
     def test_lists_show_status_pills_and_theme(self):
         self.assertContains(self.get("/admin/shop/order/"), 'haat-badge haat-pending')
