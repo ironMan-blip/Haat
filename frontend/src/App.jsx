@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { FileQuestion } from 'lucide-react'
 import { Link, Route, Routes, useLocation } from 'react-router-dom'
 import { Button } from './components/ui/button'
 import EmptyState from './components/EmptyState'
@@ -32,7 +33,7 @@ export default function App() {
           <Route path="/orders" element={<Orders />} />
           <Route path="/orders/claim" element={<ClaimOrders />} />
           <Route path="*" element={
-            <EmptyState icon="?" title="Page not found" action={<Button asChild><Link to="/">Back to the home page</Link></Button>}>
+            <EmptyState icon={<FileQuestion strokeWidth={1.5} />} title="Page not found" action={<Button asChild><Link to="/">Back to the home page</Link></Button>}>
               The link may be old or mistyped. Search above or browse the shop.
             </EmptyState>
           } />

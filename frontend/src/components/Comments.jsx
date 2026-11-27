@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Heart } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
 import { useStore } from '../useStore'
@@ -111,9 +112,9 @@ function Comment({ c, ctx }) {
       )}
       {!c.deleted && mode !== 'edit' && (
         <div className="flex flex-wrap items-center gap-4 whitespace-normal">
-          <Button type="button" variant="link" size="inline" disabled={!auth} aria-pressed={c.liked} aria-label={`Like, ${c.likes}`}
+          <Button type="button" variant="link" size="inline" className="gap-1" disabled={!auth} aria-pressed={c.liked} aria-label={`Like, ${c.likes}`}
             onClick={() => ctx.change(`${url}like/`, { method: c.liked ? 'DELETE' : 'POST' })}>
-            {c.liked ? '♥' : '♡'} {c.likes}
+            <Heart aria-hidden="true" strokeWidth={1.75} className={c.liked ? 'fill-current' : undefined} /> {c.likes}
           </Button>
           {auth && !c.is_reply && <Button type="button" variant="link" size="inline" onClick={() => setMode('reply')}>Reply</Button>}
           {c.mine && (

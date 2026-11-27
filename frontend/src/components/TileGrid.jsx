@@ -22,7 +22,8 @@ function Tile({ p, big }) {
       'hover:-translate-y-0.5 hover:border-transparent hover:shadow-soft motion-reduce:hover:translate-y-0 has-[>a:focus-visible]:outline-3 has-[>a:focus-visible]:outline-offset-2 has-[>a:focus-visible]:outline-ring',
       big && 'col-span-2 md:row-span-2',
     )}>
-      <span className="relative mb-1.5 grid aspect-square place-items-center overflow-hidden rounded-lg bg-page">
+      {/* Big tiles span two rows; the picture takes the spare height instead of leaving a gap. */}
+      <span className={cn('relative mb-1.5 grid aspect-square place-items-center overflow-hidden rounded-lg bg-page', big && 'md:aspect-auto md:flex-1')}>
         <img src={p.image} alt="" loading="lazy" width="400" height="400"
           className={cn('aspect-square w-[82%] object-contain mix-blend-multiply transition-transform duration-320 ease-haat group-hover/tile:scale-105', out && 'opacity-45')} />
         {p.badge && <Badge className={cn('absolute top-2 left-2 rounded-md font-bold text-white', out ? 'bg-foreground' : 'bg-destructive')}>{p.badge}</Badge>}

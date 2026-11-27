@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { CircleAlert, LoaderCircle } from 'lucide-react'
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import EmptyState from '../components/EmptyState'
@@ -23,9 +24,9 @@ export default function ClaimOrders() {
   }, [auth]) // eslint-disable-line react-hooks/exhaustive-deps -- once per sign-in
 
   if (!auth) return <Navigate to={`/login?next=${encodeURIComponent(pathname + search)}`} replace />
-  if (!error) return <EmptyState icon="…" title="Adding your orders" />
+  if (!error) return <EmptyState icon={<LoaderCircle strokeWidth={1.5} className="motion-safe:animate-spin" />} title="Adding your orders" />
   return (
-    <EmptyState icon="!" title="We couldn't add these orders" action={<Button asChild><Link to="/orders">Your orders</Link></Button>}>
+    <EmptyState icon={<CircleAlert strokeWidth={1.5} />} title="We couldn't add these orders" action={<Button asChild><Link to="/orders">Your orders</Link></Button>}>
       {error}
     </EmptyState>
   )

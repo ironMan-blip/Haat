@@ -1,3 +1,4 @@
+import { SearchX } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useFetch } from '../api'
 import EmptyState from '../components/EmptyState'
@@ -33,7 +34,8 @@ export default function Shop() {
         {data && <span className="text-muted-foreground">{data.count_label}</span>}
       </div>
       <div className="mb-7 flex flex-wrap items-center justify-between gap-4 border-b pb-5">
-        <nav aria-label="Categories" className="flex flex-wrap gap-2">
+        {/* Phones: one swipeable row, so products stay near the top. */}
+        <nav aria-label="Categories" className="flex gap-2 *:flex-none max-md:-mx-gutter max-md:w-[calc(100%+2*var(--spacing-gutter))] max-md:overflow-x-auto max-md:px-gutter max-md:[scrollbar-width:none] md:flex-wrap">
           <Link className={cat} to="/shop" aria-current={!category ? 'page' : undefined}>All</Link>
           {(data?.categories || []).map((c) => (
             <Link className={cat} key={c.slug} to={`/shop?category=${c.slug}`} aria-current={c.slug === category ? 'page' : undefined}>{c.name}</Link>
@@ -48,7 +50,7 @@ export default function Shop() {
       </div>
       <Status loading={loading} error={error}>
         {data?.results.length ? <TileGrid products={data.results} key={qs} /> : (
-          <EmptyState icon="⌕" title="No products found" action={<Button asChild variant="outline"><Link to="/shop">Clear filters</Link></Button>}>
+          <EmptyState icon={<SearchX strokeWidth={1.5} />} title="No products found" action={<Button asChild variant="outline"><Link to="/shop">Clear filters</Link></Button>}>
             {data?.empty}
           </EmptyState>
         )}

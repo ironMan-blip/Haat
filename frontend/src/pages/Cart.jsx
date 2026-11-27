@@ -1,3 +1,4 @@
+import { ShoppingCart } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import EmptyState from '../components/EmptyState'
 import { Line, Lines } from '../components/Lines'
@@ -15,7 +16,7 @@ export default function Cart() {
   if (!cart) return <Status loading />
   if (!cart.lines.length)
     return (
-      <EmptyState icon="🛒" title="Your cart is empty" action={<Button asChild><Link to="/shop">Start shopping</Link></Button>}>
+      <EmptyState icon={<ShoppingCart strokeWidth={1.5} />} title="Your cart is empty" action={<Button asChild><Link to="/shop">Start shopping</Link></Button>}>
         Add something you like and it will wait for you here.
       </EmptyState>
     )

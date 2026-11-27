@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Check } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useFetch } from '../api'
 import { cn } from 'cn'
@@ -91,9 +92,9 @@ function ProductPage({ slug }) {
                 </div>
               )}
             </div>
-            <div className="grid gap-4">
+            <div className="grid min-w-0 gap-4">
               <Link to={`/shop?category=${p.category.slug}`} className="justify-self-start text-small font-semibold text-primary no-underline hover:underline">{p.category.name}</Link>
-              <h1 className="text-[clamp(1.5rem,1.2rem+1.2vw,2.25rem)] leading-[1.2]">{p.name}</h1>
+              <h1 className="text-[clamp(1.25rem,1rem+1.2vw,2rem)] leading-[1.25]">{p.name}</h1>
               <Rating p={p} />
               <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-y py-4 text-[clamp(2rem,1.6rem+1.4vw,2.75rem)] leading-none font-bold tracking-[-0.03em]">
                 {item.price_display}
@@ -112,13 +113,14 @@ function ProductPage({ slug }) {
               {item.stock_level !== 'out' ? (
                 <>
                   <Stock item={item} />
-                  <div className="flex flex-wrap items-center gap-2.5">
+                  {/* Phones: the buy row stays pinned to the screen bottom while the details scroll. */}
+                  <div className="z-10 flex flex-wrap items-center gap-2.5 max-md:sticky max-md:bottom-0 max-md:-mx-gutter max-md:flex-nowrap max-md:bg-background max-md:px-gutter max-md:py-3 max-md:shadow-float">
                     <Qty value={n} max={item.max_qty} onChange={setQty} label="Quantity" />
-                    <Button className="h-12.5 flex-1" onClick={() => add(p, n, chosen)}>Add to cart</Button>
-                    <Button variant="line" className="h-12.5 flex-1" onClick={() => add(p, n, chosen).then((ok) => ok && navigate('/cart'))}>Buy now</Button>
+                    <Button className="h-12.5 min-w-0 flex-1 max-md:px-3" onClick={() => add(p, n, chosen)}>Add to cart</Button>
+                    <Button variant="line" className="h-12.5 min-w-0 flex-1 max-md:px-3" onClick={() => add(p, n, chosen).then((ok) => ok && navigate('/cart'))}>Buy now</Button>
                   </div>
                   <ul className="grid gap-2 rounded-xl bg-secondary px-5 py-4 text-small font-medium text-secondary-foreground">
-                    {config?.perks.map((t) => <li key={t} className="before:mr-2 before:font-bold before:content-['✓']">{t}</li>)}
+                    {config?.perks.map((t) => <li key={t} className="flex items-start gap-2"><Check aria-hidden="true" strokeWidth={2.5} className="mt-0.5 size-4 flex-none" />{t}</li>)}
                   </ul>
                 </>
               ) : (

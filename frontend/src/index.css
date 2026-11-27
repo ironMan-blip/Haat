@@ -91,7 +91,7 @@
 
   --page: #f7f6f3;
   --brand-hover: #0a5536;
-  --warn: #b8640a;
+  --warn: #9a5208; /* 5.2:1 on warn-soft */
   --warn-soft: #fbf0e0;
   --sale-soft: #fbe9e6;
   --star: #e0a100;

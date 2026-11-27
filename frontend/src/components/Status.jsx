@@ -1,3 +1,4 @@
+import { CircleAlert } from 'lucide-react'
 import EmptyState from './EmptyState'
 import Page from './Page'
 import { Grid } from './TileGrid'
@@ -22,7 +23,7 @@ export default function Status({ loading, error, children }) {
   if (loading) return <Page as="div"><Loading /></Page>
   if (error)
     return (
-      <EmptyState icon="!" title="We couldn't load this page"
+      <EmptyState icon={<CircleAlert strokeWidth={1.5} />} title="We couldn't load this page"
         action={<Button onClick={() => location.reload()}>Try again</Button>}>
         Check your connection and try again. ({error.message})
       </EmptyState>

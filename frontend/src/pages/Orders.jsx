@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { Package } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { useFetch } from '../api'
 import EmptyState from '../components/EmptyState'
@@ -38,7 +39,7 @@ export default function Orders() {
       )}
       <Status {...state}>
         {state.data?.length === 0 && (
-          <EmptyState icon="📦" title="No orders yet" action={<Button asChild><Link to="/shop">Start shopping</Link></Button>}>
+          <EmptyState icon={<Package strokeWidth={1.5} />} title="No orders yet" action={<Button asChild><Link to="/shop">Start shopping</Link></Button>}>
             When you place an order, you can track it here.
           </EmptyState>
         )}
