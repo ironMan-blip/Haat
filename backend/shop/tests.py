@@ -1243,7 +1243,8 @@ class OwnerAndStaffTests(TestCase):
         rafi = User.objects.get(username="rafi")
         self.assertTrue(rafi.is_superuser and rafi.is_staff and rafi.check_password("a-long-owner-pass-77"))
         self.assertEqual(rafi.email, "rafi@x.com")
-        self.assertFalse(User.objects.get(username="boss").is_superuser)
+        boss = User.objects.get(username="boss")
+        self.assertFalse(boss.is_superuser or boss.is_staff)  # the new owner adds them as staff if they want
         # Run again with a new password: kept unless --reset-password, so OWNER_PASSWORD can leave .env after setup.
         with mock.patch.dict("os.environ", {**env, "OWNER_PASSWORD": "another-owner-pass-88"}):
             call_command("sync_owner", stdout=io.StringIO())
@@ -1286,6 +1287,22 @@ class OwnerAndStaffTests(TestCase):
         choices = r.context["adminform"].form.fields["user_permissions"].queryset
         self.assertIn(perm("shop.change_order"), choices)
         self.assertNotIn(perm("shop.delete_product"), choices)
+
+    def test_only_staff_added_on_the_staff_page_can_log_in_to_the_admin(self):
+        customer = User.objects.create_user("cust", "cust@x.com", "pass-1234-word")
+        with self.assertRaises(AssertionError):
+            admin_login(self.client, customer)  # right password and code, but not staff
+        self.as_owner()
+        r = self.client.post(f"/admin/auth/user/{customer.pk}/change/", {
+            "username": "cust", "email": "cust@x.com", "is_staff": "on", "is_active": "on",
+            "date_joined_0": "2026-01-01", "date_joined_1": "00:00:00", "orders-TOTAL_FORMS": "0",
+            "orders-INITIAL_FORMS": "0"})
+        self.assertEqual(r.status_code, 302)
+        self.assertFalse(User.objects.get(pk=customer.pk).is_staff)  # the Users page can't make staff
+        self.client.post("/admin/staff/", {"email": "cust@x.com"})
+        self.assertTrue(User.objects.get(pk=customer.pk).is_staff)
+        self.client.logout()
+        admin_login(self.client, customer)
 
     # Staff page
 

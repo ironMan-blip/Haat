@@ -687,9 +687,9 @@ class HaatUserAdmin(UserAdmin):
         return super().user_change_password(request, id, form_url)
 
     def get_readonly_fields(self, request, obj=None):
-        ro = list(super().get_readonly_fields(request, obj))
+        ro = [*super().get_readonly_fields(request, obj), "is_staff"]  # only the Staff page lets someone into the admin
         if obj and (obj == request.user or obj.is_superuser):  # nobody changes their own access, nor the owner's
-            ro += ["is_staff", "is_active", "groups", "user_permissions"]
+            ro += ["is_active", "groups", "user_permissions"]
         return ro
 
     def has_change_permission(self, request, obj=None):

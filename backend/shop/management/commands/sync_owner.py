@@ -52,11 +52,11 @@ class Command(BaseCommand):
         with transaction.atomic():
             # update() skips the one-owner check on purpose: the old owner goes before the new one is saved.
             demoted = list(User.objects.filter(is_superuser=True).exclude(username=username).values_list("username", flat=True))
-            User.objects.filter(username__in=demoted).update(is_superuser=False)
+            User.objects.filter(username__in=demoted).update(is_superuser=False, is_staff=False)  # back in only if the new owner adds them on the Staff page
             user.email, user.is_superuser, user.is_staff, user.is_active = email, True, True, True
             user.save()
         self.stdout.write(f"{'Created' if new else 'Updated'} owner {username!r}.")
         if demoted:
-            self.stdout.write(f"No longer owner (still staff, check their permissions): {', '.join(demoted)}.")
+            self.stdout.write(f"No longer owner or staff (add them on the Staff page to let them back in):{', '.join(demoted)}.")
         if new:
             self.stdout.write(f"Next: manage.py admin_totp {username}, then you may delete OWNER_PASSWORD from .env.")
