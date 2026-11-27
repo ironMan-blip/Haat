@@ -169,7 +169,8 @@ class CommentDetail(generics.UpdateAPIView, generics.DestroyAPIView):
 
     def perform_update(self, serializer):
         serializer.validated_data.pop("parent", None)  # a comment can't be moved to another thread
-        serializer.save(edited=True)
+        c, text = serializer.instance, serializer.validated_data.get("text")
+        serializer.save(edited=c.edited or (text is not None and text != c.text))  # an empty or same-text save isn't an edit
 
     def destroy(self, request, *args, **kwargs):
         """Says what changed, so the page can update the comments it has loaded without reloading them."""

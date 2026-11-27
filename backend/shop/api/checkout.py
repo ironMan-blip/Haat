@@ -17,14 +17,17 @@ GUEST_ORDERS = "guest_orders"  # session key: ids of the orders this session pla
 GUEST_ORDERS_KEPT = 20  # bounds the session row
 
 
-def claim_guest_orders(request, user):
+def claim_guest_orders(request, user, new=False):
     """On sign-in, this session's guest orders move to the account, so they don't vanish from its list.
-    Only orders to a phone the account has ordered to before: on a shared browser, another person's
-    guest orders (their name, phone, address) must not become this account's. A new account claims none."""
+    Logging in claims only orders to a phone the account has ordered to before: on a shared browser, another
+    person's guest orders (their name, phone, address) must not become this account's. A new account claims
+    them all. Tradeoff, chosen by the owner: on a shared browser that can take someone else's guest order."""
     ids = request.session.pop(GUEST_ORDERS, [])
     if ids:
-        phones = Order.objects.filter(user=user).values("phone")
-        Order.objects.filter(user=None, pk__in=ids, phone__in=phones).update(user=user)
+        orders = Order.objects.filter(user=None, pk__in=ids)
+        if not new:
+            orders = orders.filter(phone__in=Order.objects.filter(user=user).values("phone"))
+        orders.update(user=user)
     request.session.cycle_key()  # a session cookie planted before sign-in no longer reads this cart
 
 

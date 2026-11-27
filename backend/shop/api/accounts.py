@@ -15,9 +15,9 @@ from ..serializers import RegisterSerializer
 from .checkout import claim_guest_orders
 
 
-def signed_in(request, user, status=200):
+def signed_in(request, user, status=200, new=False):
     """Shared end of login and sign-up: move this session's guest orders over and hand out the token."""
-    claim_guest_orders(request, user)
+    claim_guest_orders(request, user, new)
     return Response({"token": issue_token(user).key, "username": user.username, "next": safe_next(request)},
                     status=status)
 
@@ -59,7 +59,7 @@ class Register(generics.CreateAPIView):
 
     def create(self, request, *args, **kwargs):
         super().create(request, *args, **kwargs)
-        return signed_in(request, self.user, status=201)
+        return signed_in(request, self.user, status=201, new=True)
 
 
 @api_view(["POST"])

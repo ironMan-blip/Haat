@@ -483,6 +483,8 @@ class ShopApiTests(APITestCase):
                                     format="json").status_code, 400)  # another product's thread
         self.assertEqual(karim.patch(f"/api/comments/{top}/", {"text": "hacked"}, format="json").status_code, 404)
         self.assertEqual(karim.delete(f"/api/comments/{top}/").status_code, 404)
+        for body in [{}, {"text": Comment.objects.get(pk=top).text}]:  # nothing changed: not "edited"
+            self.assertIsNone(self.client.patch(f"/api/comments/{top}/", body, format="json").data["edited_label"])
         self.assertEqual(self.client.patch(f"/api/comments/{top}/", {"text": "Battery life?"}, format="json").status_code, 200)
         for _ in range(2):  # liking twice still counts once
             self.assertEqual(karim.post(f"/api/comments/{top}/like/").data["likes"], 1)
@@ -1054,11 +1056,16 @@ class GuestCheckoutTests(APITestCase):
         self.login()
         self.assertEqual(Order.objects.get(pk=r.data["id"]).user, None)
 
-    def test_new_account_claims_no_guest_orders(self):
+    def test_new_account_claims_this_sessions_guest_orders(self):
         r = self.order()
+        Order.objects.create(full_name="X", phone="01812345678", address="A", city="Dhaka",
+                             subtotal=100, delivery_fee=60, total=160)  # another session's guest order
         reg = self.client.post("/api/auth/register/", {"username": "karim", "email": "karim@x.com", "password": "pass-1234-word"}, format="json")
         self.assertEqual(reg.status_code, 201, reg.data)
-        self.assertEqual(Order.objects.get(pk=r.data["id"]).user, None)  # no past phone to match yet
+        karim = User.objects.get(username="karim")
+        self.assertEqual(list(karim.orders.values_list("pk", flat=True)), [r.data["id"]])
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {reg.data['token']}")
+        self.assertEqual([o["id"] for o in self.client.get("/api/orders/").data], [r.data["id"]])
 
     def test_login_rotates_session_key(self):
         self.client.get("/api/cart/")
