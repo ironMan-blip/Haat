@@ -454,6 +454,14 @@ input[type=submit], .button, .submit-row input { text-transform: none; }
 .haat-perms td { text-align: center; }
 .haat-perms input[type=checkbox] { width: 18px; height: 18px; }
 .haat-muted { color: var(--haat-muted); font-weight: 400; }
+.haat-tip { position: relative; display: inline-block; vertical-align: middle; margin-left: 4px; }
+.haat-tip-btn { width: 18px; height: 18px; padding: 0; border-radius: 50%; border: 1px solid var(--haat-muted); background: transparent;
+  color: var(--haat-muted); font: italic 700 11px/16px Georgia, serif; cursor: help; }
+.haat-tip-btn:hover, .haat-tip-btn:focus-visible { color: var(--haat-ink); border-color: var(--haat-ink); }
+.haat-tip [role=tooltip] { display: none; position: absolute; z-index: 20; bottom: calc(100% + 6px); right: -8px; width: 260px;
+  padding: 8px 10px; border: 1px solid var(--haat-line); border-radius: var(--haat-r-sm); background: var(--haat-card);
+  color: var(--haat-ink); font-size: .82rem; line-height: 1.4; text-align: left; box-shadow: 0 6px 18px rgb(0 0 0 / .15); }
+.haat-tip:hover [role=tooltip], .haat-tip-btn:focus-visible + [role=tooltip] { display: block; }
 .haat-inline { display: inline-flex; gap: 6px; }
 .haat-secret { font-size: 1.1em; letter-spacing: .08em; user-select: all; }
 .haat-danger { border-color: var(--haat-bad-fg); }

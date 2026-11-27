@@ -33,6 +33,59 @@ from .models import StaffInvite
 
 log = logging.getLogger("shop.security")
 ACTIONS = ["view", "add", "change", "delete"]
+GENERIC_HELP = {"view": "Can open the list and read every entry, but not change anything.",
+                "add": "Can make new entries.", "change": "Can edit existing entries.",
+                "delete": "Can remove entries for good. This can't be undone."}
+# What each tick on the Staff page lets someone do, shown in the (i) tip beside it. Keep in step with shop/admin.py.
+PERM_HELP = {
+    ("shop", "order"): {
+        "view": "Sees every order: the buyer's name, phone, email, address, items and totals.",
+        "add": "Does nothing for staff: orders only come from checkout. Only the owner can add one by hand.",
+        "change": "Can move orders between statuses, one at a time or many from the list (cancelling puts the "
+                  "stock back), and fix delivery details. Prices, totals, payment and buyer stay locked.",
+        "delete": "Does nothing for staff: they cancel orders instead, so the history stays. Only the owner can delete.",
+    },
+    ("shop", "product"): {
+        "view": "Sees every product with its price, stock, images, options and reviews.",
+        "add": "Can put new products in the shop. They show to customers as soon as they're saved.",
+        "change": "Can edit names, prices, discounts, stock, images and options, and edit or delete customer "
+                  "comments. Customers see the changes straight away.",
+        "delete": "Can remove a product for good, with its images, options and comments. Products already "
+                  "in an order can't be deleted.",
+    },
+    ("shop", "category"): {
+        "view": "Sees the list of categories and how many products each has.",
+        "add": "Can make new categories for the shop menu.",
+        "change": "Can rename categories and change their web address.",
+        "delete": "Can remove an empty category. One that still has products can't be deleted.",
+    },
+    ("auth", "user"): {
+        "view": "Sees every account: usernames, emails, names, past orders and who is staff.",
+        "add": "Can make new customer accounts.",
+        "change": "Can edit accounts and manage staff on this page, but only hand out permissions they hold "
+                  "themselves, and only change people who hold no more than they do. Never the owner.",
+        "delete": "Can delete accounts that hold no more permissions than they do (never the owner or themselves). "
+                  "Their comments go too; their orders stay, shown as Guest.",
+    },
+    ("auth", "group"): {
+        "view": "Sees the permission groups and what each one allows.",
+        "add": "Can make permission groups, filled only with permissions they hold.",
+        "change": "Can edit groups that hold nothing they lack. Everyone in the group gets the change.",
+        "delete": "Can delete groups that hold nothing they lack. Members lose what the group gave them.",
+    },
+    ("authtoken", "token"): {
+        "view": "Sees customers' login tokens. Anyone with a token can act as that customer: give with care.",
+        "add": "Can make login tokens, which sign in as a customer without their password.",
+        "change": "Can edit login tokens.",
+        "delete": "Can delete login tokens, which signs that customer out of the shop.",
+    },
+    ("otp_totp", "totpdevice"): {
+        "view": "Sees staff authenticator apps, including the secret that makes their codes.",
+        "add": "Can add an authenticator to an account, which can let someone else make its login codes.",
+        "change": "Can edit staff authenticators, which can lock a person out or let someone else in.",
+        "delete": "Can remove a staff authenticator, so that person can't log in until it's set up again.",
+    },
+}
 
 
 def grantable(user):
@@ -133,7 +186,9 @@ class StaffViews:
                 row = rows.setdefault(p.content_type_id, {"label": str(model._meta.verbose_name_plural).capitalize(),
                                                           "app": str(model._meta.app_config.verbose_name),
                                                           "cells": {}})
-                row["cells"][action] = {"pk": p.pk, "checked": p.pk in checked, "action": action}
+                ct = p.content_type
+                row["cells"][action] = {"pk": p.pk, "checked": p.pk in checked, "action": action,
+                                        "help": PERM_HELP.get((ct.app_label, ct.model), GENERIC_HELP)[action]}
         return [{**r, "cells": [r["cells"].get(a) for a in ACTIONS]}
                 for r in sorted(rows.values(), key=lambda r: (r["app"], r["label"]))]
 

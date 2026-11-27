@@ -1297,6 +1297,16 @@ class OwnerAndStaffTests(TestCase):
         self.as_owner()
         self.assertContains(self.client.get("/admin/staff/"), "clerk@x.com")
 
+    def test_every_permission_box_explains_itself(self):
+        from .staff import GENERIC_HELP, PERM_HELP
+        self.as_owner()
+        page = self.client.get("/admin/staff/")
+        boxes = [c for row in page.context["grid"] for c in row["cells"] if c]
+        self.assertTrue(boxes)
+        self.assertFalse([c for c in boxes if c["help"] in GENERIC_HELP.values()])  # every section has its own text
+        self.assertContains(page, 'role="tooltip"', count=len(boxes))
+        self.assertContains(page, PERM_HELP[("shop", "order")]["delete"])
+
     def test_invite_by_email_then_accept_makes_staff_with_those_permissions(self):
         self.as_owner()
         r = self.client.post("/admin/staff/", {"email": "New@X.com", "perms": [perm("shop.view_product").pk]})

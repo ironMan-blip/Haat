@@ -5,7 +5,8 @@
     <tr>
       <th scope="row">{{ row.label }} <span class="haat-muted">{{ row.app }}</span></th>
       {% for cell in row.cells %}
-        <td>{% if cell %}<input type="checkbox" name="perms" value="{{ cell.pk }}" aria-label="{{ cell.action|capfirst }} {{ row.label }}"{% if cell.checked %} checked{% endif %}>{% else %}<span class="haat-muted" aria-label="Not available">-</span>{% endif %}</td>
+        <td>{% if cell %}<input type="checkbox" name="perms" value="{{ cell.pk }}" aria-label="{{ cell.action|capfirst }} {{ row.label }}"{% if cell.checked %} checked{% endif %}>
+          <span class="haat-tip"><button type="button" class="haat-tip-btn" aria-label="What {{ cell.action }} {{ row.label|lower }} allows" aria-describedby="perm-tip-{{ cell.pk }}">i</button><span role="tooltip" id="perm-tip-{{ cell.pk }}">{{ cell.help }}</span></span>{% else %}<span class="haat-muted" aria-label="Not available">-</span>{% endif %}</td>
       {% endfor %}
     </tr>
   {% empty %}
@@ -13,4 +14,4 @@
   {% endfor %}
   </tbody>
 </table>
-<p class="help">View = see the list. Add = make new ones. Change = edit. Delete = remove. "Users: change" lets someone manage staff too, but only with the permissions they hold themselves.</p>
+<p class="help">Hover or focus the (i) beside a box to see what it allows. View = see the list. Add = make new ones. Change = edit. Delete = remove. "Users: change" lets someone manage staff too, but only with the permissions they hold themselves.</p>
