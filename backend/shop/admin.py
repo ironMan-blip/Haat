@@ -195,7 +195,7 @@ class PartInline(admin.TabularInline):
 
 
 class ProductImageInline(PartInline):
-    parts = ["edit_product_details"]
+    parts = ["edit_product_photos"]
     model = ProductImage
     extra = 1
     fields = ["thumb", "url", "position"]
@@ -228,7 +228,7 @@ class OptionFormSet(forms.BaseInlineFormSet):
 
 
 class ProductOptionInline(PartInline):
-    parts = ["edit_product_details"]
+    parts = ["edit_product_options"]
     model = ProductOption
     formset = OptionFormSet
     extra = 1
@@ -271,7 +271,7 @@ class ProductVariantInline(PartInline):
 class CommentInline(PartInline):
     """Customers' comments on this product, newest first. Staff fix or remove abuse; deleting a comment
     also deletes its replies. Comments are written by customers, so staff can't add them here."""
-    parts = ["moderate_product_comments"]
+    parts = ["edit_product_comments"]
     model = Comment
     fk_name = "product"
     extra = 0
@@ -303,6 +303,9 @@ class CommentInline(PartInline):
 
     def has_add_permission(self, request, obj=None):
         return False
+
+    def has_delete_permission(self, request, obj=None):  # editing and deleting comments are given apart
+        return may(request.user, "product", "delete_product_comments")
 
     @admin.display(description="Reply to")
     def reply_to(self, obj):
@@ -353,8 +356,10 @@ class ProductAdmin(admin.ModelAdmin):
             cdn(obj.image, 600), obj.image, "" if obj.image else " hidden")
 
     # Which fields each part of "change product" unlocks. Adding a product needs none of them.
-    PART_FIELDS = {"edit_product_details": ["name", "slug", "category", "description", "image", "rating", "reviews"],
-                   "edit_product_price": ["price", "original_price"], "edit_product_stock": ["stock"]}
+    PART_FIELDS = {"edit_product_name": ["name", "slug"], "edit_product_category": ["category"],
+                   "edit_product_description": ["description"], "edit_product_photos": ["image"],
+                   "edit_product_price": ["price"], "edit_product_discount": ["original_price"],
+                   "edit_product_stock": ["stock"], "edit_product_reviews": ["rating", "reviews"]}
 
     @classmethod
     def locked(cls, user, fields=None):
@@ -482,7 +487,7 @@ class OwnerOrderForm(forms.ModelForm):
 def set_status(status):
     """Bulk action. Saves each order one by one so Order.save() puts cancelled stock back."""
 
-    @admin.action(description=f"Mark selected orders {status}", permissions=["cancel" if status == "cancelled" else "ship"])
+    @admin.action(description=f"Mark selected orders {status}", permissions=[{"cancelled": "cancel", "delivered": "deliver"}.get(status, "ship")])
     def action(modeladmin, request, queryset):
         done, refused = 0, []
         for order in queryset.exclude(status=status):
@@ -562,27 +567,31 @@ class OrderAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return request.user.is_superuser
 
-    DELIVERY = ["full_name", "phone", "email", "address", "city"]
+    CONTACT, ADDRESS = ["full_name", "phone", "email"], ["address", "city"]
 
     def has_change_permission(self, request, obj=None):
         return may(request.user, "order", *parts(Order))
 
     def has_ship_permission(self, request):  # read by the bulk actions
-        return may(request.user, "order", "ship_order")
+        return may(request.user, "order", "mark_order_shipped")
+
+    def has_deliver_permission(self, request):
+        return may(request.user, "order", "mark_order_delivered")
 
     def has_cancel_permission(self, request):
         return may(request.user, "order", "cancel_order")
 
     def statuses(self, request):
         """The statuses this person may move an order to."""
-        return ({"pending", "shipped", "delivered"} if self.has_ship_permission(request) else set()) | \
-            ({"cancelled"} if self.has_cancel_permission(request) else set())
+        return {s for s, ok in [("shipped", self.has_ship_permission), ("delivered", self.has_deliver_permission),
+                                ("cancelled", self.has_cancel_permission)] if ok(request)}
 
     def get_readonly_fields(self, request, obj=None):
         if request.user.is_superuser:
             return ["progress", "created"]
         return [*self.readonly_fields, *([] if self.statuses(request) else ["status"]),
-                *([] if may(request.user, "order", "edit_order_delivery") else self.DELIVERY)]
+                *([] if may(request.user, "order", "edit_order_contact") else self.CONTACT),
+                *([] if may(request.user, "order", "edit_order_address") else self.ADDRESS)]
 
     def get_form(self, request, obj=None, **kwargs):
         if request.user.is_superuser:

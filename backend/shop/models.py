@@ -80,8 +80,13 @@ class Product(models.Model):
     class Meta:
         ordering = ["-created", "id"]
         # Parts of "change product", each given alone on the Staff page; change_product gives them all.
-        permissions = [("edit_product_details", "Edit details and photos"), ("edit_product_price", "Change prices"),
-                       ("edit_product_stock", "Change stock"), ("moderate_product_comments", "Moderate comments")]
+        # Keep in step with ProductAdmin.PART_FIELDS and PERM_HELP in shop/staff.py.
+        permissions = [("edit_product_name", "Rename and change web address"), ("edit_product_category", "Change category"),
+                       ("edit_product_description", "Edit description"), ("edit_product_photos", "Change photos"),
+                       ("edit_product_options", "Change buyer options"), ("edit_product_price", "Change price"),
+                       ("edit_product_discount", "Change before-discount price"), ("edit_product_stock", "Change stock"),
+                       ("edit_product_reviews", "Change rating and review count"),
+                       ("edit_product_comments", "Edit comments"), ("delete_product_comments", "Delete comments")]
 
     def __str__(self):
         return self.name
@@ -270,8 +275,9 @@ class Order(models.Model):
     class Meta:
         ordering = ["-created"]
         # Parts of "change order", each given alone on the Staff page; change_order gives them all.
-        permissions = [("ship_order", "Mark shipped or delivered"), ("cancel_order", "Cancel"),
-                       ("edit_order_delivery", "Fix delivery details")]
+        permissions = [("mark_order_shipped", "Mark shipped"), ("mark_order_delivered", "Mark delivered"),
+                       ("cancel_order", "Cancel"), ("edit_order_contact", "Fix buyer's name, phone and email"),
+                       ("edit_order_address", "Fix delivery address and city")]
 
     def __str__(self):
         return f"Order #{self.pk}"

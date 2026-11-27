@@ -4,14 +4,15 @@ from unittest import mock
 
 from urllib.parse import parse_qs, urlparse
 
-from django.contrib.auth.models import Permission, User
+from django.contrib.auth.models import Group, Permission, User
 from django.core import mail
 from django.core.cache import cache
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.management import CommandError, call_command
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, connection, transaction
+from django.db.migrations.executor import MigrationExecutor
 from django.conf import settings
-from django.test import TestCase, override_settings
+from django.test import TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from rest_framework.exceptions import ValidationError
@@ -1309,7 +1310,8 @@ class OwnerAndStaffTests(TestCase):
         self.assertContains(page, 'role="tooltip"', count=len(boxes))
         self.assertContains(page, PERM_HELP[("shop", "order")]["delete"])
         orders = next(r for r in page.context["grid"] if r["label"] == "Orders")
-        self.assertEqual([c["label"] for c in orders["parts"]], ["Mark shipped or delivered", "Cancel", "Fix delivery details"])
+        self.assertEqual([c["label"] for c in orders["parts"]], ["Mark shipped", "Mark delivered", "Cancel",
+                                                             "Fix buyer's name, phone and email", "Fix delivery address and city"])
 
     # Parts of "change": each can be given alone
 
@@ -1318,7 +1320,7 @@ class OwnerAndStaffTests(TestCase):
         self.as_clerk()
 
     def test_shipping_only_staff_ship_but_cannot_cancel_or_edit_delivery(self):
-        self.as_staff_with("shop.view_order", "shop.ship_order")
+        self.as_staff_with("shop.view_order", "shop.mark_order_shipped", "shop.mark_order_delivered")
         url = f"/admin/shop/order/{self.order.pk}/change/"
         form = self.client.get(url).context["adminform"].form
         self.assertNotIn("address", form.fields)
@@ -1339,9 +1341,11 @@ class OwnerAndStaffTests(TestCase):
         self.assertEqual(Order.objects.get(pk=self.order.pk).status, "cancelled")
 
     def test_delivery_only_staff_fix_the_address_but_not_the_status(self):
-        self.as_staff_with("shop.edit_order_delivery")
+        self.as_staff_with("shop.edit_order_address")
         url = f"/admin/shop/order/{self.order.pk}/change/"
-        self.assertNotIn("status", self.client.get(url).context["adminform"].form.fields)
+        fields = self.client.get(url).context["adminform"].form.fields
+        self.assertNotIn("status", fields)
+        self.assertNotIn("phone", fields)  # contact details are their own permission
         self.assertEqual(self.client.post(url, self.order_form(address="New road 9")).status_code, 302)
         self.assertEqual(Order.objects.get(pk=self.order.pk).address, "New road 9")
 
@@ -1357,7 +1361,7 @@ class OwnerAndStaffTests(TestCase):
                                    price=50, image="https://x.y/a.jpg", stock=3)
         self.as_staff_with("shop.view_product", "shop.edit_product_price")
         page = self.client.get(f"/admin/shop/product/{p.pk}/change/")
-        self.assertEqual(set(page.context["adminform"].form.fields), {"price", "original_price"})
+        self.assertEqual(set(page.context["adminform"].form.fields), {"price"})
         inlines = {f.formset.prefix: f for f in page.context["inline_admin_formsets"]}
         self.assertFalse(inlines["photos"].has_change_permission)
         self.assertFalse(inlines["comments"].has_delete_permission)
@@ -1371,6 +1375,24 @@ class OwnerAndStaffTests(TestCase):
                                                       "form-0-price": 30, "form-0-stock": 99, "_save": "Save"})
         p.refresh_from_db()
         self.assertEqual((p.price, p.stock), (30, 3))  # the list page's stock column is locked too
+
+    def test_deliver_only_staff_cannot_ship(self):
+        self.as_staff_with("shop.view_order", "shop.mark_order_delivered")
+        form = self.client.get(f"/admin/shop/order/{self.order.pk}/change/").context["adminform"].form
+        self.assertEqual([k for k, _ in form.fields["status"].choices], ["pending", "delivered"])
+        self.client.post("/admin/shop/order/", {"action": "mark_shipped", "_selected_action": [self.order.pk]})
+        self.assertEqual(Order.objects.get(pk=self.order.pk).status, "pending")
+
+    def test_comment_edit_and_delete_are_given_apart(self):
+        p = Product.objects.create(category=Category.objects.create(name="C", slug="c"), name="P", slug="p",
+                                   price=50, image="https://x.y/a.jpg", stock=3)
+        url = f"/admin/shop/product/{p.pk}/change/"
+        for codes, edit, delete in [(["shop.edit_product_comments"], True, False),
+                                    (["shop.delete_product_comments"], False, True)]:
+            self.as_staff_with("shop.view_product", *codes)
+            comments = {f.formset.prefix: f for f in self.client.get(url).context["inline_admin_formsets"]}["comments"]
+            self.assertEqual((comments.has_change_permission, comments.has_delete_permission), (edit, delete))
+            self.client.logout()
 
     def test_part_shows_in_the_staff_list(self):
         self.as_staff_with("shop.view_order", "shop.cancel_order", "auth.change_user")
@@ -1504,3 +1526,31 @@ class OwnerAndStaffTests(TestCase):
         self.as_owner()
         r = self.client.post(f"/admin/shop/order/{self.order.pk}/change/", self.order_form(status="shipped"))
         self.assertEqual(r.status_code, 302)
+
+
+class PermissionSplitMigrationTests(TransactionTestCase):
+    """0017 turns each old permission into its finer parts, so staff keep exactly what they could do."""
+
+    def test_old_permissions_become_their_parts(self):
+        executor = MigrationExecutor(connection)
+        executor.migrate([("shop", "0016_staff_permission_parts")])
+        apps = executor.loader.project_state([("shop", "0016_staff_permission_parts")]).apps
+        P, U, G = (apps.get_model("auth", m) for m in ("Permission", "User", "Group"))
+        ct = apps.get_model("contenttypes", "ContentType").objects
+        product = ct.get_or_create(app_label="shop", model="product")[0]
+        order = ct.get_or_create(app_label="shop", model="order")[0]
+        details = P.objects.get_or_create(content_type=product, codename="edit_product_details", defaults={"name": "x"})[0]
+        ship = P.objects.get_or_create(content_type=order, codename="ship_order", defaults={"name": "x"})[0]
+        u = U.objects.create(username="old-staff")
+        u.user_permissions.add(details)
+        G.objects.create(name="shippers").permissions.add(ship)
+
+        executor = MigrationExecutor(connection)
+        executor.loader.build_graph()
+        executor.migrate(executor.loader.graph.leaf_nodes())
+        self.assertEqual(set(User.objects.get(username="old-staff").user_permissions.values_list("codename", flat=True)),
+                         {"edit_product_name", "edit_product_category", "edit_product_description",
+                          "edit_product_photos", "edit_product_options", "edit_product_reviews"})
+        self.assertEqual(set(Group.objects.get(name="shippers").permissions.values_list("codename", flat=True)),
+                         {"mark_order_shipped", "mark_order_delivered"})
+        self.assertFalse(Permission.objects.filter(codename__in=["edit_product_details", "ship_order"]).exists())

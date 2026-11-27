@@ -39,25 +39,34 @@ PERM_HELP = {
     ("shop", "order"): {
         "view": "Sees every order: the buyer's name, phone, email, address, items and totals.",
         "add": "Does nothing for staff: orders only come from checkout. Only the owner can add one by hand.",
-        "change": "Everything in the three boxes below: ship, cancel and fix delivery details. Prices, totals, "
-                  "payment and buyer stay locked.",
-        "ship_order": "Can mark orders shipped, then delivered, one at a time or many from the list. A shipped "
-                      "order can't go back to pending.",
+        "change": "Everything in the boxes below: ship, deliver, cancel and fix contact and address. Prices, "
+                  "totals, payment and buyer stay locked.",
+        "mark_order_shipped": "Can mark pending orders shipped, one at a time or many from the list. A shipped order "
+                              "can't go back to pending.",
+        "mark_order_delivered": "Can mark orders delivered, one at a time or many from the list.",
         "cancel_order": "Can cancel pending or shipped orders. Cancelling a pending order puts its stock back on "
                         "sale, and a cancelled order can't be reopened.",
-        "edit_order_delivery": "Can fix the buyer's name, phone, email, address and city on an order.",
+        "edit_order_contact": "Can fix the buyer's name, phone and email on an order.",
+        "edit_order_address": "Can fix the delivery address and city on an order.",
         "delete": "Does nothing for staff: they cancel orders instead, so the history stays. Only the owner can delete.",
     },
     ("shop", "product"): {
         "view": "Sees every product with its price, stock, images, options and reviews.",
         "add": "Can put new products in the shop. They show to customers as soon as they're saved.",
-        "change": "Everything in the four boxes below. Customers see the changes straight away.",
-        "edit_product_details": "Can edit the name, web address, category, description, images, extra photos, "
-                                "options and review numbers.",
-        "edit_product_price": "Can change prices and the before-discount price, also per option combination.",
+        "change": "Everything in the boxes below. Customers see the changes straight away.",
+        "edit_product_name": "Can rename products and change their web address. Old links to the product stop working.",
+        "edit_product_category": "Can move products to another category.",
+        "edit_product_description": "Can edit the description customers read on the product page.",
+        "edit_product_photos": "Can change the main image and add, reorder or remove extra photos.",
+        "edit_product_options": "Can change the options buyers pick (e.g. Size: S, M, L). Combinations that still "
+                                "have stock can't be removed.",
+        "edit_product_price": "Can change the price, also per option combination.",
+        "edit_product_discount": "Can change the before-discount price, which sets the sale badge.",
         "edit_product_stock": "Can change how many are in stock, also per option combination. Orders take stock "
                               "on their own.",
-        "moderate_product_comments": "Can edit or delete customers' comments. Deleting one also deletes its replies.",
+        "edit_product_reviews": "Can change the star rating and review count shown on the product.",
+        "edit_product_comments": "Can edit the text of customers' comments.",
+        "delete_product_comments": "Can delete customers' comments. Deleting one also deletes its replies.",
         "delete": "Can remove a product for good, with its images, options and comments. Products already "
                   "in an order can't be deleted.",
     },
