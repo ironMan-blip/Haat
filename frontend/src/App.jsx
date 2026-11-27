@@ -18,6 +18,7 @@ const Checkout = lazy(() => import('./pages/Checkout'))
 const Login = lazy(() => import('./pages/Login'))
 const Orders = lazy(() => import('./pages/Orders'))
 const ClaimOrders = lazy(() => import('./pages/ClaimOrders'))
+const Connect = lazy(() => import('./pages/Connect'))
 
 export default function App() {
   const { pathname } = useLocation()
@@ -41,6 +42,7 @@ export default function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/orders" element={<Orders />} />
             <Route path="/orders/claim" element={<ClaimOrders />} />
+            <Route path="/connect" element={<Connect />} />
             <Route path="*" element={
               <EmptyState icon={<FileQuestion strokeWidth={1.5} />} title={t.not_found.title} action={<Button asChild><Link to="/">{t.not_found.action}</Link></Button>}>
                 {t.not_found.body}

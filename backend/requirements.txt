@@ -4,3 +4,16 @@ djangorestframework==3.18.3
 psycopg[binary]==3.3.9
 redis==8.1.0
 sqlparse==0.6.1
+# AI apps (the MCP server) sign in over OAuth; the rest are its dependencies
+django-oauth-toolkit==3.4.1
+oauthlib==4.0.1
+jwcrypto==1.6.2
+cryptography==50.0.2
+cffi==2.1.1
+pycparser==3.12
+typing_extensions==4.16.0
+requests==2.34.2
+urllib3==2.8.0
+certifi==2026.11.20
+charset-normalizer==3.5.3
+idna==3.20

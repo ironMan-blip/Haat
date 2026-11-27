@@ -1,6 +1,6 @@
-from django.urls import path
+from django.urls import include, path
 
-from . import accounts, catalog, checkout
+from . import accounts, catalog, checkout, oauth
 
 urlpatterns = [
     path("config/", catalog.store_config),
@@ -18,4 +18,6 @@ urlpatterns = [
     path("auth/register/", accounts.Register.as_view()),
     path("auth/login/", accounts.Login.as_view()),
     path("auth/logout/", accounts.logout),
+    path("auth/me/", accounts.me),
+    path("oauth/", include((oauth.urlpatterns, "oauth2_provider"))),  # AI apps' sign-in
 ]

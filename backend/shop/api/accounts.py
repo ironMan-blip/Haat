@@ -2,11 +2,13 @@ from collections.abc import Mapping
 
 from django.contrib.auth.models import User
 from django.core.cache import cache
+from oauth2_provider.models import AccessToken
 from rest_framework import generics
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.exceptions import Throttled, ValidationError
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from ..auth import (AnonThrottle, CsrfProtected, ScopedThrottle, UserThrottle, email_username, issue_token, locked_out,
@@ -73,3 +75,15 @@ def logout(request):
         Token.objects.filter(key=key).delete()
     request.session.flush()
     return Response(status=204)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def me(request):
+    """Who the token belongs to. The MCP server asks this to check an AI app's token before every request."""
+    body = {"id": request.user.pk, "username": request.user.username}
+    token = request.auth
+    if isinstance(token, AccessToken):  # an AI app's OAuth token
+        body |= {"client_id": token.application.client_id, "scopes": token.scope.split(), "resource": token.resource,
+                 "expires": int(token.expires.timestamp())}
+    return Response(body)

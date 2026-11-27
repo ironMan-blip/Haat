@@ -34,6 +34,10 @@ TEXT = {
                "guest_login": "Log in", "guest_after": "to see your account's orders.", "empty_title": "No orders yet",
                "empty_body": "When you place an order, you can track it here.", "start": "Start shopping"},
     "claim": {"busy": "Adding your orders", "failed": "We couldn't add these orders", "orders": "Your orders"},
+    # An AI app (through the MCP server) asking to use the buyer's account; the app's name comes with the request.
+    "connect": {"busy": "Checking the app", "failed": "We couldn't connect this app", "allow": "Allow",
+                "deny": "Don't allow", "sending": "Sending you back…", "home": "Back to the shop",
+                "warning": "Only allow an app you started yourself. It stays signed in until you change your password."},
     # One set per form mode; `switch` flips to the other mode.
     "login": {
         "login": {"title": "Welcome back", "lead": "Log in to track your orders on any device.",

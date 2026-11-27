@@ -79,6 +79,40 @@ Demo buyer account on the dev database: `demo_buyer` / `haat-demo-2026`.
 
 Tests: `cd backend && DJANGO_DEBUG=1 .venv/bin/python manage.py test shop`
 
+### MCP server (AI apps)
+
+`mcp-server/` is a third app, run next to the backend and frontend: an [MCP](https://modelcontextprotocol.io)
+server (Python SDK v2) that lets a buyer's AI app (Claude Code, Claude Desktop…) shop at Haat as them.
+It never touches the database; each tool is a few calls to `/api`.
+
+```bash
+cd mcp-server
+uv venv --python 3.15 .venv && uv pip install --python .venv/bin/python -r requirements.txt
+.venv/bin/python -m haat_mcp                  # http://127.0.0.1:8100/mcp (env vars: see .env.example)
+claude mcp add --transport http haat http://127.0.0.1:8100/mcp   # then /mcp in Claude Code to sign in
+```
+
+- **Login once, required.** Every request needs a token, so even listing the tools does. On first connect the
+  app opens the browser: the buyer logs in on the site (or signs up), then allows the app on `/connect`.
+  Django issues the tokens (django-oauth-toolkit: dynamic client registration, PKCE, refresh tokens that
+  never expire). The app stays signed in until the buyer changes their password or the app's tokens are
+  deleted in admin; logging out of the website doesn't sign it out.
+- **App down:** every tool answers "The Haat app is not reachable at …" instead of failing.
+- AI carts live in the MCP server's memory, one per buyer, apart from the website cart; restarting it empties them.
+
+| Tool | Does | API calls |
+| --- | --- | --- |
+| `store_info` | payment options, delivery cost, cities | `GET /config/` |
+| `find_products` | search or browse by words, category, sort | `GET /products/` |
+| `product_details` | price, options, each combination's stock, specs, latest comments | `GET /products/<slug>/`, `GET /products/<slug>/comments/` |
+| `add_to_cart` | add a product with its options | `GET /products/<slug>/`, `GET /cart/` (CSRF cookie), `POST /cart/` |
+| `view_cart` | items, totals, notes; its `expected_total` goes to checkout | `GET /cart/` |
+| `change_cart` | set a line's quantity, 0 removes it | `PATCH` or `DELETE /cart/<item>/` |
+| `checkout` | cash-on-delivery order; refused if the cart changed since `view_cart` | `GET /cart/`, `POST /orders/` |
+| `my_orders` | the buyer's orders with status | `GET /orders/` |
+
+Tests: `cd mcp-server && .venv/bin/python -m unittest discover tests` (no running app needed).
+
 CI (`.github/workflows/ci.yml`, every push/PR): backend tests on PostgreSQL, `pip-audit`, missing-migration check;
 frontend `npm audit`, lint and build.
 
@@ -187,12 +221,13 @@ and HTTPS redirect, HSTS and secure cookies turn on.
 | `REDIS_URL` | e.g. `redis://localhost:6379/0`; required with more than one worker, so throttle and lockout counts are shared |
 | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS`, `DEFAULT_FROM_EMAIL` | SMTP for the guest-order claim links (dev prints mail to the console) |
 | `DJANGO_NUM_PROXIES` | number of reverse proxies in front of Django (throttling uses the real client IP); above 0 also trusts the proxy's `X-Forwarded-Proto` for HTTPS |
+| `MCP_RESOURCE_URL` | the MCP server's public address, e.g. `https://mcp.example.com/mcp`; set the same value in the MCP server's env, with `HAAT_URL` (the site) and `HAAT_API` |
 
 Run `manage.py collectstatic` (into `backend/staticfiles/`) so the admin has its CSS, and run
 `manage.py clearsessions` daily (cron): every guest who fills a cart leaves a session row.
 
 Also:
-- Serve the frontend and `/api` from one origin, and have the proxy pass the browser's `Host` header to
+- Serve the frontend, `/api` and `/.well-known/oauth-authorization-server` from one origin, and have the proxy pass the browser's `Host` header to
   Django (nginx: `proxy_set_header Host $host;`). The CSRF check compares it with `Origin`.
 - The built `index.html` carries a Content-Security-Policy. Headers that a `<meta>` tag can't set must come
   from the web server serving the frontend: `Content-Security-Policy: frame-ancestors 'none'`,

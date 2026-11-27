@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework.authtoken',
+    'oauth2_provider',
     'shop',
 ]
 
@@ -120,7 +121,8 @@ DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'Haat <no-reply@localh
 
 # Frontend talks to /api via the Vite dev proxy, so no CORS setup needed.
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': ['shop.auth.ExpiringTokenAuthentication'],
+    # The site's login tokens ("Token …"), then AI apps' OAuth tokens ("Bearer …", see OAUTH2_PROVIDER)
+    'DEFAULT_AUTHENTICATION_CLASSES': ['shop.auth.ExpiringTokenAuthentication', 'shop.auth.OAuth2Authentication'],
     'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.AllowAny'],
     'EXCEPTION_HANDLER': 'shop.api.errors.exception_handler',  # adds `message` to every error
     # The browsable HTML API is a dev tool; production speaks JSON only.
@@ -147,6 +149,35 @@ FREE_DELIVERY_MIN = 299  # taka; Cartup-style free delivery threshold
 DELIVERY_FEE = 60
 MAX_PENDING_ORDERS = 5  # per buyer and per phone number; COD orders cost nothing, so this stops stock hoarding
 TOKEN_TTL_DAYS = 30  # API tokens die after this; logging in again issues a fresh one
+
+# AI apps (the MCP server in mcp-server/) sign in over OAuth: the app opens /api/oauth/authorize/, the buyer
+# allows it on the React /connect page, and the app gets tokens for the MCP server, which spends them here.
+MCP_RESOURCE_URL = os.environ.get('MCP_RESOURCE_URL', 'http://127.0.0.1:8100/mcp')
+OAUTH2_PROVIDER = {
+    'SCOPES': {'shop': 'Browse the shop, use your cart and place orders as you'},
+    'DEFAULT_SCOPES': ['shop'],
+    # The buyer signs in once per app: hourly access tokens renew from a refresh token that never expires
+    # (a new one on each use). It dies only on a password change or when the app's tokens are removed in admin.
+    'ACCESS_TOKEN_EXPIRE_SECONDS': 60 * 60,
+    'REFRESH_TOKEN_EXPIRE_SECONDS': None,
+    'ROTATE_REFRESH_TOKEN': True,
+    'REFRESH_TOKEN_GRACE_PERIOD_SECONDS': 120,  # two refreshes racing must not sign the app out
+    'PKCE_REQUIRED': True,
+    'ALLOW_LOCALHOST_LOOPBACK': True,  # desktop apps take the reply on a random localhost port (RFC 8252)
+    # AI apps register themselves (RFC 7591); /connect shows where the buyer is sent back to, against look-alikes.
+    'DCR_ENABLED': True,
+    'DCR_REGISTRATION_PERMISSION_CLASSES': ('oauth2_provider.dcr.AllowAllDCRPermission',),
+    'RESOURCE_SERVER_TOKEN_RESOURCE_VALIDATOR': 'shop.auth.mcp_audience',
+    # What /.well-known/oauth-authorization-server advertises. AI apps are public clients: no secret, PKCE instead.
+    'OAUTH2_GRANT_TYPES_SUPPORTED': ['authorization_code', 'refresh_token'],
+    'OAUTH2_TOKEN_ENDPOINT_AUTH_METHODS_SUPPORTED': ['none', 'client_secret_post', 'client_secret_basic'],
+    # RFC 9700: no implicit or password grant, S256 PKCE only, tokens only in the header, stored hashed.
+    'COMPLIANT_BCP_RFC9700_IMPLICIT_GRANT': True,
+    'COMPLIANT_BCP_RFC9700_PASSWORD_GRANT': True,
+    'COMPLIANT_BCP_RFC9700_PKCE_METHOD': True,
+    'COMPLIANT_BCP_RFC9700_ACCESS_TOKEN_TRANSPORT': True,
+    'COMPLIANT_BCP_RFC9700_TOKEN_STORAGE': True,
+}
 # Failed logins, then locked out for LOGIN_LOCKOUT_SECONDS (see shop.auth.login_fail_keys). Counted on
 # the API and admin logins together (else the API is a password oracle for admin accounts): per username
 # and IP, per username from anywhere, and per IP on the admin login. Mobile carriers share IPs, so the

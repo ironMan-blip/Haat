@@ -12,6 +12,9 @@ from django.db.models.signals import pre_save
 from django.dispatch import receiver
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
+from oauth2_provider.contrib.rest_framework import authentication as oauth2_drf
+from oauth2_provider.models import AccessToken, Grant, RefreshToken
+from oauth2_provider.oauth2_validators import validate_resource_as_url_prefix
 from rest_framework import exceptions, permissions, throttling
 from rest_framework.authentication import CSRFCheck, TokenAuthentication
 from rest_framework.authtoken.models import Token
@@ -127,6 +130,24 @@ class ExpiringTokenAuthentication(TokenAuthentication):
         return user, token
 
 
+class OAuth2Authentication(oauth2_drf.OAuth2Authentication):
+    """AI apps' tokens. DOT reads a bad Bearer token as no sign-in at all; here it fails, so an app whose sign-in
+    was revoked can't go on as a guest (guest orders, a guest cart) while it thinks it is the buyer."""
+
+    def authenticate(self, request):
+        found = super().authenticate(request)
+        if found is None and request.headers.get("Authorization", "").startswith("Bearer "):
+            raise exceptions.AuthenticationFailed("This app was signed out. Connect it to your account again.")
+        if found and not found[0].is_active:  # DOT doesn't check; DRF's own tokens refuse these too
+            raise exceptions.AuthenticationFailed("This account is disabled.")
+        return found
+
+
+def mcp_audience(request_uri, audiences):
+    """AI apps get tokens for the MCP server, which spends them on this API for the buyer (RFC 8707 audience)."""
+    return settings.MCP_RESOURCE_URL in audiences or validate_resource_as_url_prefix(request_uri, audiences)
+
+
 def issue_token(user):
     """The user's token, replaced by a fresh one if it has expired."""
     token, created = Token.objects.get_or_create(user=user)
@@ -151,6 +172,8 @@ def revoke_tokens_on_password_change(sender, instance, raw=False, **kwargs):
     old = User.objects.filter(pk=instance.pk).values_list("password", flat=True).first()
     if old is not None and old != instance.password:
         Token.objects.filter(user_id=instance.pk).delete()
+        for model in (RefreshToken, AccessToken, Grant):  # connected AI apps too
+            model.objects.filter(user_id=instance.pk).delete()
 
 
 @receiver(pre_save, sender=User)

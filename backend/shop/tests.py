@@ -1,8 +1,10 @@
+import base64
+import hashlib
 import io
 from datetime import timedelta
 from unittest import mock
 
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlencode, urlparse
 
 from django.contrib.auth.models import Group, Permission, User
 from django.core import mail
@@ -14,6 +16,7 @@ from django.db.migrations.executor import MigrationExecutor
 from django.conf import settings
 from django.test import TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
+from oauth2_provider.models import AccessToken
 from rest_framework.authtoken.models import Token
 from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIClient, APITestCase
@@ -1644,3 +1647,122 @@ class PermissionSplitMigrationTests(TransactionTestCase):
         executor.migrate(executor.loader.graph.leaf_nodes())
         self.assertEqual(codes(full), {"edit_product_price", "edit_product_discount", "mark_order_shipped",
                                        "mark_order_delivered"})
+
+
+class AiAppSignInTests(APITestCase):
+    """An AI app (the MCP server's client) signs in once over OAuth and stays signed in as the buyer."""
+    REDIRECT = "http://127.0.0.1:33418/callback"
+
+    def setUp(self):
+        self.user = User.objects.create_user("rahim", "r@x.com", "pass-1234-word")
+        self.web = Token.objects.create(user=self.user)
+        reg = self.client.post("/api/oauth/register/", {
+            "client_name": "Claude Code", "redirect_uris": [self.REDIRECT], "token_endpoint_auth_method": "none",
+            "grant_types": ["authorization_code", "refresh_token"], "response_types": ["code"]}, format="json")
+        self.assertEqual(reg.status_code, 201, reg.content)
+        self.client_id = reg.json()["client_id"]
+        self.verifier = "v" * 64
+
+    def query(self, **over):
+        challenge = base64.urlsafe_b64encode(hashlib.sha256(self.verifier.encode()).digest()).rstrip(b"=").decode()
+        return urlencode({"response_type": "code", "client_id": self.client_id, "redirect_uri": self.REDIRECT,
+                          "code_challenge": challenge, "code_challenge_method": "S256", "state": "s1", "scope": "shop",
+                          "resource": settings.MCP_RESOURCE_URL} | over)
+
+    def as_buyer(self):
+        c = APIClient()
+        c.credentials(HTTP_AUTHORIZATION=f"Token {self.web.key}")
+        return c
+
+    def bearer(self, token):
+        c = APIClient()
+        c.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+        return c
+
+    def tokens(self, **over):
+        res = self.as_buyer().post(f"/api/oauth/connect/?{self.query(**over)}", {"allow": True}, format="json")
+        code = parse_qs(urlparse(res.json()["redirect"]).query)["code"][0]
+        res = APIClient().post("/api/oauth/token/", {"grant_type": "authorization_code", "code": code,
+                                                     "redirect_uri": self.REDIRECT, "client_id": self.client_id,
+                                                     "code_verifier": self.verifier})
+        self.assertEqual(res.status_code, 200, res.content)
+        return res.json()
+
+    def refresh(self, refresh_token):
+        return APIClient().post("/api/oauth/token/", {"grant_type": "refresh_token", "refresh_token": refresh_token,
+                                                      "client_id": self.client_id})
+
+    def test_metadata_lists_the_endpoints(self):
+        meta = self.client.get("/.well-known/oauth-authorization-server").json()
+        self.assertEqual(meta["issuer"], "http://testserver")
+        self.assertEqual(meta["authorization_endpoint"], "http://testserver/api/oauth/authorize/")
+        self.assertEqual(meta["token_endpoint"], "http://testserver/api/oauth/token/")
+        self.assertEqual(meta["registration_endpoint"], "http://testserver/api/oauth/register/")
+        self.assertEqual(meta["code_challenge_methods_supported"], ["S256"])
+        self.assertEqual(meta["grant_types_supported"], ["authorization_code", "refresh_token"])
+        self.assertIn("none", meta["token_endpoint_auth_methods_supported"])  # public clients, PKCE
+
+    def test_authorize_hands_the_request_to_the_connect_page(self):
+        res = self.client.get(f"/api/oauth/authorize/?{self.query()}")
+        self.assertEqual(res.status_code, 302)
+        self.assertEqual(res["Location"], f"/connect?{self.query()}")
+
+    def test_connect_asks_a_signed_in_buyer(self):
+        self.assertEqual(APIClient().get(f"/api/oauth/connect/?{self.query()}").status_code, 401)
+        page = self.as_buyer().get(f"/api/oauth/connect/?{self.query()}").json()
+        self.assertIn("Claude Code", page["title"])
+        self.assertIn("rahim", page["lead"])
+        self.assertIn("127.0.0.1", page["returns_to"])
+
+    def test_an_unregistered_return_address_is_refused_not_followed(self):
+        for method in ("get", "post"):
+            res = getattr(self.as_buyer(), method)(f"/api/oauth/connect/?{self.query(redirect_uri='https://evil.example/cb')}",
+                                                    {"allow": True}, format="json")
+            self.assertEqual(res.status_code, 400)
+            self.assertNotIn("redirect", res.json())
+            self.assertTrue(res.json()["message"])
+
+    def test_dont_allow_sends_the_app_access_denied(self):
+        res = self.as_buyer().post(f"/api/oauth/connect/?{self.query()}", {"allow": False}, format="json")
+        back = parse_qs(urlparse(res.json()["redirect"]).query)
+        self.assertEqual((back["error"], back["state"]), (["access_denied"], ["s1"]))
+
+    def test_the_app_acts_as_the_buyer(self):
+        tokens = self.tokens()
+        app = self.bearer(tokens["access_token"])
+        me = app.get("/api/auth/me/").json()
+        self.assertEqual((me["username"], me["resource"], me["scopes"]), ("rahim", [settings.MCP_RESOURCE_URL], ["shop"]))
+        self.assertEqual(app.get("/api/orders/").status_code, 200)
+        self.assertEqual(self.as_buyer().get("/api/auth/me/").json(), {"id": self.user.pk, "username": "rahim"})
+
+    def test_the_app_renews_its_tokens_without_the_buyer(self):
+        tokens = self.tokens()
+        AccessToken.objects.update(expires=timezone.now() - timedelta(seconds=1))
+        self.assertEqual(self.bearer(tokens["access_token"]).get("/api/auth/me/").status_code, 401)
+        res = self.refresh(tokens["refresh_token"])
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(self.bearer(res.json()["access_token"]).get("/api/auth/me/").status_code, 200)
+        self.assertIsNone(settings.OAUTH2_PROVIDER["REFRESH_TOKEN_EXPIRE_SECONDS"])  # the sign-in never runs out
+
+    def test_web_logout_keeps_the_app_but_a_new_password_signs_it_out(self):
+        tokens = self.tokens()
+        self.as_buyer().post("/api/auth/logout/")
+        self.assertEqual(self.bearer(tokens["access_token"]).get("/api/auth/me/").status_code, 200)
+        self.user.set_password("new-pass-5678-word")
+        self.user.save()
+        self.assertEqual(self.bearer(tokens["access_token"]).get("/api/auth/me/").status_code, 401)
+        self.assertEqual(self.refresh(tokens["refresh_token"]).status_code, 400)
+
+    def test_a_bad_app_token_is_refused_not_served_as_a_guest(self):
+        for path in ("/api/cart/", "/api/orders/", "/api/products/"):
+            self.assertEqual(self.bearer("not-a-token").get(path).status_code, 401, path)
+        self.assertEqual(self.bearer("not-a-token").post("/api/orders/", ADDR, format="json").status_code, 401)
+
+    def test_a_disabled_account_is_signed_out(self):
+        tokens = self.tokens()
+        User.objects.filter(pk=self.user.pk).update(is_active=False)
+        self.assertEqual(self.bearer(tokens["access_token"]).get("/api/auth/me/").status_code, 401)
+
+    def test_a_token_for_another_site_is_refused(self):
+        tokens = self.tokens(resource="https://other.example/api")
+        self.assertEqual(self.bearer(tokens["access_token"]).get("/api/auth/me/").status_code, 401)

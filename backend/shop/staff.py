@@ -96,6 +96,37 @@ PERM_HELP = {
         "change": "Can edit login tokens.",
         "delete": "Can delete login tokens, which signs that customer out of the shop.",
     },
+    # AI apps that customers connected to their accounts (OAuth, through the MCP server).
+    ("oauth2_provider", "application"): {
+        "view": "Sees the AI apps that registered to connect to customer accounts.",
+        "add": "Can register AI apps by hand. Apps normally register themselves.",
+        "change": "Can edit an AI app, including where it sends customers back after they allow it.",
+        "delete": "Can remove an AI app, which signs it out of every customer account it was connected to.",
+    },
+    ("oauth2_provider", "accesstoken"): {
+        "view": "Sees AI apps' access tokens. Anyone with one can act as that customer for up to an hour.",
+        "add": "Can make access tokens, which act as a customer without their password.",
+        "change": "Can edit access tokens, including how long they last.",
+        "delete": "Can delete access tokens. The app gets a new one from its refresh token unless that goes too.",
+    },
+    ("oauth2_provider", "refreshtoken"): {
+        "view": "Sees AI apps' refresh tokens, which keep an app connected to a customer's account for good.",
+        "add": "Can make refresh tokens, which keep an app signed in as a customer.",
+        "change": "Can edit refresh tokens.",
+        "delete": "Can delete refresh tokens, which disconnects that app from the customer's account.",
+    },
+    ("oauth2_provider", "grant"): {
+        "view": "Sees the one-time codes customers' browsers hand to AI apps while connecting.",
+        "add": "Can make one-time codes, which an app swaps for a customer's tokens.",
+        "change": "Can edit one-time codes.",
+        "delete": "Can delete one-time codes. An app still connecting has to start again.",
+    },
+    ("oauth2_provider", "idtoken"): {
+        "view": "Sees OpenID sign-in records. The shop doesn't use them.",
+        "add": "Can make OpenID sign-in records. The shop doesn't use them.",
+        "change": "Can edit OpenID sign-in records. The shop doesn't use them.",
+        "delete": "Can delete OpenID sign-in records. The shop doesn't use them.",
+    },
 }
 
 

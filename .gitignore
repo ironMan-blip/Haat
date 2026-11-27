@@ -1,4 +1,5 @@
 backend/.venv/
+mcp-server/.venv/
 backend/staticfiles/
 __pycache__/
 node_modules/

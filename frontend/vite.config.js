@@ -27,5 +27,11 @@ export default defineConfig({
   plugins: [react(), tailwindcss(), csp],
   resolve: { alias: { '@': path.resolve(import.meta.dirname, 'src') } },
   // Keep the browser's Host header: Django's CSRF check compares it with the Origin header.
-  server: { proxy: { '/api': { target: 'http://127.0.0.1:8000', changeOrigin: false } } },
+  // /.well-known: AI apps find the OAuth sign-in endpoints there, on the site's own origin.
+  server: {
+    proxy: {
+      '/api': { target: 'http://127.0.0.1:8000', changeOrigin: false },
+      '/.well-known/oauth-authorization-server': { target: 'http://127.0.0.1:8000', changeOrigin: false },
+    },
+  },
 })
