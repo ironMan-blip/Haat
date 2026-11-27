@@ -1,25 +1,25 @@
 [
  {
   "category": "Mobiles",
-  "name": "realme Note 80 4/64 | 6300mAh Battery | Official Warranty",
+  "name": "realme Note 80 | 6300mAh Battery | Official Warranty",
   "price": 16580,
   "original_price": 17999,
   "image": "https://bd-live-21.slatic.net/kf/S79071e4dcfe942c79bb65dc22075dafd4.jpg",
   "rating": 0.0,
-  "description": "OS: Realme UI 5.0 Based on Android 15\nChipset: Unisoc T7250 (12 nm)\nGPU: Mali-G57 MP1\nRAM: 4GB\nROM: 64GB\nSize: 6.74”\nDisplay Type: LCD\nResolution: HD+ (720 x 1600 pixels)\nRefresh Rate: Up to 90Hz\nScreen-to-Body Ratio: 85.6%\nRear Camera: 8MP; f/2.0; FOV 78°; 4P lens; AF Supported\nFront Camera: 5MP; f/2.2; FOV 77°; 3P lens\nCapacity: 6300mAh\nCharging: 15W Charging Supported\nPort: Type-C\nSIM Card Slot: Dual Nano SIM\nWLAN: Wi-Fi 802.11 a/b/g/n/ac, dual-band\nBluetooth: 5.2\nUSB Interface: USB Type-C\nNFC: Not-Supported\nOTG: Supported\nFingerprint (side-mounted) | accelerometer | gyro | proximity | compass",
+  "description": "OS: Realme UI 5.0 Based on Android 15\nChipset: Unisoc T7250 (12 nm)\nGPU: Mali-G57 MP1\nRAM and storage: 4GB + 64GB or 4GB + 128GB\nSize: 6.74”\nDisplay Type: LCD\nResolution: HD+ (720 x 1600 pixels)\nRefresh Rate: Up to 90Hz\nScreen-to-Body Ratio: 85.6%\nRear Camera: 8MP; f/2.0; FOV 78°; 4P lens; AF Supported\nFront Camera: 5MP; f/2.2; FOV 77°; 3P lens\nCapacity: 6300mAh\nCharging: 15W Charging Supported\nPort: Type-C\nSIM Card Slot: Dual Nano SIM\nWLAN: Wi-Fi 802.11 a/b/g/n/ac, dual-band\nBluetooth: 5.2\nUSB Interface: USB Type-C\nNFC: Not-Supported\nOTG: Supported\nFingerprint (side-mounted) | accelerometer | gyro | proximity | compass",
   "stock": 50,
   "reviews": 0,
   "options": {
    "Storage": {
     "4GB + 64GB": 0,
-    "4GB + 128GB": 1500,
-    "6GB + 128GB": 2800
+    "4GB + 128GB": 2000
    },
    "Color": [
-    "Obsidian Black",
-    "Beach Gold"
+    "Glacier Blue",
+    "Storm Black"
    ]
-  }
+  },
+  "slug": "realme-note-80-464-6300mah-battery-official-warranty-1"
  },
  {
   "category": "Mobiles",
@@ -50,13 +50,9 @@
   "reviews": 2,
   "options": {
    "Color": [
-    "Midnight Black",
-    "Ocean Blue"
-   ],
-   "Warranty": {
-    "1 year official": 0,
-    "2 years official": 990
-   }
+    "Grey",
+    "Black"
+   ]
   }
  },
  {
@@ -68,47 +64,38 @@
   "rating": 0.0,
   "description": "### Proton NitroX Smartphone Product Highlights- 6.7-Inch HD+ 120Hz Display: Enjoy a smooth viewing experience with a cinematic punch-hole display, 10-point touch support, in-cell technology, and full lamination.- 18GB Boosted RAM: 6GB physical RAM + 12GB extended RAM for everyday multitasking and app usage.- 128GB Internal Storage: Store your photos, videos, apps, and files with expandable storage support up to 1TB.- 108MP Rear Camera: Capture detailed photos with Pro, Portrait, Night, Beauty, Slow Motion, and other camera modes.- 32MP Front Camera: Take selfies and enjoy video calls with the dedicated front camera.- MediaTek G81 Processor: Supports everyday smartphone tasks, browsing, and entertainment.- 6600mAh Battery: High-capacity Li-polymer battery designed for extended everyday use.- 33W Charging Support: Convenient charging with compatible charging accessories.- Android 16 Operating System: Enjoy the features and interface of Android 16.- Panda Display Protection: Added display protection for everyday use.- Side-Mounted Fingerprint Sensor: Convenient fingerprint unlocking.- 4G LTE Connectivity: Supports 2G, 3G, and 4G LTE networks.- Modern Connectivity: USB Type-C, dual-band Wi-Fi (2.4GHz + 5GHz), Wi-Fi hotspot, wireless display casting, and USB OTG.- Smart Features: Mini Capsule, Riding Mode, Speaker Cleaner, and Smart Touch.- Multiple Sensors: Gravity, proximity, light sensor, accelerometer, and electronic compass.- Slim and Stylish Design: Dimensions of 165.9 × 76 × 7.99 mm.- Elegant Color Options: Available in Desert Silk and Mystical Black.- Included Accessories: Protective cover, SIM ejector, charger, and charging cable.Keywords: Proton NitroX smartphone, Proton NitroX price in Bangladesh, 18GB RAM mobile, 128GB ROM smartphone, 108MP camera phone, 32MP selfie camera, 6600mAh battery mobile, 120Hz display smartphone, MediaTek G81 phone, Android 16 smartphone.",
   "stock": 50,
-  "reviews": 0,
-  "options": {
-   "Color": [
-    "Shadow Black",
-    "Neon Green"
-   ],
-   "Warranty": {
-    "1 year official": 0,
-    "2 years official": 990
-   }
-  }
+  "reviews": 0
  },
  {
   "category": "Mobiles",
-  "name": "Realme C100i 4/64GB Smartphone – 7000mAh Battery, HD+ Display | Official Warranty",
+  "name": "Realme C100i Smartphone – 7000mAh Battery, HD+ Display | Official Warranty",
   "price": 18330,
   "original_price": 19999,
   "image": "https://bd-live-21.slatic.net/kf/Scea61ab5bb9b40b480d5528d2126b01cV.jpg",
   "rating": 4.9,
-  "description": "Performance: T7250 Octa-core Processor | 4GB LPDDR4X RAM | 128GB eMMC 5.1 Storage | realme UI (Android 16).\nDisplay: 6.8\" Eye-Comfort LCD | 120Hz Refresh Rate | 900 nits Peak Brightness (HBM) | 240Hz Touch Sampling Rate.\nCamera: 8MP Wide-angle Rear Camera (f/2.0) | 5MP Selfie Camera | Dual-view Video &amp; 10x Digital Zoom.\nBattery: 7000mAh Massive Titan Battery | 15W Fast Charging | Supports PD, QC, and Reverse Charging.  \nDesign: 8.38mm Slim Body | 208g Weight | Corning® Gorilla® Glass+ | Panda MN228 Protection.\nDurability: IP64 Dust &amp; Water Resistance | ArmorShell™ Protection | Military-Grade Shock Resistance.  \nAudio: 3.5mm Headphone Jack | 300% Ultra Volume Mode | LDAC &amp; Hi-Res Audio Codec Support.  \nSecurity: Side-mounted Fingerprint Sensor | AI Face Unlock.\nConnectivity: 4G LTE Dual SIM | Wi-Fi 5 | Bluetooth 5.2 | USB Type-C (OTG).",
+  "description": "Performance: T7250 Octa-core Processor | 4GB LPDDR4X RAM | 64GB or 128GB eMMC 5.1 Storage | realme UI (Android 16).\nDisplay: 6.8\" Eye-Comfort LCD | 120Hz Refresh Rate | 900 nits Peak Brightness (HBM) | 240Hz Touch Sampling Rate.\nCamera: 8MP Wide-angle Rear Camera (f/2.0) | 5MP Selfie Camera | Dual-view Video &amp; 10x Digital Zoom.\nBattery: 7000mAh Massive Titan Battery | 15W Fast Charging | Supports PD, QC, and Reverse Charging.  \nDesign: 8.38mm Slim Body | 208g Weight | Corning® Gorilla® Glass+ | Panda MN228 Protection.\nDurability: IP64 Dust &amp; Water Resistance | ArmorShell™ Protection | Military-Grade Shock Resistance.  \nAudio: 3.5mm Headphone Jack | 300% Ultra Volume Mode | LDAC &amp; Hi-Res Audio Codec Support.  \nSecurity: Side-mounted Fingerprint Sensor | AI Face Unlock.\nConnectivity: 4G LTE Dual SIM | Wi-Fi 5 | Bluetooth 5.2 | USB Type-C (OTG).",
   "stock": 50,
   "reviews": 50,
   "options": {
    "Storage": {
     "4GB + 64GB": 0,
-    "4GB + 128GB": 1500
+    "4GB + 128GB": 2000
    },
    "Color": [
-    "Ink Black",
-    "Jade Green"
+    "Dawn Purple",
+    "Dusk Gray"
    ]
-  }
+  },
+  "slug": "realme-c100i-464gb-smartphone-7000mah-battery-hd-display-official-warranty-5"
  },
  {
   "category": "Mobiles",
-  "name": "Infinix XPAD 20 | 6GB RAM + 128GB ROM | 11\" Display | 1 Year Official Warranty",
+  "name": "Infinix XPAD 20 | 11\" Display | 1 Year Official Warranty",
   "price": 17999,
   "original_price": 19999,
   "image": "https://bd-live-21.slatic.net/kf/Sc14f82004a724d26a09d67e81023b0d6L.jpg",
   "rating": 4.8,
-  "description": "6GB RAM + 128GB ROM — smooth multitasking &amp; large storage capacity\n11\" Full HD Display — wide, vibrant, and perfect for entertainment or work\n8000mAh Battery — long-lasting power for all-day use\n8MP Rear Camera + 5MP Front Camera — clear photos and video calls\nQuad Speakers with DTS Audio — immersive sound experience\nMediaTek Helio G99 Processor — efficient and responsive performance\nAndroid 13 — clean, fast, and user-friendly interface\n1 Year Official Warranty",
+  "description": "6GB RAM + 128GB ROM or 8GB RAM + 256GB ROM — smooth multitasking &amp; large storage capacity\n11\" Full HD Display — wide, vibrant, and perfect for entertainment or work\n8000mAh Battery — long-lasting power for all-day use\n8MP Rear Camera + 5MP Front Camera — clear photos and video calls\nQuad Speakers with DTS Audio — immersive sound experience\nMediaTek Helio G99 Processor — efficient and responsive performance\nAndroid 13 — clean, fast, and user-friendly interface\n1 Year Official Warranty",
   "stock": 50,
   "reviews": 5,
   "options": {
@@ -116,15 +103,14 @@
     "6GB + 128GB": 0,
     "8GB + 256GB": 3000
    },
-   "Connectivity": {
-    "Wi-Fi": 0,
-    "Wi-Fi + 4G": 2000
-   },
    "Color": [
-    "Titan Gray",
-    "Frost Blue"
+    "Stellar Grey",
+    "Forest Green",
+    "Dreamy Purple",
+    "Rising Red"
    ]
-  }
+  },
+  "slug": "infinix-xpad-20-6gb-ram-128gb-rom-11-display-1-year-official-warranty-6"
  },
  {
   "category": "Mobiles",
@@ -137,13 +123,9 @@
   "stock": 50,
   "reviews": 27,
   "options": {
-   "Storage": {
-    "4GB + 64GB": 0,
-    "4GB + 128GB": 1500
-   },
    "Color": [
-    "Midnight Black",
-    "Emerald Green"
+    "Ocean Cyan",
+    "Midnight Black"
    ]
   }
  },
@@ -156,17 +138,7 @@
   "rating": 4.0,
   "description": "Features :Display: 6.67” HD+ , 120Hz Punch HoleRAM: RAM: 12GB Boosted (4GB+8GB) ,ROM: 128GB (Expandable Upto 1TB) UMCPRear Camera : Rear 50MP+CIF&amp;CIFFront Camera: 12M SelfieProcessor : MediaTek G81 2.0GHz Octa-Core I 12nmBattery : 6000 Li-polymer ( 20W Charging )OS : Android 16Sunshine Screen in Outdoor :700 + nits' brightnessSplashproof, IP64 ,Panda Glass , Dynamic BarExclusive Default Call Recording Features . (Nonotifications)1 Year Brand Warranty",
   "stock": 50,
-  "reviews": 1,
-  "options": {
-   "Color": [
-    "Black",
-    "Blue"
-   ],
-   "Warranty": {
-    "1 year official": 0,
-    "2 years official": 990
-   }
-  }
+  "reviews": 1
  },
  {
   "category": "Electronics",
@@ -177,17 +149,7 @@
   "rating": 4.8,
   "description": "🎧✨ AirPods Pro 2nd Generation ✨🎧🔥 Premium Look | Powerful Sound | Stylish Design 🔥✅ High-Quality Sound✅ Clear Calling Experience✅ Bluetooth Connectivity✅ Touch Control✅ Comfortable In-Ear Design✅ Long Battery Backup✅ Charging Case Included💎 Premium Experience at a Great Price!🏪 Infinity Magg Mall📩 অর্ডার করতে ইনবক্স করুন।",
   "stock": 50,
-  "reviews": 30,
-  "options": {
-   "Color": [
-    "White",
-    "Black"
-   ],
-   "Bundle": {
-    "Earbuds only": 0,
-    "With silicone case": 80
-   }
-  }
+  "reviews": 30
  },
  {
   "category": "Electronics",
@@ -198,14 +160,7 @@
   "rating": 4.8,
   "description": "সর্বাধুনিক Bluetooth 5.3 প্রযুক্তি দ্রুত ও স্থিতিশীল সংযোগআকর্ষণীয় Retro Camera Style Charging CaseHi-Fi Stereo Sound ও শক্তিশালী BassHD Microphone পরিষ্কার ও স্বচ্ছ ভয়েস কলSmart Touch Control সহজে গান ও কল নিয়ন্ত্রণAuto Pairing - কেস খুললেই স্বয়ংক্রিয়ভাবে সংযুক্তদীর্ঘ সময় মিউজিক ও কলিং ব্যাকআপType-C Fast Charging সুবিধাAndroid ও iPhone উভয় ডিভাইসের সাথে সম্পূর্ণ সামঞ্জস্যপূর্ণ* হালকা ও আরামদায়ক ডিজাইন দৈনন্দিন ব্যবহার ও স্পোর্টসের জন্য আদর্শNew Q86 TWS Wireless Earphones আপনার স্টাইল ও সাউন্ড এক্সপেরিয়েন্সকে আরও উন্নত করার জন্য ডিজাইন করা হয়েছে। এর ইউনিক Retro Camera Style Charging Case প্রথম দেখাতেই নজর কাড়ে এবং প্রিমিয়াম লুক প্রদান করে।Bluetooth 5.3 প্রযুক্তির মাধ্যমে দ্রুত, স্থিতিশীল ও নিরবচ্ছিন্ন সংযোগ উপভোগ করুন। Hi-Fi Stereo Sound এবং গভীর Bass আপনার প্রিয় গান, ভিডিও ও গেমিংকে আরও প্রাণবন্ত করে তুলবে।বিল্ট-ইন HD Microphone-এর মাধ্যমে পরিষ্কারভাবে কথা বলা যায়, আর Smart Touch Control ব্যবহার করে সহজেই গান পরিবর্তন, কল রিসিভ/রিজেক্ট এবং মিউজিক নিয়ন্ত্রণ করা সম্ভব।Auto Pairing সুবিধার কারণে কেস খুললেই ইয়ারবাড দ্রুত ডিভাইসের সাথে সংযুক্ত হয়ে যায়। দীর্ঘস্থায়ী ব্যাটারি ব্যাকআপ এবং Type-C চার্জিং সুবিধা আপনার দৈনন্দিন ব্যবহারে আরও স্বাচ্ছন্দ্য এনে দেয়।Android ও iPhone উভয় ডিভাইসের সাথে সহজেই ব্যবহার করা যায়। অফিস, ভ্রমণ, পড়াশোনা, ব্যায়াম কিংবা প্রতিদিনের ব্যবহারের জন্য New Q86 TWS একটি স্টাইলিশ, নির্ভরযোগ্য ও দারুণ পছন্দ।",
   "stock": 50,
-  "reviews": 46,
-  "options": {
-   "Color": [
-    "Black",
-    "Beige",
-    "Pink"
-   ]
-  }
+  "reviews": 46
  },
  {
   "category": "Electronics",
@@ -216,17 +171,7 @@
   "rating": 4.4,
   "description": "Product Type: Earbuds\nModel: Airpods Pro\nBluetooth 5.0 Connectivity\nCustomizable fit for all day comfort\nTalk Time: 3Hours\nMusic Time: 2 Hours\nBattery For Buds: 35 mAh\nBattery For Box: 300 mAh\nSupported: Mobile Tablets.Computer\nWith Mic:Yes\nTotal Charging time: 1.5hours\nDistance: 10m\nActive Noice Cancllation: NO\nANC: NO\nCharging Type: ios\nCharging Cable Included: Yes",
   "stock": 50,
-  "reviews": 116,
-  "options": {
-   "Color": [
-    "White",
-    "Black"
-   ],
-   "Bundle": {
-    "Earbuds only": 0,
-    "With silicone case": 80
-   }
-  }
+  "reviews": 116
  },
  {
   "category": "Electronics",
@@ -237,17 +182,7 @@
   "rating": 4.6,
   "description": "🎧 Special Audio with Dynamic Head TrackingExperience immersive sound that surrounds you from every direction. Dynamic head tracking creates a theater-like audio experience.🎵 Adaptive EQ TechnologyAutomatically adjusts music according to your ear shape for a personalized and balanced listening experience.✨ All-New Contoured DesignDesigned for a comfortable and secure fit with a sleek, premium appearance.🎛️ Force Sensor ControlEasily control music, answer or end calls, and manage entertainment with a simple press.💧 Sweat &amp; Water ResistantBuilt to handle workouts, outdoor activities, and everyday use with reliable water resistance.🔋 Long Battery LifeEnjoy up to 10 hours of listening time on a single charge and up to 40 hours total listening time with the charging case.🗣️ Hands-Free Siri AccessQuickly access Siri by simply saying “Hey Siri”.⚡ Seamless ConnectivityEnjoy effortless setup, automatic in-ear detection, and smooth device switching for a magical wireless experience.🎧 Spatial Audio ও Dynamic Head Trackingচারপাশ থেকে আসা বাস্তবসম্মত ও immersive sound experience উপভোগ করুন। Head tracking প্রযুক্তি সিনেমার মতো অডিও অনুভূতি প্রদান করে।🎵 Adaptive EQ Technologyআপনার কানের আকৃতি অনুযায়ী স্বয়ংক্রিয়ভাবে শব্দের মান ঠিক করে, যাতে পাওয়া যায় পরিষ্কার ও balanced audio quality।✨ নতুন Contoured Designআরামদায়ক ব্যবহার ও নিরাপদ fitting-এর জন্য তৈরি premium ও stylish design।🎛️ Force Sensor Controlসহজ press-এর মাধ্যমে গান নিয়ন্ত্রণ, কল গ্রহণ/শেষ করা এবং entertainment পরিচালনা করুন।💧 Sweat &amp; Water Resistantব্যায়াম, ভ্রমণ এবং দৈনন্দিন ব্যবহারের জন্য ঘাম ও পানির বিরুদ্ধে সুরক্ষিত।🔋 দীর্ঘ ব্যাটারি ব্যাকআপএকবার চার্জে ১০ ঘণ্টা পর্যন্ত listening time এবং charging case সহ মোট ৪০ ঘণ্টা পর্যন্ত listening time উপভোগ করুন।🗣️ Hands-Free Siri Supportশুধু “Hey Siri” বলেই সহজে Siri ব্যবহার করুন।⚡ সহজ Setup ও Smart Connectivityদ্রুত pairing, automatic in-ear detection এবং device switching সুবিধার মাধ্যমে পান seamless wireless experience।",
   "stock": 50,
-  "reviews": 9,
-  "options": {
-   "Color": [
-    "White",
-    "Black"
-   ],
-   "Bundle": {
-    "Earbuds only": 0,
-    "With silicone case": 80
-   }
-  }
+  "reviews": 9
  },
  {
   "category": "Electronics",
@@ -258,17 +193,7 @@
   "rating": 4.5,
   "description": "🎧 Special Audio with Dynamic Head TrackingExperience immersive sound that surrounds you from every direction. Dynamic head tracking creates a theater-like audio experience.🎵 Adaptive EQ TechnologyAutomatically adjusts music according to your ear shape for a personalized and balanced listening experience.✨ All-New Contoured DesignDesigned for a comfortable and secure fit with a sleek, premium appearance.🎛️ Force Sensor ControlEasily control music, answer or end calls, and manage entertainment with a simple press.💧 Sweat &amp; Water ResistantBuilt to handle workouts, outdoor activities, and everyday use with reliable water resistance.🔋 Long Battery LifeEnjoy up to 10 hours of listening time on a single charge and up to 40 hours total listening time with the charging case.🗣️ Hands-Free Siri AccessQuickly access Siri by simply saying “Hey Siri”.⚡ Seamless ConnectivityEnjoy effortless setup, automatic in-ear detection, and smooth device switching for a magical wireless experience.🎧 Spatial Audio ও Dynamic Head Trackingচারপাশ থেকে আসা বাস্তবসম্মত ও immersive sound experience উপভোগ করুন। Head tracking প্রযুক্তি সিনেমার মতো অডিও অনুভূতি প্রদান করে।🎵 Adaptive EQ Technologyআপনার কানের আকৃতি অনুযায়ী স্বয়ংক্রিয়ভাবে শব্দের মান ঠিক করে, যাতে পাওয়া যায় পরিষ্কার ও balanced audio quality।✨ নতুন Contoured Designআরামদায়ক ব্যবহার ও নিরাপদ fitting-এর জন্য তৈরি premium ও stylish design।🎛️ Force Sensor Controlসহজ press-এর মাধ্যমে গান নিয়ন্ত্রণ, কল গ্রহণ/শেষ করা এবং entertainment পরিচালনা করুন।💧 Sweat &amp; Water Resistantব্যায়াম, ভ্রমণ এবং দৈনন্দিন ব্যবহারের জন্য ঘাম ও পানির বিরুদ্ধে সুরক্ষিত।🔋 দীর্ঘ ব্যাটারি ব্যাকআপএকবার চার্জে ১০ ঘণ্টা পর্যন্ত listening time এবং charging case সহ মোট ৪০ ঘণ্টা পর্যন্ত listening time উপভোগ করুন।🗣️ Hands-Free Siri Supportশুধু “Hey Siri” বলেই সহজে Siri ব্যবহার করুন।⚡ সহজ Setup ও Smart Connectivityদ্রুত pairing, automatic in-ear detection এবং device switching সুবিধার মাধ্যমে পান seamless wireless experience।",
   "stock": 50,
-  "reviews": 12,
-  "options": {
-   "Color": [
-    "White",
-    "Black"
-   ],
-   "Bundle": {
-    "Earbuds only": 0,
-    "With silicone case": 80
-   }
-  }
+  "reviews": 12
  },
  {
   "category": "Electronics",
@@ -279,17 +204,7 @@
   "rating": 5.0,
   "description": "\\u2022 ২-ইন-১ ইয়ার ক্লিপ ও ইন-ইয়ার ডিজাইন\nইয়ার ক্লিপ এবং ইন-ইয়ার\\u2014দুইভাবেই ব্যবহার করা যায়। দৈনন্দিন ব্যবহার বা ব্যায়ামের সময় এটি কানে আরামদায়ক ও স্থিরভাবে ফিট থাকে।\\u2022 ব্লুটুথ ৫.৪ ও ট্রু ওয়্যারলেস কানেক্টিভিটি\nব্লুটুথ ৫.৪ প্রযুক্তির মাধ্যমে দ্রুত পেয়ারিং, স্থিতিশীল সংযোগ এবং কম ল্যাটেন্সি নিশ্চিত করে।\\u2022 অ্যাকটিভ নয়েজ ক্যানসেলেশন ও ENC মাইক্রোফোন\nঅ্যাকটিভ নয়েজ ক্যানসেলেশন বাইরের শব্দ কমিয়ে পরিষ্কার অডিও উপভোগ করতে সাহায্য করে। ENC নয়েজ-ক্যানসেলিং মাইক্রোফোন কোলাহলপূর্ণ পরিবেশেও পরিষ্কার কল নিশ্চিত করে।",
   "stock": 50,
-  "reviews": 20,
-  "options": {
-   "Color": [
-    "Black",
-    "White"
-   ],
-   "Style": [
-    "Ear clip",
-    "In-ear"
-   ]
-  }
+  "reviews": 20
  },
  {
   "category": "Electronics",
@@ -300,13 +215,7 @@
   "rating": 4.5,
   "description": "Material:Plastic\nCategory:Earphones &amp; Headphones\nCategory:Earphones &amp; Headphones\nCharging Method:WireLess\nTotal Harmonic Distortion:10%\nImpedance Range:up to 32 Ω\nBluetooth Version:5.4\nPackage List:User Manual,Charging case,Charging Cable\nCodecs:none\nWith Microphone:Yes\nIs wireless:Yes\nResistance:32Ω\nLine Length:0m\nFrequency Response Range:20 - 20000Hz\nSensitivity:123dB\nPlug Type:none\nVolume Control:Yes\nControl Button:No\nVocalism Principle:Balanced Armature\nWireless Type:bluetooth\nCommunication:WireLess\nStyle:In-ear\nOrigin:Mainland China",
   "stock": 50,
-  "reviews": 175,
-  "options": {
-   "Color": [
-    "Black",
-    "White"
-   ]
-  }
+  "reviews": 175
  },
  {
   "category": "Electronics",
@@ -337,17 +246,11 @@
   "stock": 50,
   "reviews": 337,
   "options": {
-   "Size": {
-    "M": 0,
-    "L": 0,
-    "XL": 0,
-    "XXL": 20
-   },
-   "Color": [
-    "Black",
-    "White",
-    "Navy",
-    "Maroon"
+   "Size": [
+    "M",
+    "L",
+    "XL",
+    "XXL"
    ]
   }
  },
@@ -362,17 +265,17 @@
   "stock": 50,
   "reviews": 232,
   "options": {
-   "Size": {
-    "M": 0,
-    "L": 0,
-    "XL": 0,
-    "XXL": 20
-   },
+   "Size": [
+    "M",
+    "L",
+    "XL",
+    "XXL"
+   ],
    "Color": [
     "Black",
-    "Olive",
-    "Sky Blue",
-    "Red"
+    "White",
+    "Navy",
+    "Maroon"
    ]
   }
  },
@@ -391,11 +294,6 @@
     "M",
     "L",
     "XL"
-   ],
-   "Color": [
-    "Black",
-    "White",
-    "Navy"
    ]
   }
  },
@@ -415,12 +313,6 @@
     "L",
     "XL",
     "XXL"
-   ],
-   "Color": [
-    "Black",
-    "Ash",
-    "Navy",
-    "Bottle Green"
    ]
   }
  },
@@ -443,6 +335,7 @@
    "Color": [
     "Black",
     "White",
+    "Navy",
     "Maroon"
    ]
   }
@@ -458,17 +351,17 @@
   "stock": 50,
   "reviews": 513,
   "options": {
-   "Size": {
-    "M": 0,
-    "L": 0,
-    "XL": 0,
-    "XXL": 20
-   },
+   "Size": [
+    "M",
+    "L",
+    "XL",
+    "XXL"
+   ],
    "Color": [
     "Black",
+    "White",
     "Navy",
-    "Coffee",
-    "Mint"
+    "Maroon"
    ]
   }
  },
@@ -511,9 +404,7 @@
    "Color": [
     "White",
     "Black",
-    "Navy Blue",
-    "Maroon",
-    "Sky Blue"
+    "Navy Blue"
    ]
   }
  },
@@ -528,11 +419,6 @@
   "stock": 50,
   "reviews": 164,
   "options": {
-   "Size": {
-    "5 × 7 ft": -100,
-    "6 × 7 ft": 0,
-    "7 × 8 ft": 150
-   },
    "Color": [
     "Blue",
     "Pink",
@@ -549,15 +435,7 @@
   "rating": 4.4,
   "description": "Product Type: Bed Sheet\nKing size Bedsheet with Two pillow cover set.\nKing size Bedsheet 1pcs:7 × 8.5Feet.\nStandard Pillow cover 2pcs: 20×26 inch.\nMain Material: Cotton\nGSM :130",
   "stock": 50,
-  "reviews": 27,
-  "options": {
-   "Design": [
-    "Floral",
-    "Paisley",
-    "Geometric",
-    "Checked"
-   ]
-  }
+  "reviews": 27
  },
  {
   "category": "Home & Living",
@@ -568,19 +446,7 @@
   "rating": 4.4,
   "description": "Product Details:Item Code: B2nKing size Bedsheet with Two pillow cover set.King size Bedsheet 1pcs:7.5×8.25Feet.Standard Pillow cover 2pcs: 18×26 inch.Made with full cotton soft fabric.Full king size Bedsheet with 2pcs machine Head pillow cover.Full washable ,and color will not rise.Manufacturer by our own manufacturer, it's more quality full than usual other Bedsheet set in local market.Full QC pass with best stitching quality.#bedsheetKing size Bedsheet with Two Pillow cover set.King size Bedsheet 1pcs:7.5×8.25Feet.Excellent Quality.Very Soft &amp; Comfortable to Use.Color: Green and white art (As Given Picture)",
   "stock": 50,
-  "reviews": 31,
-  "options": {
-   "Bed size": {
-    "Double (6.5 × 7.5 ft)": -60,
-    "King (7.5 × 8.25 ft)": 0
-   },
-   "Design": [
-    "Floral",
-    "Paisley",
-    "Geometric",
-    "Checked"
-   ]
-  }
+  "reviews": 31
  },
  {
   "category": "Home & Living",
@@ -591,14 +457,7 @@
   "rating": 5.0,
   "description": "Product Type: Bed Sheet with Pillow Covers● Color: Multicolor● Main Material: Cotton Blend● Bed Sheet Size: 7 x .8 Feet● Pillow Cover Size:18 x 24 Inch● Double Size Bed Sheet● Bed Sheet with Matching 2 Pillow Covers.● Product color may slightly vary due to photographic lighting sources or your monitor settings.",
   "stock": 50,
-  "reviews": 4,
-  "options": {
-   "Design": [
-    "Yellow multicolor",
-    "Blue multicolor",
-    "Green multicolor"
-   ]
-  }
+  "reviews": 4
  },
  {
   "category": "Home & Living",
@@ -609,14 +468,7 @@
   "rating": 4.5,
   "description": "Product details of King Size Premium Bed Sheet 88\" x 98\" with 2 Pillow Covers | Multicolor Motif Print with Yellow Border\nKing Size Premium Bed Sheet 88\" x 98\" with 2 Pillow Covers | Multicolor Motif Print with Yellow Border1. Product details of King Size Premium Bed Sheet 88\" x 98\" with 2 Pillow Covers | Multicolor Motif Print with Yellow Border\n1. Product details of King Size Premium Bed Sheet 88\" x 98\" with 2 Pillow Covers | Multicolor Motif Print with Yellow Border",
   "stock": 50,
-  "reviews": 35,
-  "options": {
-   "Design": [
-    "Yellow border motif",
-    "Red border motif",
-    "Green border motif"
-   ]
-  }
+  "reviews": 35
  },
  {
   "category": "Home & Living",
@@ -627,18 +479,7 @@
   "rating": 5.0,
   "description": "Product Type: Bed Sheet\nMain Material: Cotton\nBed Sheet Size: 7.5x8.33 Feet\n2 Pillow Case\nPillow Cover Size: 18 x 28 Inch\nMachine Washable\nQuick Dry\n#BedSheet",
   "stock": 50,
-  "reviews": 2,
-  "options": {
-   "Bed size": {
-    "Double (6.5 × 7.5 ft)": -80,
-    "King (7.5 × 8.33 ft)": 0
-   },
-   "Color": [
-    "White",
-    "Sky Blue",
-    "Ash"
-   ]
-  }
+  "reviews": 2
  },
  {
   "category": "Home & Living",
@@ -649,15 +490,7 @@
   "rating": 4.6,
   "description": "",
   "stock": 50,
-  "reviews": 55,
-  "options": {
-   "Design": [
-    "Floral",
-    "Paisley",
-    "Geometric",
-    "Checked"
-   ]
-  }
+  "reviews": 55
  },
  {
   "category": "Home & Living",
@@ -668,15 +501,7 @@
   "rating": 4.4,
   "description": "",
   "stock": 50,
-  "reviews": 50,
-  "options": {
-   "Design": [
-    "Floral",
-    "Paisley",
-    "Geometric",
-    "Checked"
-   ]
-  }
+  "reviews": 50
  },
  {
   "category": "Beauty",
@@ -687,14 +512,7 @@
   "rating": 3.8,
   "description": "🌊 Muuchstac Ocean Face Wash For Men! 🌊Say goodbye to acne, pimples, and excess oil with our multi-action formula. Muuchstac Ocean Face Wash is designed to:✅ Control acne, pimples, and excess oil✅ Keep your skin cool and refreshed✅ Reduce dryness, dandruff, and dullness✅ Brighten your skin and improve its tone✅ Remove blemishes and dark spotsExperience the refreshing feel of Muuchstac Ocean Face Wash and see the difference it makes!",
   "stock": 50,
-  "reviews": 38,
-  "options": {
-   "Pack": {
-    "1 pc": 0,
-    "Pack of 2": 130,
-    "Pack of 3": 260
-   }
-  }
+  "reviews": 38
  },
  {
   "category": "Beauty",
@@ -705,14 +523,7 @@
   "rating": 4.6,
   "description": "Introducing ZM Foaming Face Wash for Men – a dynamic 100 ML formulation enriched with the invigorating combination of Tea Tree and Salicylic Acid. Experience the power of thorough yet gentle cleansing that leaves your skin feeling refreshed and revitalized. ZM Foaming Face Wash is your essential companion for a clear and energized complexion.",
   "stock": 50,
-  "reviews": 169,
-  "options": {
-   "Pack": {
-    "1 pc": 0,
-    "Pack of 2": 190,
-    "Pack of 3": 360
-   }
-  }
+  "reviews": 169
  },
  {
   "category": "Beauty",
@@ -723,14 +534,7 @@
   "rating": 4.1,
   "description": "Comedolytic against impurities\nOil control formula\nHighly moisturizing effect\nSuitable for acne scar\nSpecial formula for acne skin\nMade in Thiland\n100% Original Product\nOfficial Store Product",
   "stock": 50,
-  "reviews": 26,
-  "options": {
-   "Pack": {
-    "1 pc": 0,
-    "Pack of 2": 130,
-    "Pack of 3": 250
-   }
-  }
+  "reviews": 26
  },
  {
   "category": "Beauty",
@@ -741,14 +545,7 @@
   "rating": 4.7,
   "description": "Product Type: Pimple Clear Neem Face Wash\nBrand: Himalaya\nCapacity:100ml\nGender: Men",
   "stock": 50,
-  "reviews": 1701,
-  "options": {
-   "Pack": {
-    "1 pc": 0,
-    "Pack of 2": 100,
-    "Pack of 3": 200
-   }
-  }
+  "reviews": 1701
  },
  {
   "category": "Beauty",
@@ -759,14 +556,7 @@
   "rating": 4.8,
   "description": "জাপানি সাকুরা ইনফিউজড ক্লিনজার: লাইকুরার সাকুরা ক্লিনজারের সাথে জাপানি সাকুরার জাদু অনুভব করুন।সাকুরার সারাংশের সাথে মিশ্রিত, এটি একটি সতেজ এবং পুনরুজ্জীবিত পরিষ্কারের প্রস্তাব দেয়।",
   "stock": 50,
-  "reviews": 693,
-  "options": {
-   "Pack": {
-    "1 pc": 0,
-    "Pack of 2": 160,
-    "Pack of 3": 320
-   }
-  }
+  "reviews": 693
  },
  {
   "category": "Beauty",
@@ -777,14 +567,7 @@
   "rating": 4.4,
   "description": "- **Deep Cleansing**: Removes dirt, oil, and impurities, leaving your skin fresh and clean. \n- **Natural Ingredients**: Enriched with oceanic minerals and natural extracts for gentle care. \n- **Hydrating Formula**: Maintains skin&#39;s moisture balance without over-drying. \n- **All Skin Types**: Suitable for oily, dry, and combination skin, making it versatile for every man. \n- **Refreshing Fragrance**: Invigorating oceanic scent for an energizing start or end to your day.",
   "stock": 50,
-  "reviews": 18,
-  "options": {
-   "Pack": {
-    "1 pc": 0,
-    "Pack of 2": 130,
-    "Pack of 3": 250
-   }
-  }
+  "reviews": 18
  },
  {
   "category": "Beauty",
@@ -795,14 +578,7 @@
   "rating": 4.8,
   "description": "Product Type: Intense Oil Clear Face Wash\nBrand: Himalaya\nCapacity:100ml\nGender: Men",
   "stock": 50,
-  "reviews": 1325,
-  "options": {
-   "Pack": {
-    "1 pc": 0,
-    "Pack of 2": 100,
-    "Pack of 3": 200
-   }
-  }
+  "reviews": 1325
  },
  {
   "category": "Beauty",
@@ -824,14 +600,7 @@
   "rating": 4.8,
   "description": " Fortune Biryani Special Basmati Rice - 1 kg. \nNet Weight: 1 kg. \nKey product features:\nExtra long basmati grain. \nEnticing aroma. \nNon‐sticky after cooking; fluffy long grain. \nHygienically packed.\nPricing on Daraz (snapshot): ~ ৳ 559 in one listing. \nMultiple listing prices exist (various sellers). Example: one listing ~৳ 480.\nCategory: Rice → Basmati rice → Ideal for biryani/pulao. \nRice\nBasmati rice\nBiryani\nBiryani Rice\nQuality Rice\nSpecial Rice",
   "stock": 50,
-  "reviews": 345,
-  "options": {
-   "Weight": {
-    "1 kg": 0,
-    "2 kg": 290,
-    "5 kg": 1150
-   }
-  }
+  "reviews": 345
  },
  {
   "category": "Groceries",
@@ -842,14 +611,7 @@
   "rating": 4.5,
   "description": "Buniyadi Dhekichata Rice - 1Kg\nPremium quality rice from Bangladesh\nflavorful\nBrand: Buniyadi\nCategory: Rice\nWeight: 1 KG",
   "stock": 50,
-  "reviews": 70,
-  "options": {
-   "Weight": {
-    "1 kg": 0,
-    "2 kg": 100,
-    "5 kg": 370
-   }
-  }
+  "reviews": 70
  },
  {
   "category": "Groceries",
@@ -860,14 +622,7 @@
   "rating": 3.0,
   "description": " থায়ামিন, নায়াসিন, পেন্টোথেনিক অ্যাসিড, ম্যাঙ্গানিজ, আয়রণ, জিঙ্ক, সেলেনিয়াম ইত্যাদি উপস্থিত থাকে।\nএতে রয়েছে যথেষ্ট পরিমাণে ডায়েটারি ফাইবার বা খাদ্য আঁশ যা আমাদের জন্য আবশ্যক। \nএর গ্লাইসেমিক ইনডেক্স কম,যার ফলে ডায়াবেটিক রোগীদের জন্য এই চাল বেশ উপযোগী।\nএটি অ্যান্টিঅক্সিডেন্ট এর খুব ভালো উৎস।\n কোলেস্টেরলের মাত্রা নিয়ন্ত্রণে রাখে ফলে হৃদরোগের ঝুঁকি অনেকাংশেই হ্রাস করা সম্ভব।\nএটি নিয়মিত গ্রহণ করলে গলগণ্ড, ক্যান্সার এর মতন রোগের ঝুঁকি কমে।\nএটি অনেকটা সময় পেট ভরা রাখে এবং ক্ষুধা কমায়।\nপাকস্থলী এবং সর্বপরি পরিপাক তন্ত্রের ক্রিয়া সচল রাখতে বেশ কার্যকরী।এতে বিদ্যমান বিভিন্ন উপাদান দেহের রোগ প্রতিরোধ ক্ষমতা বৃদ্ধি করে।। এতে বিদ্যমান ক্যালসিয়াম হাঁড় ও দাঁতের সুস্থতায় ভীষণ উপযোগী।    ",
   "stock": 50,
-  "reviews": 1,
-  "options": {
-   "Weight": {
-    "1 kg": 0,
-    "2 kg": 100,
-    "5 kg": 410
-   }
-  }
+  "reviews": 1
  },
  {
   "category": "Groceries",
@@ -878,14 +633,7 @@
   "rating": 0.0,
   "description": "Product details of Red Rice 5 kg\nRED RICE is a highly nutritious food. It is a whole grain that is relatively low in calories high Volume in fiber, gluten-free and can be incorporated into a variety of dishes ORIGINAL Rice That Maintain Balance Of Your Health Directly COLLECTED FROM The VILLAGE FARMERS\nProperties of our Red Rice: \nIts Natural Red Rice. \nNo color chemicals &amp; Preservatives. \nManually Extracted.",
   "stock": 50,
-  "reviews": 0,
-  "options": {
-   "Weight": {
-    "5 kg": 0,
-    "10 kg": 180,
-    "25 kg": 670
-   }
-  }
+  "reviews": 0
  },
  {
   "category": "Groceries",
@@ -896,14 +644,7 @@
   "rating": 0.0,
   "description": "pre { white-space: pre-wrap; }• Premium quality white rice for traditional pitha making.• Atop cal (Atap rice) in a convenient 5 kg pack.• Ideal for preparing delicious and authentic rice-based dishes.• Perfect choice for households and commercial food establishments.",
   "stock": 50,
-  "reviews": 0,
-  "options": {
-   "Weight": {
-    "5 kg": 0,
-    "10 kg": 110,
-    "25 kg": 410
-   }
-  }
+  "reviews": 0
  },
  {
   "category": "Groceries",
@@ -914,14 +655,7 @@
   "rating": 0.0,
   "description": "Atop Rice\n5kg\nProduct off Bangladesh,\nThere are two kind of rice, boiled rice (regular rice) and non boiled(Atop rice)\nYou can get those type of rice from same paddy. Atop rice is very popular for traditional festive for makeing ckae (pitha), Payes etc.",
   "stock": 50,
-  "reviews": 0,
-  "options": {
-   "Weight": {
-    "5 kg": 0,
-    "10 kg": 110,
-    "25 kg": 410
-   }
-  }
+  "reviews": 0
  },
  {
   "category": "Groceries",
@@ -932,14 +666,7 @@
   "rating": 4.9,
   "description": "Our products are made from completely natural ingredients, no chemical additives. • High Quality Assurance: Each product is manufactured through the highest quality control process. • Credibility and Quality: We have been serving customers for a long time, and are known for the quality of our products. • Varied Cargo: We have a wide variety of products to meet your daily needs. • Customer Satisfaction: Our goal is to provide complete customer satisfaction, and we always value their suggestions and opinions. • Competitive Pricing: We provide high quality products at competitive prices, which are accessible to all. • Fast and reliable delivery: Our delivery service is fast and reliable, so that you get your product on time. • Hassle-free delivery and service assuranceOur customers' satisfaction is our first priority. So, if for any reason the delivery goes wrong, the product goes bad or you receive a damaged product, we will resolve it quickly.",
   "stock": 50,
-  "reviews": 10,
-  "options": {
-   "Weight": {
-    "5 kg": 0,
-    "10 kg": 1180,
-    "25 kg": 4480
-   }
-  }
+  "reviews": 10
  },
  {
   "category": "Groceries",
@@ -950,13 +677,6 @@
   "rating": 5.0,
   "description": "Aaush grows in medium high fresh water of river Padma both side of banks. It is one of the native rice grows in Bengal.\nWholemeal rice has high fibre. Most of the carbohydrates is contained as fibre which are never digested. Therefore flushing out your gut &amp; promoting healthy “gutflora”.\nYou also feel full &amp; satisfied because it is slow digestive. Thus, you always eat less than white rice.\nIt is naturally LOW GI, great for DIABETIC, HIGH BLOOD SUGAR patients &amp; if you want to maintain a healthy eating habit.",
   "stock": 50,
-  "reviews": 3,
-  "options": {
-   "Weight": {
-    "5 kg": 0,
-    "10 kg": 570,
-    "25 kg": 2160
-   }
-  }
+  "reviews": 3
  }
 ]

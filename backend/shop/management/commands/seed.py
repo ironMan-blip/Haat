@@ -34,7 +34,8 @@ class Command(BaseCommand):
                 continue  # Daraz search often repeats the same listing
             seen.add(name.lower())
             cat, _ = Category.objects.get_or_create(name=row["category"], defaults={"slug": slugify(row["category"])})
-            slug = f"{slugify(name)[:200].strip('-')}-{i}"
+            # A fixed slug keeps a product's links and orders when its title is reworded.
+            slug = row.get("slug") or f"{slugify(name)[:200].strip('-')}-{i}"
             slugs.append(slug)
             product, _ = Product.objects.update_or_create(slug=slug, defaults={
                 "category": cat, "name": name,

@@ -253,11 +253,12 @@ class ShopApiTests(APITestCase):
         self.assertEqual(list(p.options.values_list("name", "values")), edited)
         p.refresh_from_db()
         self.assertEqual(p.stock, sum(p.variants.values_list("stock", flat=True)))
-        # Choices that cost more get their own price: a bigger rice bag, more phone storage.
-        rice = Product.objects.get(name="Buniyadi Dhekichata Rice 1 Kg")
-        prices = {v.label: v.unit_price for v in rice.variants.all()}
-        self.assertEqual(prices["Weight: 1 kg"], rice.price)
-        self.assertGreater(prices["Weight: 5 kg"], prices["Weight: 2 kg"])
+        # Choices that cost more get their own price, and a reworded title keeps its old slug (links, orders).
+        phone = Product.objects.get(slug="realme-note-80-464-6300mah-battery-official-warranty-1")
+        self.assertEqual(phone.name, "realme Note 80 | 6300mAh Battery | Official Warranty")
+        prices = {v.label: v.unit_price for v in phone.variants.all()}
+        self.assertEqual(prices["Storage: 4GB + 64GB · Color: Storm Black"], phone.price)
+        self.assertEqual(prices["Storage: 4GB + 128GB · Color: Storm Black"], phone.price + 2000)
 
     def test_tiles_show_from_price_and_sort_by_it(self):
         shirt = self.shirt()
