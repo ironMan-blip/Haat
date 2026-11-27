@@ -4,6 +4,7 @@ from datetime import timedelta
 from django import forms
 from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth.forms import AdminUserCreationForm, UserChangeForm
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
@@ -366,7 +367,37 @@ class OrderInline(admin.TabularInline):
         return False
 
 
+def clean_unique_email(form):
+    """Admin twin of RegisterSerializer.validate_email: required, lowercased, one account per email."""
+    email = form.cleaned_data["email"].lower()
+    if User.objects.filter(email__iexact=email).exclude(pk=form.instance.pk).exists():
+        raise ValidationError("An account with that email already exists.")
+    return email
+
+
+class HaatUserCreationForm(AdminUserCreationForm):
+    class Meta(AdminUserCreationForm.Meta):
+        fields = ["username", "email"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["email"].required = True
+
+    clean_email = clean_unique_email
+
+
+class HaatUserChangeForm(UserChangeForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["email"].required = True  # older accounts without one get it filled on next edit
+
+    clean_email = clean_unique_email
+
+
 class HaatUserAdmin(UserAdmin):
+    form = HaatUserChangeForm
+    add_form = HaatUserCreationForm
+    add_fieldsets = [(None, {"classes": ["wide"], "fields": ["username", "email", "usable_password", "password1", "password2"]})]
     list_display = ["username", "email", "first_name", "last_name", "order_count", "is_staff", "is_active",
                     "date_joined", "last_login"]
     list_filter = UserAdmin.list_filter + ("date_joined",)

@@ -35,7 +35,7 @@ export default function Login() {
           <p className="soft">{mode === 'login' ? 'Log in to track your orders on any device.' : 'It takes less than a minute.'}</p>
         </div>
         <input type="hidden" name="next" value={params.get('next') || ''} />
-        <label>Username<input name="username" required autoComplete="username" /></label>
+        <label>{mode === 'login' ? 'Username or email' : 'Username'}<input name="username" required autoComplete="username" /></label>
         {mode === 'register' && <label>Email<input name="email" type="email" required autoComplete="email" /></label>}
         <label>Password
           <span className="pw">

@@ -1,5 +1,6 @@
 from collections.abc import Mapping
 
+from django.contrib.auth.models import User
 from django.core.cache import cache
 from rest_framework import generics
 from rest_framework.authtoken.models import Token
@@ -26,11 +27,17 @@ class Login(ObtainAuthToken):
     throttle_scope = "auth"  # slows password guessing from one IP; the lockout below covers many IPs
 
     def post(self, request, *args, **kwargs):
-        username = request.data.get("username") if isinstance(request.data, Mapping) else None
+        data = request.data.copy() if isinstance(request.data, Mapping) else request.data
+        username = data.get("username") if isinstance(data, Mapping) else None
+        # "username" may hold an email; a real username that looks like one still wins.
+        if isinstance(username, str) and "@" in username and not User.objects.filter(username__iexact=username.strip()).exists():
+            user = User.objects.filter(email__iexact=username.strip()).first()
+            if user:
+                data["username"] = username = user.username  # same lockout counter as logging in by name
         keys = login_fail_keys(username)  # the admin login counts into the same per-user counter
         if locked_out(keys):
             raise Throttled(detail="Too many failed logins for this account. Try again in 15 minutes.")
-        serializer = self.serializer_class(data=request.data, context={"request": request})
+        serializer = self.serializer_class(data=data, context={"request": request})
         if not serializer.is_valid():
             record_login_failure(keys)
             raise ValidationError(serializer.errors)

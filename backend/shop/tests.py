@@ -222,6 +222,14 @@ class ShopApiTests(APITestCase):
         r = self.client.post("/api/auth/login/", {"username": "new", "password": "pass-1234-word"})
         self.assertIn("token", r.data)
 
+    def test_login_by_email(self):
+        self.client.force_authenticate(None)
+        self.client.post("/api/auth/register/", {"username": "mail", "email": "mail@x.com", "password": "pass-1234-word"})
+        r = self.client.post("/api/auth/login/", {"username": "MAIL@x.com", "password": "pass-1234-word"})
+        self.assertEqual(r.data["username"], "mail")
+        r = self.client.post("/api/auth/login/", {"username": "mail@x.com", "password": "wrong"})
+        self.assertEqual(r.status_code, 400)
+
     def test_register_requires_unique_email(self):
         self.client.force_authenticate(None)
         r = self.client.post("/api/auth/register/", {"username": "noemail", "password": "pass-1234-word"})
@@ -607,6 +615,16 @@ class AdminPanelTests(TestCase):
                                             image="https://x.y/a.jpg", stock=2)
         self.order = Order.objects.create(user=self.admin, subtotal=200, delivery_fee=60, total=260, **ADDR)
         self.order.items.create(product=self.phone, name="Phone", price=100, quantity=2)
+
+    def test_admin_user_needs_unique_email(self):
+        User.objects.create_user("taken", email="taken@x.com")
+        form = {"username": "staffer", "usable_password": "true", "password1": "pass-1234-word", "password2": "pass-1234-word",
+                "orders-TOTAL_FORMS": "0", "orders-INITIAL_FORMS": "0"}  # the orders inline
+        self.assertContains(self.post("/admin/auth/user/add/", form), "This field is required")
+        self.assertContains(self.post("/admin/auth/user/add/", {**form, "email": "TAKEN@x.com"}), "already exists")
+        r = self.post("/admin/auth/user/add/", {**form, "email": "Staff@x.com"})
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(User.objects.get(username="staffer").email, "staff@x.com")
 
     def test_dashboard_shows_sales_and_low_stock(self):
         r = self.get("/admin/")
