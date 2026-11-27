@@ -17,7 +17,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.mail import send_mail
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect
@@ -143,9 +143,11 @@ class AcceptForm(forms.Form):
     password1 = forms.CharField(label="Password", widget=forms.PasswordInput, strip=False)
     password2 = forms.CharField(label="Password again", widget=forms.PasswordInput, strip=False)
 
-    def __init__(self, *args, email, **kwargs):
+    def __init__(self, *args, email, user=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.email = email
+        self.email, self.user = email, user
+        if user:  # the email's existing account keeps its name; the inbox owner sets its password
+            del self.fields["username"]
 
     def clean_username(self):
         username = self.cleaned_data["username"]
@@ -159,9 +161,9 @@ class AcceptForm(forms.Form):
         data = super().clean()
         if data.get("password1") != data.get("password2"):
             self.add_error("password2", "The passwords don't match.")
-        elif data.get("password1") and data.get("username"):
+        elif data.get("password1") and (self.user or data.get("username")):
             try:
-                validate_password(data["password1"], User(username=data["username"], email=self.email))
+                validate_password(data["password1"], self.user or User(username=data["username"], email=self.email))
             except ValidationError as e:
                 self.add_error("password1", e)
         return data
@@ -219,13 +221,14 @@ class StaffViews:
 
     def send_invite(self, request, invite):
         key = secrets.token_urlsafe(32)
-        invite.key_hash, invite.sent = key_hash(key), timezone.now()
+        # Whoever (re)sends it vouches for it now: accepting checks what they may still hand out.
+        invite.key_hash, invite.sent, invite.invited_by = key_hash(key), timezone.now(), request.user
         invite.save()
         link = request.build_absolute_uri(reverse("admin:staff_accept", args=[key]))
         try:
             send_mail("You're invited to help run Haat",
                       f"{request.user.get_username()} invited you to join the Haat shop team.\n\n"
-                      f"Open this link within {StaffInvite.DAYS} days to choose a username and password:\n\n{link}\n\n"
+                      f"Open this link within {StaffInvite.DAYS} days to set your staff login:\n\n{link}\n\n"
                       "If you weren't expecting this, ignore this email.",
                       None, [invite.email])
             return True
@@ -276,14 +279,9 @@ class StaffViews:
             messages.error(request, f"{email} is already staff. Change what they can do in the list below.")
         elif user and not outranks(request.user, user):
             raise PermissionDenied
-        elif user:  # a customer account: it becomes staff now
-            with transaction.atomic():
-                user.is_staff = True
-                user.save(update_fields=["is_staff"])
-                user.user_permissions.set(perms)
-            log_change(request, user, CHANGE, f"Made staff from the Staff page with: {self.describe(perms)}")
-            messages.success(request, f"{user.get_username()} ({email}) is staff now.")
-        elif settings.DEBUG:  # development: skip the invite email and make the account straight away
+        # A customer account with this email gets an invite too, never staff at once: sign-up doesn't verify emails,
+        # so whoever made it may not own the inbox. Accepting sets a new password, so the inbox owner holds it.
+        elif settings.DEBUG and not user:  # development: skip the invite email and make the account straight away
             base = email.split("@", 1)[0][:140] or "staff"
             username, n = base, 1
             while User.objects.filter(username__iexact=username).exists():
@@ -346,22 +344,38 @@ class StaffViews:
         return redirect("admin:staff")
 
     def accept_view(self, request, key):
-        invite = StaffInvite.objects.filter(key_hash=key_hash(key)).exclude(key_hash="").first()
-        if not invite or invite.sent < timezone.now() - timedelta(days=StaffInvite.DAYS):
+        invite = StaffInvite.objects.filter(key_hash=key_hash(key)).exclude(key_hash="").select_related("invited_by").first()
+        inviter = invite and invite.invited_by
+        # The inviter must still be able to add staff, else removing them from staff wouldn't stop their invites.
+        if not invite or invite.sent < timezone.now() - timedelta(days=StaffInvite.DAYS) or not (
+                inviter and inviter.is_active and inviter.is_staff and inviter.has_perm("auth.change_user")):
             return TemplateResponse(request, "admin/staff/accept.html", {
                 **self.site.each_context(request), "title": "Invite link not valid", "invalid": True}, status=404)
-        form = AcceptForm(request.POST or None, email=invite.email)
+        existing = User.objects.filter(email__iexact=invite.email).first()
+        if existing and (existing.is_staff or existing.is_superuser):
+            return TemplateResponse(request, "admin/staff/accept.html", {
+                **self.site.each_context(request), "title": "Invite link not valid", "invalid": True}, status=404)
+        form = AcceptForm(request.POST or None, email=invite.email, user=existing)
         if request.method == "POST" and form.is_valid():
-            if User.objects.filter(email__iexact=invite.email).exists():
-                form.add_error(None, "An account with this email was made meanwhile. Ask whoever invited you to "
-                                     "add it from the Staff page instead.")
-            else:
+            perms = grantable(inviter).filter(pk__in=invite.permissions.all())  # only what they may still give
+            try:
                 with transaction.atomic():
-                    user = User.objects.create_user(form.cleaned_data["username"], invite.email,
-                                                    form.cleaned_data["password1"], is_staff=True)
-                    user.user_permissions.set(invite.permissions.all())
+                    if existing:  # a new password locks out whoever made the account (tokens: auth.py signal)
+                        user = existing
+                        user.set_password(form.cleaned_data["password1"])
+                        user.is_staff = True
+                        user.save(update_fields=["password", "is_staff"])
+                        user.groups.clear()
+                    else:
+                        user = User.objects.create_user(form.cleaned_data["username"], invite.email,
+                                                        form.cleaned_data["password1"], is_staff=True)
+                    user.user_permissions.set(perms)
                     invite.delete()
-                log.info("staff invite accepted: %s as %s", invite.email, user.username)
+            except IntegrityError:  # a parallel sign-up took the username or email
+                form.add_error(None, "That username or email was just taken. Reload the page and try again.")
+            else:
+                log.info("staff invite accepted: %s as %s (existing account: %s)", invite.email, user.username,
+                         bool(existing))
                 messages.success(request, "You're in. Log in with your email and password.")
                 return redirect("admin:login")
         return TemplateResponse(request, "admin/staff/accept.html", {

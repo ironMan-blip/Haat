@@ -3,12 +3,13 @@
 {% block content %}
 <div class="module haat-staff">
 {% if invalid %}
-  <p>This invite link doesn't work. It may be older than 3 days, already used, cancelled, or replaced by a newer email. Ask whoever invited you to press Resend.</p>
+  <p>This invite link doesn't work. It may be older than 3 days, already used, cancelled, replaced by a newer email, or whoever sent it can no longer add staff. Ask the shop owner to invite you again.</p>
 {% else %}
   <p>You're joining as staff with the email <b>{{ invite.email }}</b>.</p>
   <form method="post">{% csrf_token %}
     {% if form.non_field_errors %}<p class="errornote">{{ form.non_field_errors|join:" " }}</p>{% endif %}
-    <h3>1. Choose your login</h3>
+    {% if form.user %}<p>This email already has the shop account <b>{{ form.user.username }}</b>. Set a new password for it: the old one stops working everywhere.</p>{% endif %}
+    <h3>{% if form.user %}Set your password{% else %}Choose your login{% endif %}</h3>
     {% for field in form %}
       <p>{{ field.label_tag }}<br>{{ field }}{% for e in field.errors %}<br><span class="errornote">{{ e }}</span>{% endfor %}</p>
     {% endfor %}

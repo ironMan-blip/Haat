@@ -487,7 +487,8 @@ class OwnerOrderForm(forms.ModelForm):
 def set_status(status):
     """Bulk action. Saves each order one by one so Order.save() puts cancelled stock back."""
 
-    @admin.action(description=f"Mark selected orders {status}", permissions=[{"cancelled": "cancel", "delivered": "deliver"}.get(status, "ship")])
+    @admin.action(description=f"Mark selected orders {status}",
+                  permissions=[{"shipped": "ship", "cancelled": "cancel", "delivered": "deliver"}.get(status, "owner")])
     def action(modeladmin, request, queryset):
         done, refused = 0, []
         for order in queryset.exclude(status=status):
@@ -586,6 +587,9 @@ class OrderAdmin(admin.ModelAdmin):
 
     def has_cancel_permission(self, request):
         return may(request.user, "order", "cancel_order")
+
+    def has_owner_permission(self, request):  # moving an order back to pending: only the owner may undo work
+        return request.user.is_superuser
 
     def statuses(self, request):
         """The statuses this person may move an order to."""

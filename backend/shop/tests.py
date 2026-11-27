@@ -1286,9 +1286,10 @@ class OwnerAndStaffTests(TestCase):
         self.assertEqual(r.status_code, 302)
         self.assertFalse(User.objects.get(pk=customer.pk).is_staff)  # the Users page can't make staff
         self.client.post("/admin/staff/", {"email": "cust@x.com"})
-        self.assertTrue(User.objects.get(pk=customer.pk).is_staff)
         self.client.logout()
-        admin_login(self.client, customer)
+        self.client.post(self.invite_link(), {"password1": "a-new-pass-5678", "password2": "a-new-pass-5678"})
+        self.assertTrue(User.objects.get(pk=customer.pk).is_staff)
+        admin_login(self.client, customer, "a-new-pass-5678")
 
     # Staff page
 
@@ -1445,14 +1446,67 @@ class OwnerAndStaffTests(TestCase):
         self.assertEqual(self.client.get(old).status_code, 404)
         self.assertEqual(self.client.get(new).status_code, 200)
 
-    def test_existing_customer_email_becomes_staff_at_once(self):
-        customer = User.objects.create_user("cust", "cust@x.com")
+    def invite_link(self):
+        return urlparse(next(w for w in mail.outbox[-1].body.split() if "/admin/staff/join/" in w)).path
+
+    def test_existing_customer_email_gets_an_invite_and_the_inbox_owner_sets_the_password(self):
+        # Sign-up doesn't verify emails: whoever registered this one may not own it, so they must not become staff.
+        squatter = User.objects.create_user("mallory", "cust@x.com", "mallory-pass-998")
+        token = Token.objects.create(user=squatter)
         self.as_owner()
         self.client.post("/admin/staff/", {"email": "CUST@x.com", "perms": [perm("shop.view_order").pk]})
-        customer.refresh_from_db()
-        self.assertTrue(customer.is_staff)
-        self.assertEqual(customer.get_all_permissions(), {"shop.view_order"})
-        self.assertEqual(mail.outbox, [])
+        squatter.refresh_from_db()
+        self.assertFalse(squatter.is_staff)
+        self.assertEqual(mail.outbox[0].to, ["cust@x.com"])
+        link = self.invite_link()
+        self.client.logout()
+        self.assertNotIn("username", self.client.get(link).context["form"].fields)  # the account keeps its name
+        r = self.client.post(link, {"password1": "the-real-owner-77", "password2": "the-real-owner-77"})
+        self.assertEqual(r.status_code, 302)
+        user = User.objects.get(pk=squatter.pk)
+        self.assertTrue(user.is_staff and user.check_password("the-real-owner-77"))
+        self.assertEqual(user.get_all_permissions(), {"shop.view_order"})
+        self.assertFalse(Token.objects.filter(key=token.key).exists())  # the old password's holder is signed out
+        self.assertEqual(self.client.post("/admin/login/", {"username": "cust@x.com",
+                                                            "password": "mallory-pass-998"}).status_code, 200)
+
+    def test_account_made_after_the_invite_is_taken_over_by_the_inbox_owner(self):
+        self.as_owner()
+        self.client.post("/admin/staff/", {"email": "hire@x.com", "perms": [perm("shop.view_order").pk]})
+        squatter = User.objects.create_user("mallory", "hire@x.com", "mallory-pass-998")
+        self.client.logout()
+        self.client.post(self.invite_link(), {"password1": "the-real-owner-77", "password2": "the-real-owner-77"})
+        user = User.objects.get(pk=squatter.pk)
+        self.assertTrue(user.is_staff and user.check_password("the-real-owner-77"))
+
+    def test_invite_dies_when_the_inviter_can_no_longer_add_staff(self):
+        self.clerk.user_permissions.set([perm("auth.change_user"), perm("shop.view_order")])
+        self.as_clerk()
+        self.client.post("/admin/staff/", {"email": "sock@x.com", "perms": [perm("shop.view_order").pk]})
+        link = self.invite_link()
+        self.client.logout()
+        self.clerk.user_permissions.set([perm("auth.change_user")])  # lost what the invite hands out
+        form = {"username": "sock", "password1": "sock-pass-4471x", "password2": "sock-pass-4471x"}
+        self.client.post(link, form)
+        self.assertEqual(User.objects.get(username="sock").get_all_permissions(), set())
+        StaffInvite.objects.all().delete()
+        User.objects.filter(username="sock").delete()
+        self.as_clerk()
+        self.client.post("/admin/staff/", {"email": "sock@x.com"})
+        link = self.invite_link()
+        self.client.logout()
+        self.clerk.is_staff = False  # removed from staff
+        self.clerk.save()
+        self.assertEqual(self.client.get(link).status_code, 404)
+        self.client.post(link, form)
+        self.assertFalse(User.objects.filter(username="sock").exists())
+
+    def test_staff_cannot_mark_orders_pending(self):
+        Order.objects.filter(pk=self.order.pk).update(status="shipped")
+        self.as_staff_with("shop.view_order", "shop.mark_order_shipped")
+        r = self.client.post("/admin/shop/order/", {"action": "mark_pending", "_selected_action": [self.order.pk]})
+        self.assertLess(r.status_code, 500)
+        self.assertEqual(Order.objects.get(pk=self.order.pk).status, "shipped")
 
     @override_settings(DEBUG=True)
     def test_in_development_new_email_becomes_staff_without_invite(self):

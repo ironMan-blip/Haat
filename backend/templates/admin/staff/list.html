@@ -6,7 +6,7 @@
   <form method="post" action="{% url 'admin:staff' %}">{% csrf_token %}
     <p><label for="staff-email">Their email</label><br>
       <input type="email" id="staff-email" name="email" required class="vTextField" autocomplete="off" placeholder="name@example.com"></p>
-    <p class="help">If they already have a Haat account with this email, they become staff now. If not, {% if debug %}an account is made for them now and its password is shown once{% else %}they get an invite email with a link to set up their account{% endif %}.</p>
+    <p class="help">They get an invite email with a link that works for 3 days. If a Haat account already has this email, opening the link sets a new password for it, so only whoever owns the inbox gets in.{% if debug %} In development, a new email gets an account now instead, with its password shown once.{% endif %}</p>
     <h3>What they can do</h3>
     {% include "admin/staff/_grid.html" %}
     <div class="submit-row"><input type="submit" class="default" value="Add staff"></div>

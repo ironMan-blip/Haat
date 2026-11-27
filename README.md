@@ -36,7 +36,7 @@ A simple general store for Bangladesh. React (Vite, Tailwind CSS, shadcn/ui) fro
 - Remove abusive comments
 - `seed` command loads 47 cleaned Daraz products; `scripts/fetch_daraz.py` re-pulls them
 - One owner (the only superuser), set from `backend/.env` by `sync_owner`; a second superuser is refused
-- Staff page (`/admin/staff/`): add staff by email (existing account, or an invite link valid 3 days), tick what each may do, remove them. Anyone with "change user" can use it, but
+- Staff page (`/admin/staff/`): add staff by email (always an invite link valid 3 days; for an existing account it sets a new password, since sign-up doesn't verify emails), tick what each may do, remove them. Anyone with "change user" can use it, but
   only hands out permissions they hold and only changes people who hold nothing more
 - The owner may add or delete orders, edit their money and items, or reopen cancelled ones, after ticking a
   warning; staff never can. Deleting a pending order puts its stock back first
