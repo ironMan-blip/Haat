@@ -14,7 +14,7 @@ A simple general store for Bangladesh. React (Vite, Tailwind CSS, shadcn/ui) fro
 - Quick-add buttons on product tiles; out-of-stock states
 - Guest session cart with totals and a free-delivery meter (free at ৳299+, else ৳60)
 - Register / login with password visibility toggle; tokens expire after 30 days
-- Checkout with cash on delivery, Bangladeshi phone and city validation; guests can order without an account
+- Checkout with cash on delivery, Bangladeshi phone and city validation, and the cart's items listed in the order summary; guests can order without an account
 - Checkout sends the total the buyer saw; if the cart changed meanwhile (price, stock, other tab) the order is refused with what changed
 - Phone numbers typed in Bengali digits (০১৭…) are accepted and stored as ASCII
 - Cart auto-fixes itself (sold out, less stock, max qty) and tells the buyer why; header shows "Cart, N items"
@@ -22,7 +22,7 @@ A simple general store for Bangladesh. React (Vite, Tailwind CSS, shadcn/ui) fro
 - Order history (own orders only) with status badges; guest orders from the same browser move to the account on login or sign-up when their phone got an earlier account order delivered, or, when their optional email is the account's, after the buyer opens the link mailed to that address
 - Lucide icons, lazy-loaded routes (stale chunks after a deploy reload the page), toast messages, empty states, scroll-reveal animations, star rating labels
 - Responsive product images (200/400/800px copies from the Daraz CDN)
-- Every price, date, badge and label comes pre-formatted from the API (taka, Indian digit grouping)
+- Every price, date, badge and label comes pre-formatted from the API (taka, Indian digit grouping); all fixed UI words (buttons, headings, aria labels) come from `shop/copy.py` via `/api/config/`, so the React app writes no copy of its own
 - Safe `next` redirect after login/register
 
 **Sellers**
@@ -49,6 +49,7 @@ A simple general store for Bangladesh. React (Vite, Tailwind CSS, shadcn/ui) fro
 - CSRF on cart changes
 - Every error returns one readable `message`
 - Production hardening: HTTPS, HSTS, secure cookies, CSP, custom admin path, Redis-shared throttle counts
+- Database connections are reused per worker (60s) with health checks
 
 ## Run it
 
@@ -117,11 +118,13 @@ flowchart LR
 frontend/  React 19 + react-router 7, no state library
   src/api.js         fetch wrapper, useFetch hook
   src/store.jsx      StoreProvider: auth token, the server's cart and config responses (hook: useStore.js)
+  src/lib/styles.js  shared Tailwind class strings
   src/components/    one file per shared component (Header, TileGrid, Summary, Qty, Comments, Toast, ...); ui/ holds shadcn/ui
   src/pages/         Home, Shop (category/search/sort), Product, Cart, Checkout, Login, Orders, ClaimOrders (emailed link)
 backend/   Django 5.2 LTS + DRF, one app: shop
   shop/models.py      Category, Product (discount, stock level, specs, rank), ProductOption, ProductVariant,
                       ProductImage, Comment, Order, OrderItem
+  shop/copy.py        every fixed UI string, by page; sent as `text` in /api/config/
   shop/display.py     taka, Indian digit grouping, dates, image sizes: the API sends every string ready to print
   shop/cart.py        session cart: quantities, totals, delivery fee, free-delivery meter
   shop/auth.py        token expiry, CSRF check, client IP, login lockout
@@ -135,7 +138,7 @@ backend/   Django 5.2 LTS + DRF, one app: shop
 
 | Endpoint | Method | Auth | Notes |
 | --- | --- | --- | --- |
-| `/api/config/` | GET | - | cities, sort options, payment options, password rules, footer copy and photo |
+| `/api/config/` | GET | - | cities, sort options, payment options, password rules, footer copy and photo, `text` (all UI copy) |
 | `/api/home/` | GET | - | wall, deals, best rated, category menu |
 | `/api/products/?category=&q=&sort=` | GET | - | `{title, count_label, empty, categories, results}`; sort: `price`, `-price`, `-rating` |
 | `/api/products/<slug>/` | GET | - | adds specs, stock level and label, max qty, options, variants, photos, related |
@@ -152,7 +155,7 @@ backend/   Django 5.2 LTS + DRF, one app: shop
 | `/api/orders/` | GET, POST | optional | account's orders, or a guest's orders from this session; POST (CSRF) takes the address and `expected_total`, and orders the session cart |
 
 Every error response carries `message`: the one line the app shows. The frontend only renders: prices (`*_display`),
-badges, rating labels, image sizes (`thumb`/`image`/`image_large`), dates, totals lines and copy all come from the API.
+badges, rating labels, aria labels, image sizes (`thumb`/`image`/`image_large`), dates, totals lines and copy all come from the API.
 
 Order rules (server side, tested): price comes from the database, never the client; stock is locked
 and decremented in one transaction; delivery is free at ৳299 and above, otherwise ৳60; payment is
