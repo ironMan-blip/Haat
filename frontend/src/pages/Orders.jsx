@@ -2,8 +2,19 @@ import { useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useFetch } from '../api'
 import EmptyState from '../components/EmptyState'
+import { Line, Lines } from '../components/Lines'
+import Page from '../components/Page'
 import Status from '../components/Status'
+import { Badge } from '../components/ui/badge'
+import { Button } from '../components/ui/button'
+import { Card } from '../components/ui/card'
 import { useStore } from '../useStore'
+
+const status = {
+  pending: 'bg-warn-soft text-warn',
+  delivered: 'bg-secondary text-secondary-foreground',
+  cancelled: 'bg-sale-soft text-destructive',
+}
 
 export default function Orders() {
   const { auth, expire } = useStore()
@@ -16,40 +27,39 @@ export default function Orders() {
   }, [state.error]) // eslint-disable-line react-hooks/exhaustive-deps -- expire is recreated every render
 
   return (
-    <section className="page orders">
+    <Page className="grid max-w-225 gap-5">
       <h1>Your orders</h1>
-      {notice && <p className="ok" role="status">{notice}</p>}
+      {notice && <p className="my-2 flex items-center gap-2.5 rounded-lg bg-secondary px-4 py-3 font-medium text-secondary-foreground" role="status">{notice}</p>}
       {!auth && (
-        <p className="soft">
+        <p className="text-muted-foreground">
           Orders placed without an account show here on this device only, until you log out or the session ends.
           {' '}<Link to="/login?next=/orders">Log in</Link> to see your account's orders.
         </p>
       )}
       <Status {...state}>
         {state.data?.length === 0 && (
-          <EmptyState icon="📦" title="No orders yet" action={<Link to="/shop" className="btn">Start shopping</Link>}>
+          <EmptyState icon="📦" title="No orders yet" action={<Button asChild><Link to="/shop">Start shopping</Link></Button>}>
             When you place an order, you can track it here.
           </EmptyState>
         )}
         {state.data?.map((o) => (
-          <article key={o.id} className="order">
-            <div className="order-head">
-              <h2>{o.title}</h2>
-              <span className={`status status--${o.status}`}>{o.status_display}</span>
-            </div>
-            <p className="soft">{o.meta_line}</p>
-            <ul className="lines">
-              {o.items.map((it, i) => (
-                <li key={i} className="line line--small">
-                  <img src={it.thumb} alt="" width="52" height="52" loading="lazy" />
-                  <div className="line-text"><Link to={`/p/${it.slug}`}>{it.name}</Link>{it.options && <span className="soft">{it.options}</span>}<span className="soft">{it.qty_line}</span></div>
-                </li>
-              ))}
-            </ul>
-            <p className="order-total">{o.total_line}</p>
+          <article key={o.id}>
+            <Card className="gap-3.5 rounded-2xl p-6 text-base ring-border">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-xl">{o.title}</h2>
+                <Badge className={`h-auto px-3 py-1 text-small font-semibold capitalize ${status[o.status] ?? 'bg-muted text-muted-foreground'}`}>{o.status_display}</Badge>
+              </div>
+              <p className="text-muted-foreground">{o.meta_line}</p>
+              <Lines>
+                {o.items.map((it, i) => (
+                  <Line key={i} thumb={it.thumb} size={52} slug={it.slug} name={it.name} details={[it.options, it.qty_line]} className="grid-cols-[52px_minmax(0,1fr)]" />
+                ))}
+              </Lines>
+              <p className="border-t pt-3.5 font-bold">{o.total_line}</p>
+            </Card>
           </article>
         ))}
       </Status>
-    </section>
+    </Page>
   )
 }

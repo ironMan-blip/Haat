@@ -1,9 +1,15 @@
 import { Link, useSearchParams } from 'react-router-dom'
 import { useFetch } from '../api'
 import EmptyState from '../components/EmptyState'
+import Page from '../components/Page'
 import Status from '../components/Status'
+import { Button } from '../components/ui/button'
+import { NativeSelect, NativeSelectOption } from '../components/ui/native-select'
+import { pill } from '../lib/styles'
 import TileGrid from '../components/TileGrid'
 import { useStore } from '../useStore'
+
+const cat = `${pill} border bg-background hover:border-primary hover:text-primary aria-[current=page]:border-primary aria-[current=page]:bg-primary aria-[current=page]:text-primary-foreground`
 
 export default function Shop() {
   const [params, setParams] = useSearchParams()
@@ -21,32 +27,32 @@ export default function Shop() {
   }
 
   return (
-    <section className="page shop">
-      <div className="sec-head">
+    <Page>
+      <div className="mb-6 flex flex-wrap items-baseline justify-between gap-4">
         <h1>{data?.title ?? ' '}</h1>
-        {data && <span className="soft">{data.count_label}</span>}
+        {data && <span className="text-muted-foreground">{data.count_label}</span>}
       </div>
-      <div className="filters">
-        <nav aria-label="Categories" className="cat-links">
-          <Link to="/shop" aria-current={!category ? 'page' : undefined}>All</Link>
+      <div className="mb-7 flex flex-wrap items-center justify-between gap-4 border-b pb-5">
+        <nav aria-label="Categories" className="flex flex-wrap gap-2">
+          <Link className={cat} to="/shop" aria-current={!category ? 'page' : undefined}>All</Link>
           {(data?.categories || []).map((c) => (
-            <Link key={c.slug} to={`/shop?category=${c.slug}`} aria-current={c.slug === category ? 'page' : undefined}>{c.name}</Link>
+            <Link className={cat} key={c.slug} to={`/shop?category=${c.slug}`} aria-current={c.slug === category ? 'page' : undefined}>{c.name}</Link>
           ))}
         </nav>
-        <label className="sort">
+        <label className="flex items-center gap-2.5 font-medium">
           Sort
-          <select value={sort} onChange={(e) => set('sort', e.target.value)}>
-            {(config?.sorts || []).map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-          </select>
+          <NativeSelect value={sort} onChange={(e) => set('sort', e.target.value)}>
+            {(config?.sorts || []).map((s) => <NativeSelectOption key={s.value} value={s.value}>{s.label}</NativeSelectOption>)}
+          </NativeSelect>
         </label>
       </div>
       <Status loading={loading} error={error}>
         {data?.results.length ? <TileGrid products={data.results} key={qs} /> : (
-          <EmptyState icon="⌕" title="No products found" action={<Link to="/shop" className="btn btn--paper">Clear filters</Link>}>
+          <EmptyState icon="⌕" title="No products found" action={<Button asChild variant="outline"><Link to="/shop">Clear filters</Link></Button>}>
             {data?.empty}
           </EmptyState>
         )}
       </Status>
-    </section>
+    </Page>
   )
 }

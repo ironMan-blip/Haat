@@ -1,6 +1,6 @@
 # Haat — MVP e-commerce
 
-A simple general store for Bangladesh. React (Vite) frontend, Django + DRF backend, PostgreSQL.
+A simple general store for Bangladesh. React (Vite, Tailwind CSS, shadcn/ui) frontend, Django + DRF backend, PostgreSQL.
 "Haat" (হাট) is the open village market; the design lays products out like goods at a haat stall.
 
 ## Features

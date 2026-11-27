@@ -1,5 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
+import path from 'node:path'
 
 // The login token lives in localStorage, so injected script must not run. Build only: the dev server
 // needs inline scripts for hot reload. frame-ancestors and HSTS only work as headers: see README.
@@ -22,7 +24,8 @@ const csp = {
 }
 
 export default defineConfig({
-  plugins: [react(), csp],
+  plugins: [react(), tailwindcss(), csp],
+  resolve: { alias: { '@': path.resolve(import.meta.dirname, 'src') } },
   // Keep the browser's Host header: Django's CSRF check compares it with the Origin header.
   server: { proxy: { '/api': { target: 'http://127.0.0.1:8000', changeOrigin: false } } },
 })

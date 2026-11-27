@@ -2,6 +2,13 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
 import { useStore } from '../useStore'
+import Page from './Page'
+import Fail from './Fail'
+import { Button } from './ui/button'
+import { Label } from './ui/label'
+import { Textarea } from './ui/textarea'
+
+const danger = 'text-muted-foreground hover:text-destructive'
 
 // Server order: threads newest first, replies oldest first. Ids only grow, so sorting by id keeps it.
 const merge = (list, more, dir) => {
@@ -65,24 +72,24 @@ export default function Comments({ slug }) {
     if (d) { setThreads((ts) => merge(ts, d.results, -1)); setPage((p) => ({ ...p, next: d.next })) }
   })
 
-  if (loadError) return <section className="page comments"><p className="alert" role="alert">{loadError}</p></section>
+  if (loadError) return <Page className="grid max-w-190 gap-5"><Fail>{loadError}</Fail></Page>
   if (!page) return null // loading, or a stale token being dropped
   return (
-    <section className="page comments">
-      <div className="sec-head"><h2>{page.title}</h2></div>
-      {fail && <p className="alert" role="alert">{fail}</p>}
+    <Page className="grid max-w-190 gap-5">
+      <h2>{page.title}</h2>
+      {fail && <Fail>{fail}</Fail>}
       {auth ? (
         <CommentForm placeholder={page.placeholder} label="Post comment" submit={(text) => ctx.post(text)} />
       ) : (
-        <p className="soft"><Link className="link" to={`/login?next=/p/${slug}`}>{page.login_prompt}</Link></p>
+        <p className="text-muted-foreground"><Button asChild variant="link" size="inline"><Link to={`/login?next=/p/${slug}`}>{page.login_prompt}</Link></Button></p>
       )}
-      {threads.length === 0 ? <p className="soft">{page.empty}</p> : (
-        <ul className="comment-list">
+      {threads.length === 0 ? <p className="text-muted-foreground">{page.empty}</p> : (
+        <ul className="grid gap-3">
           {threads.map((c) => <Comment key={c.id} c={c} ctx={ctx} />)}
         </ul>
       )}
       {page.next && <More label={page.more_label} load={moreThreads} />}
-    </section>
+    </Page>
   )
 }
 
@@ -94,37 +101,37 @@ function Comment({ c, ctx }) {
   const done = (ok) => { if (ok) setMode(null); return ok }
 
   return (
-    <li>
-      {c.author && <p className="soft"><strong>{c.author}</strong> · {c.date}{c.edited_label && ` · ${c.edited_label}`}</p>}
+    <li className="grid gap-2 rounded-xl border bg-background px-5 py-4 whitespace-pre-line wrap-anywhere">
+      {c.author && <p className="text-muted-foreground"><strong>{c.author}</strong> · {c.date}{c.edited_label && ` · ${c.edited_label}`}</p>}
       {mode === 'edit' ? (
         <CommentForm text={c.text} placeholder={page.placeholder} label="Save" cancel={() => setMode(null)}
           submit={(text) => ctx.change(url, { method: 'PATCH', body: { text } }).then(done)} />
       ) : (
-        <p className={c.deleted ? 'soft' : undefined}>{c.text}</p>
+        <p className={c.deleted ? 'text-muted-foreground' : undefined}>{c.text}</p>
       )}
       {!c.deleted && mode !== 'edit' && (
-        <div className="comment-actions">
-          <button type="button" className="link" disabled={!auth} aria-pressed={c.liked} aria-label={`Like, ${c.likes}`}
+        <div className="flex flex-wrap items-center gap-4 whitespace-normal">
+          <Button type="button" variant="link" size="inline" disabled={!auth} aria-pressed={c.liked} aria-label={`Like, ${c.likes}`}
             onClick={() => ctx.change(`${url}like/`, { method: c.liked ? 'DELETE' : 'POST' })}>
             {c.liked ? '♥' : '♡'} {c.likes}
-          </button>
-          {auth && !c.is_reply && <button type="button" className="link" onClick={() => setMode('reply')}>Reply</button>}
+          </Button>
+          {auth && !c.is_reply && <Button type="button" variant="link" size="inline" onClick={() => setMode('reply')}>Reply</Button>}
           {c.mine && (
             <>
-              <button type="button" className="link" onClick={() => setMode('edit')}>Edit</button>
-              <button type="button" className="link link--danger"
-                onClick={() => window.confirm(page.delete_confirm) && ctx.remove(c)}>Delete</button>
+              <Button type="button" variant="link" size="inline" onClick={() => setMode('edit')}>Edit</Button>
+              <Button type="button" variant="link" size="inline" className={danger}
+                onClick={() => window.confirm(page.delete_confirm) && ctx.remove(c)}>Delete</Button>
             </>
           )}
         </div>
       )}
       {c.reply_count > 0 && (
-        <button type="button" className="link comment-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <Button type="button" variant="link" size="inline" className="justify-self-start" aria-expanded={open} onClick={() => setOpen(!open)}>
           {open ? page.hide_replies_label : page.show_replies_label.replace('{n}', c.reply_count)} {open ? '▴' : '▾'}
-        </button>
+        </Button>
       )}
       {open && c.replies?.length > 0 && (
-        <ul className="comment-list comment-replies">
+        <ul className="ml-[clamp(12px,3vw,32px)] grid gap-3 [&>li]:bg-transparent">
           {c.replies.map((r) => <Comment key={r.id} c={r} ctx={ctx} />)}
         </ul>
       )}
@@ -140,10 +147,10 @@ function Comment({ c, ctx }) {
 function More({ label, load }) {
   const [busy, setBusy] = useState(false)
   return (
-    <button type="button" className="btn btn--line comment-more" disabled={busy}
+    <Button type="button" variant="line" className="justify-self-start whitespace-normal" disabled={busy}
       onClick={() => { setBusy(true); load().finally(() => setBusy(false)) }}>
       {busy ? 'Loading…' : label}
-    </button>
+    </Button>
   )
 }
 
@@ -157,15 +164,15 @@ function CommentForm({ text = '', placeholder, label, submit, cancel }) {
     setBusy(false)
   }
   return (
-    <form className="form" onSubmit={onSubmit}>
-      <label>
+    <form className="grid max-w-150 gap-4.5" onSubmit={onSubmit}>
+      <Label>
         <span className="sr-only">{placeholder}</span>
-        <textarea name="text" rows="3" maxLength="1000" required placeholder={placeholder} defaultValue={text}
+        <Textarea className="resize-y font-normal" name="text" rows="3" maxLength="1000" required placeholder={placeholder} defaultValue={text}
           autoFocus={Boolean(cancel)} />
-      </label>
-      <div className="comment-actions">
-        <button className="btn" disabled={busy}>{busy ? 'Saving…' : label}</button>
-        {cancel && <button type="button" className="link" onClick={cancel}>Cancel</button>}
+      </Label>
+      <div className="flex flex-wrap items-center gap-4">
+        <Button disabled={busy}>{busy ? 'Saving…' : label}</Button>
+        {cancel && <Button type="button" variant="link" size="inline" onClick={cancel}>Cancel</Button>}
       </div>
     </form>
   )

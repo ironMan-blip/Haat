@@ -1,16 +1,20 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useFetch } from '../api'
+import { cn } from 'cn'
 import Comments from '../components/Comments'
+import Page from '../components/Page'
 import Qty from '../components/Qty'
 import Rating from '../components/Rating'
 import Status from '../components/Status'
 import TileGrid from '../components/TileGrid'
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from '../components/ui/breadcrumb'
+import { Button } from '../components/ui/button'
 import { useStore } from '../useStore'
 
-const ZOOM = 2.5 // must match background-size in .pdp-zoom
+const ZOOM = 2.5 // must match bg-size-[250%] on the zoom pane
 
-// Places the lens over the image and pans the side pane to the same spot, via CSS vars.
+// Places the lens over the image and pans the side pane to the same spot, via CSS vars the classes read.
 function moveZoom(box, x, y) {
   const img = box.querySelector('img')
   const r = img.getBoundingClientRect()
@@ -26,6 +30,16 @@ function moveZoom(box, x, y) {
 }
 
 // Keyed by slug so moving to a related product starts fresh (quantity back to 1).
+const stock = {
+  in: 'text-foreground before:bg-primary',
+  low: 'text-warn before:bg-warn',
+  out: 'text-destructive before:bg-destructive',
+}
+const Stock = ({ item }) => (
+  <p className={cn('inline-flex items-center gap-2 font-medium before:size-2 before:rounded-full', stock[item.stock_level] ?? stock.in)}>{item.stock_label}</p>
+)
+const crumb = 'no-underline hover:text-primary hover:underline'
+
 export default function Product() {
   const { slug } = useParams()
   return <ProductPage key={slug} slug={slug} />
@@ -47,75 +61,82 @@ function ProductPage({ slug }) {
     <Status loading={loading} error={error}>
       {p && (
         <>
-          <section className="page pdp">
-            <nav className="crumbs" aria-label="Breadcrumb">
-              <Link to="/">Home</Link><span aria-hidden="true">/</span>
-              <Link to={`/shop?category=${p.category.slug}`}>{p.category.name}</Link>
-            </nav>
-            <div className="pdp-media">
+          <Page className="grid items-start gap-[clamp(24px,4vw,64px)] md:grid-cols-[7fr_5fr]">
+            <Breadcrumb className="col-span-full">
+              <BreadcrumbList className="gap-2 text-small">
+                <BreadcrumbItem><BreadcrumbLink asChild className={crumb}><Link to="/">Home</Link></BreadcrumbLink></BreadcrumbItem>
+                <BreadcrumbSeparator className="text-border">/</BreadcrumbSeparator>
+                <BreadcrumbItem><BreadcrumbLink asChild className={crumb}><Link to={`/shop?category=${p.category.slug}`}>{p.category.name}</Link></BreadcrumbLink></BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
+            <div className="z-2 grid gap-3 md:sticky md:top-22">
               <div
-                className="pdp-pic"
+                className="group/pic relative grid aspect-square place-items-center rounded-2xl border bg-background md:pointer-fine:cursor-crosshair"
                 onMouseMove={(e) => moveZoom(e.currentTarget, e.clientX, e.clientY)}
               >
-                <img src={p.gallery[shown].image_large} alt={p.gallery[shown].alt} width="800" height="800" />
-                <span className="pdp-lens" aria-hidden="true" />
-                <div className="pdp-zoom" aria-hidden="true" style={{ backgroundImage: `url(${p.gallery[shown].image_large})` }} />
+                <img className="aspect-square w-[86%] object-contain mix-blend-multiply" src={p.gallery[shown].image_large} alt={p.gallery[shown].alt} width="800" height="800" />
+                {/* Side zoom: lens on the image, magnified pane over the info column. Mouse + wide screens only. */}
+                <span className="pointer-events-none absolute top-(--ly) left-(--lx) hidden aspect-square w-(--lw) rounded-lg border border-primary bg-primary/12 md:group-hover/pic:block" aria-hidden="true" />
+                <div className="pointer-events-none absolute -top-px left-[calc(100%+clamp(24px,4vw,64px))] hidden aspect-square w-[72%] rounded-2xl border bg-background bg-size-[250%] bg-[position:var(--bx)_var(--by)] bg-no-repeat shadow-float md:group-hover/pic:block"
+                  aria-hidden="true" style={{ backgroundImage: `url(${p.gallery[shown].image_large})` }} />
               </div>
               {p.gallery.length > 1 && (
-                <div className="pdp-thumbs">
+                <div className="flex gap-2 overflow-x-auto">
                   {p.gallery.map((g, i) => (
-                    <button key={i} type="button" aria-label={g.alt} aria-pressed={i === shown} onClick={() => setShown(i)}>
-                      <img src={g.thumb} alt="" width="200" height="200" />
+                    <button key={i} type="button" aria-label={g.alt} aria-pressed={i === shown} onClick={() => setShown(i)}
+                      className="aspect-square flex-[0_0_72px] rounded-lg border bg-background p-1 aria-pressed:border-primary aria-pressed:ring-1 aria-pressed:ring-primary">
+                      <img className="size-full object-contain mix-blend-multiply" src={g.thumb} alt="" width="200" height="200" />
                     </button>
                   ))}
                 </div>
               )}
             </div>
-            <div className="pdp-info">
-              <Link to={`/shop?category=${p.category.slug}`} className="pdp-cat">{p.category.name}</Link>
-              <h1>{p.name}</h1>
+            <div className="grid gap-4">
+              <Link to={`/shop?category=${p.category.slug}`} className="justify-self-start text-small font-semibold text-primary no-underline hover:underline">{p.category.name}</Link>
+              <h1 className="text-[clamp(1.5rem,1.2rem+1.2vw,2.25rem)] leading-[1.2]">{p.name}</h1>
               <Rating p={p} />
-              <p className="pdp-price">
+              <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-y py-4 text-[clamp(2rem,1.6rem+1.4vw,2.75rem)] leading-none font-bold tracking-[-0.03em]">
                 {item.price_display}
-                {item.original_price_display && <> <s>{item.original_price_display}</s> <span className="off">{item.discount_label}</span></>}
+                {item.original_price_display && <> <s className="text-base tracking-normal">{item.original_price_display}</s> <span className="rounded-md bg-sale-soft px-2 py-0.75 text-base font-semibold tracking-normal whitespace-nowrap text-destructive">{item.discount_label}</span></>}
               </p>
               {p.stock_level !== 'out' && p.options.map((o) => (
-                <fieldset key={o.name} className="pdp-opt">
-                  <legend>{o.name}{chosen[o.name] && <span className="soft">: {chosen[o.name]}</span>}</legend>
+                <fieldset key={o.name} className="flex flex-wrap gap-2">
+                  <legend className="mb-2 font-semibold">{o.name}{chosen[o.name] && <span className="text-muted-foreground">: {chosen[o.name]}</span>}</legend>
                   {o.values.map((v) => (
-                    <button key={v} type="button" aria-pressed={chosen[o.name] === v}
-                      onClick={() => setChosen({ ...chosen, [o.name]: v })}>{v}</button>
+                    <Button key={v} type="button" variant="outline" aria-pressed={chosen[o.name] === v}
+                      className="h-10 min-w-12 px-3.5 font-normal hover:border-primary hover:bg-background aria-pressed:border-primary aria-pressed:font-semibold aria-pressed:ring-1 aria-pressed:ring-primary"
+                      onClick={() => setChosen({ ...chosen, [o.name]: v })}>{v}</Button>
                   ))}
                 </fieldset>
               ))}
               {item.stock_level !== 'out' ? (
                 <>
-                  <p className={item.stock_level === 'low' ? 'stock stock--low' : 'stock'}>{item.stock_label}</p>
-                  <div className="pdp-buy">
+                  <Stock item={item} />
+                  <div className="flex flex-wrap items-center gap-2.5">
                     <Qty value={n} max={item.max_qty} onChange={setQty} label="Quantity" />
-                    <button className="btn" onClick={() => add(p, n, chosen)}>Add to cart</button>
-                    <button className="btn btn--line" onClick={() => add(p, n, chosen).then((ok) => ok && navigate('/cart'))}>Buy now</button>
+                    <Button className="h-12.5 flex-1" onClick={() => add(p, n, chosen)}>Add to cart</Button>
+                    <Button variant="line" className="h-12.5 flex-1" onClick={() => add(p, n, chosen).then((ok) => ok && navigate('/cart'))}>Buy now</Button>
                   </div>
-                  <ul className="perks">
-                    {config?.perks.map((t) => <li key={t}>{t}</li>)}
+                  <ul className="grid gap-2 rounded-xl bg-secondary px-5 py-4 text-small font-medium text-secondary-foreground">
+                    {config?.perks.map((t) => <li key={t} className="before:mr-2 before:font-bold before:content-['✓']">{t}</li>)}
                   </ul>
                 </>
               ) : (
-                <p className="stock stock--out">{item.stock_label}</p>
+                <Stock item={item} />
               )}
               {p.specs.length > 0 && (
-                <ul className="pdp-spec">
+                <ul className="grid list-disc gap-1.5 rounded-xl border bg-background py-5 pr-5 pl-10">
                   {p.specs.map((line, i) => <li key={i}>{line}</li>)}
                 </ul>
               )}
             </div>
-          </section>
+          </Page>
           <Comments slug={slug} />
           {p.related.length > 0 && (
-            <section className="page">
-              <div className="sec-head"><h2>More in {p.category.name}</h2></div>
+            <Page>
+              <h2 className="mb-6">More in {p.category.name}</h2>
               <TileGrid products={p.related} />
-            </section>
+            </Page>
           )}
         </>
       )}

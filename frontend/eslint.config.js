@@ -28,4 +28,6 @@ export default [
       ],
     },
   },
+  // shadcn/ui files export their variant helpers beside the component, as generated.
+  { files: ['src/components/ui/**'], rules: { 'react-refresh/only-export-components': 'off' } },
 ]

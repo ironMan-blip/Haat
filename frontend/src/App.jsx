@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Link, Route, Routes, useLocation } from 'react-router-dom'
+import { Button } from './components/ui/button'
 import EmptyState from './components/EmptyState'
 import Footer from './components/Footer'
 import Header from './components/Header'
@@ -17,7 +18,7 @@ export default function App() {
   useEffect(() => { window.scrollTo(0, 0) }, [pathname])
   return (
     <>
-      <a href="#main" className="skip">Skip to content</a>
+      <a href="#main" className="sr-only z-30 rounded-lg bg-foreground px-4 py-2 text-background focus:not-sr-only focus:fixed focus:top-2 focus:left-2">Skip to content</a>
       <Header />
       <main id="main">
         <Routes>
@@ -29,7 +30,7 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/orders" element={<Orders />} />
           <Route path="*" element={
-            <EmptyState icon="?" title="Page not found" action={<Link to="/" className="btn">Back to the home page</Link>}>
+            <EmptyState icon="?" title="Page not found" action={<Button asChild><Link to="/">Back to the home page</Link></Button>}>
               The link may be old or mistyped. Search above or browse the shop.
             </EmptyState>
           } />
