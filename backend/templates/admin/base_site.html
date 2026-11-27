@@ -14,3 +14,5 @@
 {% block branding %}
 <div id="site-name"><a href="{% url 'admin:index' %}" class="haat-brand"><span class="haat-mark" aria-hidden="true">H</span><span><b>Haat</b> admin</span></a></div>
 {% endblock %}
+
+{% block userlinks %}{% if perms.auth.change_user %}<a href="{% url 'admin:staff' %}">Staff</a> / {% endif %}{{ block.super }}{% endblock %}

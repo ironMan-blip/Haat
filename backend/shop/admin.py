@@ -3,12 +3,12 @@ from datetime import timedelta
 
 from django import forms
 from django.contrib import admin, messages
-from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth.admin import GroupAdmin, UserAdmin
 from django.contrib.auth.forms import AdminUserCreationForm, UserChangeForm
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, User
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Count, Exists, F, OuterRef, Sum
 from django.db.models.functions import TruncDate
 from django.http import HttpResponse
@@ -18,6 +18,7 @@ from django_otp.admin import OTPAdminSite
 
 from .auth import client_ident, locked_out, login_fail_keys, record_login_failure
 from .display import cdn, taka
+from .staff import StaffViews, grantable, hold, outranks
 from .models import COMMENT_PAGE, LOW_STOCK, Category, Comment, Order, OrderItem, Product, ProductImage, ProductOption, ProductVariant, options_error, variant_keys
 
 log = logging.getLogger("shop.security")
@@ -44,6 +45,9 @@ class HaatAdminSite(OTPAdminSite):
             log.warning("admin login failed: ip=%s username=%r", ip, username)
             record_login_failure(keys)
         return response
+
+    def get_urls(self):
+        return StaffViews(self).urls() + super().get_urls()  # before the catch-all app URLs
 
     index_template = "admin/haat_index.html"  # own name: shop's templates load after django.contrib.admin's
     site_header = site_title = "Haat admin"
@@ -356,20 +360,58 @@ class ProductAdmin(admin.ModelAdmin):
         return badge(obj.stock_label, obj.stock_level)
 
 
+OVERRIDE_WARNING = ("Owner only. This changes your shop's records: totals, stock and order history may stop matching "
+                    "what really happened. Stock is not taken or put back for these edits.")
+CONFIRM = "confirm_override"
+
+
+class OwnerItemFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if self.has_changed() and not self.data.get(CONFIRM):
+            raise ValidationError("Changing an order's items needs the \"I understand\" tick at the bottom.")
+
+
 class OrderItemInline(admin.TabularInline):
-    # Items are what the buyer ordered and what stock was taken for: never edited, added or removed.
+    # Items are what the buyer ordered and what stock was taken for: only the owner edits them, after a warning.
     model = OrderItem
     extra = 0
-    can_delete = False
     fields = ["product", "name", "options", "price", "quantity", "line_total"]
-    readonly_fields = fields
 
     @admin.display(description="Line total")
     def line_total(self, obj):
-        return taka(obj.price * obj.quantity)
+        return taka(obj.price * obj.quantity) if obj.pk else "-"
+
+    def get_formset(self, request, obj=None, **kwargs):
+        if request.user.is_superuser:
+            kwargs["formset"] = OwnerItemFormSet
+        return super().get_formset(request, obj, **kwargs)
+
+    def get_readonly_fields(self, request, obj=None):
+        return ["line_total"] if request.user.is_superuser else self.fields
 
     def has_add_permission(self, request, obj=None):
-        return False
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+
+class OwnerOrderForm(forms.ModelForm):
+    """The owner may break the order rules (add, edit money, reopen), but only after ticking the warning."""
+    confirm_override = forms.BooleanField(required=False, label="I understand, do it anyway")
+    PROTECTED = ["user", "payment", "subtotal", "delivery_fee", "total"]
+
+    def clean(self):
+        data = super().clean()
+        was = Order.objects.filter(pk=self.instance.pk).values_list("status", flat=True).first() if self.instance.pk else None
+        breaks_status = bool(Order(status=data.get("status")).refusal(was))
+        if (not self.instance.pk or breaks_status or set(self.PROTECTED) & set(self.changed_data)) \
+                and not data.get(CONFIRM):
+            raise ValidationError("This breaks the order rules. Read the warning at the bottom, tick \"I understand\" "
+                                  "and save again.")
+        self.instance.override = breaks_status  # read by Order.clean() and Order.save()
+        return data
 
 
 def set_status(status):
@@ -447,11 +489,38 @@ class OrderAdmin(admin.ModelAdmin):
     def status_badge(self, obj):
         return badge(obj.get_status_display(), obj.status)
 
+    # Orders come from checkout, which checks stock and prices, and deleting one loses its history: staff cancel
+    # instead. The owner may do both, behind a warning.
     def has_add_permission(self, request):
-        return False  # orders come from checkout, which checks stock and prices
+        return request.user.is_superuser
 
     def has_delete_permission(self, request, obj=None):
-        return False  # deleting would lose the stock it took; cancel instead, which puts it back
+        return request.user.is_superuser
+
+    def get_readonly_fields(self, request, obj=None):
+        return ["progress", "created"] if request.user.is_superuser else self.readonly_fields
+
+    def get_form(self, request, obj=None, **kwargs):
+        if request.user.is_superuser:
+            kwargs["form"] = OwnerOrderForm
+        return super().get_form(request, obj, **kwargs)
+
+    def get_fieldsets(self, request, obj=None):
+        if not request.user.is_superuser:
+            return self.fieldsets
+        return [*self.fieldsets, ("Owner override", {"fields": [CONFIRM], "classes": ["haat-danger"],
+                                                     "description": OVERRIDE_WARNING})]
+
+    def delete_model(self, request, obj):
+        with transaction.atomic():
+            if obj.status == "pending":  # its goods are still here: put them back on sale, as cancelling does
+                obj.status = "cancelled"
+                obj.save(update_fields=["status"])
+            obj.delete()
+
+    def delete_queryset(self, request, queryset):
+        for order in queryset:
+            self.delete_model(request, order)
 
 
 class OrderInline(admin.TabularInline):
@@ -523,6 +592,57 @@ class HaatUserAdmin(UserAdmin):
     def order_count(self, obj):
         return obj.n
 
+    # Who may change whom: see shop/staff.py. The owner is set only from .env (manage.py sync_owner).
+    def get_fieldsets(self, request, obj=None):
+        return [(name, {**opts, "fields": [f for f in opts["fields"] if f != "is_superuser"]})
+                for name, opts in super().get_fieldsets(request, obj)]
 
+    def get_readonly_fields(self, request, obj=None):
+        ro = list(super().get_readonly_fields(request, obj))
+        if obj and (obj == request.user or obj.is_superuser):  # nobody changes their own access, nor the owner's
+            ro += ["is_staff", "is_active", "groups", "user_permissions"]
+        return ro
+
+    def has_change_permission(self, request, obj=None):
+        return super().has_change_permission(request, obj) and (obj is None or outranks(request.user, obj))
+
+    def has_delete_permission(self, request, obj=None):
+        return super().has_delete_permission(request, obj) and (
+            obj is None or (not obj.is_superuser and obj != request.user and outranks(request.user, obj)))
+
+    def delete_queryset(self, request, queryset):
+        allowed = [u.pk for u in queryset if self.has_delete_permission(request, u)]
+        if skipped := queryset.exclude(pk__in=allowed).count():
+            self.message_user(request, f"Skipped {skipped} account(s) you can't delete: the owner, yourself, or "
+                                       "someone with permissions you don't have.", messages.WARNING)
+        super().delete_queryset(request, queryset.filter(pk__in=allowed))
+
+    def formfield_for_manytomany(self, db_field, request, **kwargs):
+        if db_field.name == "user_permissions":
+            kwargs["queryset"] = grantable(request.user)
+        elif db_field.name == "groups":
+            kwargs["queryset"] = Group.objects.filter(
+                pk__in=[g.pk for g in Group.objects.prefetch_related("permissions__content_type")
+                        if hold(request.user, g.permissions.all())])
+        return super().formfield_for_manytomany(db_field, request, **kwargs)
+
+
+class HaatGroupAdmin(GroupAdmin):
+    """Staff can only put permissions they hold into a group, and only change groups that hold nothing more."""
+
+    def has_change_permission(self, request, obj=None):
+        return super().has_change_permission(request, obj) and (obj is None or hold(request.user, obj.permissions.all()))
+
+    def has_delete_permission(self, request, obj=None):
+        return super().has_delete_permission(request, obj) and (obj is None or hold(request.user, obj.permissions.all()))
+
+    def formfield_for_manytomany(self, db_field, request, **kwargs):
+        if db_field.name == "permissions":
+            kwargs["queryset"] = grantable(request.user)
+        return super().formfield_for_manytomany(db_field, request, **kwargs)
+
+
+admin.site.unregister(Group)
+admin.site.register(Group, HaatGroupAdmin)
 admin.site.unregister(User)  # swap Django's stock user admin for the one above with orders
 admin.site.register(User, HaatUserAdmin)

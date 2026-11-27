@@ -1,0 +1,19 @@
+{% extends "admin/base_site.html" %}
+{% block breadcrumbs %}<div class="breadcrumbs"><a href="{% url 'admin:index' %}">Home</a> &rsaquo; <a href="{% url 'admin:staff' %}">Staff</a> &rsaquo; {{ member.username }}</div>{% endblock %}
+{% block content %}
+<div class="module haat-staff">
+  <h2>{{ member.username }} <span class="haat-muted">{{ member.email }}</span></h2>
+  {% if groups %}<p class="help">Also gets the permissions of these groups: {{ groups }}. Change groups on the user's page.</p>{% endif %}
+  <form method="post">{% csrf_token %}
+    {% include "admin/staff/_grid.html" %}
+    <div class="submit-row"><input type="submit" class="default" name="action" value="Save"></div>
+  </form>
+</div>
+<div class="module haat-staff haat-danger">
+  <h2>Remove from staff</h2>
+  <p>They can't open the admin any more, from their next click. Their shop account and order history stay.</p>
+  <form method="post">{% csrf_token %}
+    <button class="button haat-danger-btn" name="action" value="remove">Remove {{ member.username }} from staff</button>
+  </form>
+</div>
+{% endblock %}

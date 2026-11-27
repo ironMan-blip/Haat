@@ -446,3 +446,16 @@ input[type=submit], .button, .submit-row input { text-transform: none; }
 #content fieldset.module > h2, #content .inline-group h2, #content fieldset.module > summary h2 { background: transparent; color: var(--haat-ink);
   font-size: .95rem; font-weight: 700; text-transform: none; letter-spacing: -.01em; padding: 14px 16px; }
 #content fieldset .description { padding: 0 16px; color: var(--haat-muted); }
+
+/* Staff page and owner-only warnings */
+.haat-staff { padding: 0 0 12px; margin-bottom: 20px; }
+.haat-staff > form, .haat-staff > p, .haat-staff > h3 { padding: 0 16px; }
+.haat-staff table { width: 100%; }
+.haat-perms td { text-align: center; }
+.haat-perms input[type=checkbox] { width: 18px; height: 18px; }
+.haat-muted { color: var(--haat-muted); font-weight: 400; }
+.haat-inline { display: inline-flex; gap: 6px; }
+.haat-secret { font-size: 1.1em; letter-spacing: .08em; user-select: all; }
+.haat-danger { border-color: var(--haat-bad-fg); }
+fieldset.haat-danger .description, .haat-danger > p { color: var(--haat-bad-fg); background: var(--haat-bad-bg); border-radius: var(--haat-r-sm); padding: 10px 12px; }
+.button.haat-danger-btn, button.haat-danger-btn { background: var(--haat-bad-fg); color: #fff; }

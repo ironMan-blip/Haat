@@ -7,6 +7,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.db.models.signals import pre_save
 from django.dispatch import receiver
 from django.utils import timezone
@@ -143,6 +144,14 @@ def revoke_tokens_on_password_change(sender, instance, raw=False, **kwargs):
     old = User.objects.filter(pk=instance.pk).values_list("password", flat=True).first()
     if old is not None and old != instance.password:
         Token.objects.filter(user_id=instance.pk).delete()
+
+
+@receiver(pre_save, sender=User)
+def one_owner(sender, instance, raw=False, **kwargs):
+    # The shop has one owner (the only superuser), set by `manage.py sync_owner` from .env. This stops a second
+    # one from `createsuperuser`, a script or a form; sync_owner demotes the old owner before saving the new.
+    if not raw and instance.is_superuser and User.objects.filter(is_superuser=True).exclude(pk=instance.pk).exists():
+        raise ValidationError("The shop already has an owner. Change OWNER_* in .env and run manage.py sync_owner.")
 
 
 class CsrfProtected(permissions.BasePermission):

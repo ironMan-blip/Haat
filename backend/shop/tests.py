@@ -4,7 +4,7 @@ from unittest import mock
 
 from urllib.parse import parse_qs, urlparse
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Permission, User
 from django.core import mail
 from django.core.cache import cache
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -22,7 +22,7 @@ from rest_framework.test import APIClient, APITestCase
 from .admin import change
 from .cart import MAX_LINES
 from .display import cdn, day, num, taka
-from .models import Category, Comment, Order, Product, ProductImage, ProductVariant
+from .models import Category, Comment, Order, Product, ProductImage, ProductVariant, StaffInvite
 from .serializers import RegisterSerializer
 from .api.accounts import SignupThrottle
 from .auth import CommentActionThrottle, GuestOrderThrottle, ScopedThrottle
@@ -738,12 +738,6 @@ class AdminSecurityTests(TestCase):
         r = api.post("/api/auth/login/", {"username": "boss", "password": "pass-1234-word"}, REMOTE_ADDR="10.0.1.1")
         self.assertEqual(r.status_code, 429)  # no oracle: the right password isn't confirmed either
 
-    def test_orders_cannot_be_deleted_in_admin(self):
-        self.login(code=self.code())
-        o = Order.objects.create(user=self.admin, full_name="X", phone="01712345678", address="A", city="Dhaka",
-                                 subtotal=100, delivery_fee=60, total=160)
-        self.assertEqual(self.client.post(f"/admin/shop/order/{o.pk}/delete/", {"post": "yes"}).status_code, 403)
-        self.assertTrue(Order.objects.filter(pk=o.pk).exists())
 
     def test_admin_totp_refuses_to_replace_a_device_silently(self):
         with self.assertRaises(CommandError):
@@ -961,7 +955,11 @@ class AdminPanelTests(TestCase):
         self.phone.refresh_from_db()
         self.assertEqual((self.order.status, self.phone.stock), ("cancelled", 4))
 
-    def test_order_money_is_read_only(self):
+    def test_order_money_is_read_only_for_staff(self):
+        clerk = User.objects.create_user("clerk", "c@x.com", "pass-1234-word", is_staff=True)
+        clerk.user_permissions.set([perm("shop.view_order"), perm("shop.change_order")])
+        self.client.logout()
+        admin_login(self.client, clerk)
         self.post(f"/admin/shop/order/{self.order.pk}/change/",
                   {**ADDR, "status": "shipped", "total": 1, "items-TOTAL_FORMS": 1, "items-INITIAL_FORMS": 1,
                    "items-0-id": self.order.items.get().pk, "items-0-order": self.order.pk})
@@ -1180,3 +1178,224 @@ class GuestCheckoutTests(APITestCase):
         self.assertIn(f"guest order id={r.data['id']}", logs.output[0])
         self.assertNotIn(ADDR["phone"], logs.output[0])
         self.assertNotIn(ADDR["address"], logs.output[0])
+
+
+def admin_login(client, user, password="pass-1234-word"):
+    """Logs `user` in to the admin with password and authenticator code, giving them a device if needed."""
+    d = TOTPDevice.objects.filter(user=user).first() or TOTPDevice.objects.create(user=user, name="a", confirmed=True)
+    code = format(TOTP(d.bin_key, d.step, d.t0, d.digits).token(), f"0{d.digits}d")
+    r = client.post("/admin/login/", {"username": user.username, "password": password, "otp_token": code,
+                                      "otp_device": d.persistent_id})
+    assert r.status_code == 302, "admin login failed"
+
+
+def perm(code):
+    app, codename = code.split(".")
+    return Permission.objects.get(content_type__app_label=app, codename=codename)
+
+
+@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+class OwnerAndStaffTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.owner = User.objects.create_superuser("boss", "boss@x.com", "pass-1234-word")
+        self.clerk = User.objects.create_user("clerk", "clerk@x.com", "pass-1234-word", is_staff=True)
+        self.clerk.user_permissions.set([perm("shop.view_order"), perm("shop.change_order"),
+                                         perm("auth.view_user"), perm("auth.change_user")])
+        self.order = Order.objects.create(user=None, subtotal=100, delivery_fee=60, total=160, **ADDR)
+
+    def as_owner(self):
+        admin_login(self.client, self.owner)
+
+    def as_clerk(self):
+        admin_login(self.client, self.clerk)
+
+    # The one owner
+
+    def test_only_one_owner_can_exist(self):
+        with self.assertRaises(DjangoValidationError):
+            User.objects.create_superuser("second", "s@x.com", "pass-1234-word")
+        self.clerk.is_superuser = True
+        with self.assertRaises(DjangoValidationError):
+            self.clerk.save()
+
+    def test_sync_owner_creates_owner_from_env_and_demotes_the_old_one(self):
+        env = {"OWNER_USERNAME": "rafi", "OWNER_EMAIL": "Rafi@X.com", "OWNER_PASSWORD": "a-long-owner-pass-77"}
+        with mock.patch.dict("os.environ", env):
+            call_command("sync_owner", stdout=io.StringIO())
+        rafi = User.objects.get(username="rafi")
+        self.assertTrue(rafi.is_superuser and rafi.is_staff and rafi.check_password("a-long-owner-pass-77"))
+        self.assertEqual(rafi.email, "rafi@x.com")
+        self.assertFalse(User.objects.get(username="boss").is_superuser)
+        # Run again with a new password: kept unless --reset-password, so a password changed on the site survives.
+        with mock.patch.dict("os.environ", {**env, "OWNER_PASSWORD": "another-owner-pass-88"}):
+            call_command("sync_owner", stdout=io.StringIO())
+            self.assertTrue(User.objects.get(username="rafi").check_password("a-long-owner-pass-77"))
+            call_command("sync_owner", "--reset-password", stdout=io.StringIO())
+        self.assertTrue(User.objects.get(username="rafi").check_password("another-owner-pass-88"))
+
+    def test_sync_owner_refuses_weak_password_and_taken_email(self):
+        with mock.patch.dict("os.environ", {"OWNER_USERNAME": "rafi", "OWNER_EMAIL": "r@x.com", "OWNER_PASSWORD": "123"}):
+            with self.assertRaises(CommandError):
+                call_command("sync_owner", stdout=io.StringIO())
+        with mock.patch.dict("os.environ", {"OWNER_USERNAME": "rafi", "OWNER_EMAIL": "clerk@x.com",
+                                            "OWNER_PASSWORD": "a-long-owner-pass-77"}):
+            with self.assertRaises(CommandError):
+                call_command("sync_owner", stdout=io.StringIO())
+        self.assertTrue(User.objects.get(username="boss").is_superuser)
+
+    # Users admin: nobody climbs above their own permissions
+
+    def test_superuser_box_is_never_shown(self):
+        self.as_owner()
+        r = self.client.get(f"/admin/auth/user/{self.clerk.pk}/change/")
+        self.assertEqual(r.status_code, 200)
+        self.assertNotIn("is_superuser", r.context["adminform"].form.fields)
+
+    def test_staff_cannot_edit_or_delete_the_owner(self):
+        self.clerk.user_permissions.add(perm("auth.delete_user"))
+        self.as_clerk()
+        r = self.client.post(f"/admin/auth/user/{self.owner.pk}/change/", {"username": "boss", "email": "evil@x.com"})
+        self.assertEqual(r.status_code, 403)
+        self.assertEqual(self.client.post(f"/admin/auth/user/{self.owner.pk}/delete/", {"post": "yes"}).status_code, 403)
+        self.assertEqual(User.objects.get(pk=self.owner.pk).email, "boss@x.com")
+
+    def test_staff_can_only_hand_out_permissions_they_hold(self):
+        self.as_clerk()
+        r = self.client.get(f"/admin/auth/user/{self.clerk.pk}/change/")
+        self.assertNotIn("user_permissions", r.context["adminform"].form.fields)  # not even their own
+        customer = User.objects.create_user("cust", "cust@x.com")
+        r = self.client.get(f"/admin/auth/user/{customer.pk}/change/")
+        choices = r.context["adminform"].form.fields["user_permissions"].queryset
+        self.assertIn(perm("shop.change_order"), choices)
+        self.assertNotIn(perm("shop.delete_product"), choices)
+
+    # Staff page
+
+    def test_staff_page_needs_permission_to_change_users(self):
+        helper = User.objects.create_user("helper", "h@x.com", "pass-1234-word", is_staff=True)
+        admin_login(self.client, helper)
+        self.assertEqual(self.client.get("/admin/staff/").status_code, 403)
+        self.client.logout()
+        self.as_owner()
+        self.assertContains(self.client.get("/admin/staff/"), "clerk@x.com")
+
+    def test_invite_by_email_then_accept_makes_staff_with_those_permissions(self):
+        self.as_owner()
+        r = self.client.post("/admin/staff/", {"email": "New@X.com", "perms": [perm("shop.view_product").pk]})
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(mail.outbox[0].to, ["new@x.com"])
+        link = urlparse(next(w for w in mail.outbox[0].body.split() if "/admin/staff/join/" in w)).path
+        self.client.logout()
+        page = self.client.get(link)
+        self.assertContains(page, "new@x.com")
+        key = self.client.session["staff_invite"]["key"]
+        t = TOTPDevice(key=key)
+        code = format(TOTP(t.bin_key, t.step, t.t0, t.digits).token(), "06d")
+        form = {"username": "newbie", "password1": "a-good-pass-1234", "password2": "a-good-pass-1234"}
+        self.assertContains(self.client.post(link, {**form, "code": "000000" if code != "000000" else "111111"}), "wrong")
+        r = self.client.post(link, {**form, "code": code})
+        self.assertEqual(r.status_code, 302)
+        newbie = User.objects.get(username="newbie")
+        self.assertTrue(newbie.is_staff and not newbie.is_superuser)
+        self.assertEqual(newbie.get_all_permissions(), {"shop.view_product"})
+        self.assertFalse(StaffInvite.objects.exists())
+        self.assertEqual(self.client.get(link).status_code, 404)  # single use
+        admin_login(self.client, newbie, "a-good-pass-1234")  # the device from the invite works
+
+    def test_invite_link_expires(self):
+        self.as_owner()
+        self.client.post("/admin/staff/", {"email": "late@x.com"})
+        link = urlparse(next(w for w in mail.outbox[0].body.split() if "/admin/staff/join/" in w)).path
+        StaffInvite.objects.update(sent=timezone.now() - timedelta(days=4))
+        self.assertEqual(self.client.get(link).status_code, 404)
+
+    def test_resend_replaces_the_old_link(self):
+        self.as_owner()
+        self.client.post("/admin/staff/", {"email": "again@x.com"})
+        invite = StaffInvite.objects.get()
+        self.client.post(f"/admin/staff/invite/{invite.pk}/", {"action": "resend"})
+        old, new = [urlparse(next(w for w in m.body.split() if "/admin/staff/join/" in w)).path for m in mail.outbox]
+        self.assertEqual(self.client.get(old).status_code, 404)
+        self.assertEqual(self.client.get(new).status_code, 200)
+
+    def test_existing_customer_email_becomes_staff_at_once(self):
+        customer = User.objects.create_user("cust", "cust@x.com")
+        self.as_owner()
+        self.client.post("/admin/staff/", {"email": "CUST@x.com", "perms": [perm("shop.view_order").pk]})
+        customer.refresh_from_db()
+        self.assertTrue(customer.is_staff)
+        self.assertEqual(customer.get_all_permissions(), {"shop.view_order"})
+        self.assertEqual(mail.outbox, [])
+
+    def test_staff_manager_cannot_grant_more_than_they_hold(self):
+        self.as_clerk()
+        self.client.post("/admin/staff/", {"email": "pal@x.com",
+                                           "perms": [perm("shop.view_order").pk, perm("shop.delete_product").pk]})
+        self.assertEqual({f"{p.content_type.app_label}.{p.codename}" for p in StaffInvite.objects.get().permissions.all()},
+                         {"shop.view_order"})
+
+    def test_staff_cannot_change_their_own_access_or_someone_above_them(self):
+        boss2 = User.objects.create_user("lead", "lead@x.com", is_staff=True)
+        boss2.user_permissions.set([perm("shop.delete_product")])
+        self.as_clerk()
+        self.assertEqual(self.client.post(f"/admin/staff/{self.clerk.pk}/", {"action": "remove"}).status_code, 403)
+        self.assertEqual(self.client.post(f"/admin/staff/{boss2.pk}/", {"action": "remove"}).status_code, 403)
+        self.assertEqual(self.client.post(f"/admin/staff/{self.owner.pk}/", {"action": "remove"}).status_code, 404)
+
+    def test_owner_edits_and_removes_staff(self):
+        self.as_owner()
+        self.client.post(f"/admin/staff/{self.clerk.pk}/", {"perms": [perm("shop.view_order").pk]})
+        self.assertEqual(User.objects.get(pk=self.clerk.pk).get_all_permissions(), {"shop.view_order"})
+        self.client.post(f"/admin/staff/{self.clerk.pk}/", {"action": "remove"})
+        clerk = User.objects.get(pk=self.clerk.pk)
+        self.assertFalse(clerk.is_staff)
+        self.assertEqual(clerk.get_all_permissions(), set())
+
+    # Orders: the owner may break the rules, after a warning
+
+    def order_form(self, **changes):
+        o = self.order
+        data = {"status": o.status, "full_name": o.full_name, "phone": o.phone, "email": o.email,
+                "address": o.address, "city": o.city, "items-TOTAL_FORMS": "0", "items-INITIAL_FORMS": "0"}
+        if self.client.session.get("_auth_user_id") == str(self.owner.pk):
+            data.update(user="", payment=o.payment, subtotal=o.subtotal, delivery_fee=o.delivery_fee, total=o.total)
+        return {**data, **changes}
+
+    def test_staff_still_cannot_delete_orders(self):
+        self.clerk.user_permissions.add(perm("shop.delete_order"))
+        self.as_clerk()
+        self.assertEqual(self.client.post(f"/admin/shop/order/{self.order.pk}/delete/", {"post": "yes"}).status_code, 403)
+        self.assertTrue(Order.objects.filter(pk=self.order.pk).exists())
+
+    def test_owner_deleting_a_pending_order_puts_stock_back(self):
+        cat = Category.objects.create(name="C", slug="c")
+        p = Product.objects.create(category=cat, name="P", slug="p", price=50, image="https://x.y/a.jpg", stock=3)
+        self.order.items.create(product=p, name="P", price=50, quantity=2)
+        self.as_owner()
+        self.assertContains(self.client.get(f"/admin/shop/order/{self.order.pk}/delete/"), "Owner only")
+        self.client.post(f"/admin/shop/order/{self.order.pk}/delete/", {"post": "yes"})
+        self.assertFalse(Order.objects.filter(pk=self.order.pk).exists())
+        self.assertEqual(Product.objects.get(pk=p.pk).stock, 5)
+
+    def test_owner_edits_money_only_after_ticking_the_warning(self):
+        self.as_owner()
+        url = f"/admin/shop/order/{self.order.pk}/change/"
+        self.assertContains(self.client.post(url, self.order_form(total=999)), "breaks the order rules")
+        self.assertEqual(Order.objects.get(pk=self.order.pk).total, 160)
+        self.assertEqual(self.client.post(url, self.order_form(total=999, confirm_override="on")).status_code, 302)
+        self.assertEqual(Order.objects.get(pk=self.order.pk).total, 999)
+
+    def test_owner_can_reopen_a_cancelled_order_after_the_warning(self):
+        Order.objects.filter(pk=self.order.pk).update(status="cancelled")
+        self.order.refresh_from_db()
+        self.as_owner()
+        url = f"/admin/shop/order/{self.order.pk}/change/"
+        self.assertContains(self.client.post(url, self.order_form(status="pending")), "breaks the order rules")
+        self.assertEqual(self.client.post(url, self.order_form(status="pending", confirm_override="on")).status_code, 302)
+        self.assertEqual(Order.objects.get(pk=self.order.pk).status, "pending")
+
+    def test_plain_status_change_needs_no_tick(self):
+        self.as_owner()
+        r = self.client.post(f"/admin/shop/order/{self.order.pk}/change/", self.order_form(status="shipped"))
+        self.assertEqual(r.status_code, 302)

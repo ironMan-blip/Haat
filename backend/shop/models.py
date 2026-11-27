@@ -282,7 +282,11 @@ class Order(models.Model):
             return self.UNSHIP_ERROR
         return None
 
+    override = False  # the owner ticked "I understand" in the admin: status rules are skipped (shop/admin.py)
+
     def clean(self):  # friendly form error; save() enforces the same rule under the row lock
+        if self.override:
+            return
         was = Order.objects.filter(pk=self.pk).values_list("status", flat=True).first() if self.pk else None
         if error := self.refusal(was):
             raise ValidationError(error)
@@ -292,7 +296,7 @@ class Order(models.Model):
         with transaction.atomic():
             was = Order.objects.select_for_update().filter(pk=self.pk).values_list("status", flat=True).first() \
                 if self.pk else None
-            if error := self.refusal(was):  # e.g. two admins racing
+            if not self.override and (error := self.refusal(was)):  # e.g. two admins racing
                 raise ValidationError(error)
             super().save(*args, **kwargs)
             if self.status == "cancelled" and was == "pending":
@@ -312,3 +316,17 @@ class OrderItem(models.Model):
     quantity = models.PositiveIntegerField()
     variant = models.ForeignKey(ProductVariant, null=True, blank=True, on_delete=models.SET_NULL)
     options = models.CharField(max_length=300, blank=True)  # snapshot of the buyer's choices, e.g. "Size: M · Color: Blue"
+
+
+class StaffInvite(models.Model):
+    """An email the owner (or staff allowed to manage users) invited to join as staff, waiting for them to accept.
+    Only a hash of the link's key is kept, so reading the database doesn't hand out working invite links."""
+    DAYS = 3  # the link stops working this long after it was (re)sent
+    email = models.EmailField(unique=True)
+    key_hash = models.CharField(max_length=64)
+    permissions = models.ManyToManyField("auth.Permission", blank=True)
+    invited_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
+    sent = models.DateTimeField()
+
+    def __str__(self):
+        return f"Invite for {self.email}"

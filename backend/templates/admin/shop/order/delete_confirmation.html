@@ -1,0 +1,5 @@
+{% extends "admin/delete_confirmation.html" %}
+{% block content %}
+<p class="errornote">Owner only. Deleting removes the order from your records for good: sales totals and history change. A pending order's items are put back in stock first; shipped or delivered goods are not.</p>
+{{ block.super }}
+{% endblock %}

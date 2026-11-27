@@ -36,6 +36,12 @@ A simple general store for Bangladesh. React (Vite, Tailwind CSS, shadcn/ui) fro
 - Remove abusive comments
 - `seed` command loads 47 cleaned Daraz products; `scripts/fetch_daraz.py` re-pulls them
 - `admin_totp` command sets up or resets a seller's authenticator
+- One owner (the only superuser), set from `backend/.env` by `sync_owner`; a second superuser is refused
+- Staff page (`/admin/staff/`): add staff by email (existing account, or an invite link valid 3 days that also
+  sets up their authenticator), tick what each may do, remove them. Anyone with "change user" can use it, but
+  only hands out permissions they hold and only changes people who hold nothing more
+- The owner may add or delete orders, edit their money and items, or reopen cancelled ones, after ticking a
+  warning; staff never can. Deleting a pending order puts its stock back first
 
 **Safety**
 - Prices from the database, stock locked and decremented in one transaction
@@ -58,7 +64,8 @@ createdb haat                                # PostgreSQL; local socket by defau
 .venv/bin/python manage.py migrate
 .venv/bin/python manage.py seed              # 47 sample products from Daraz listings
 DJANGO_DEBUG=1 .venv/bin/python manage.py demo_data  # demo users, orders, comments, stock edge cases (password: see --help)
-.venv/bin/python manage.py createsuperuser   # for /admin
+cp .env.example .env                         # then fill in OWNER_USERNAME / OWNER_EMAIL / OWNER_PASSWORD
+.venv/bin/python manage.py sync_owner       # makes that account the shop's only owner (superuser)
 .venv/bin/python manage.py admin_totp <username>  # admin needs an authenticator-app code; scan the printed URL
 .venv/bin/python manage.py runserver 127.0.0.1:8000
 

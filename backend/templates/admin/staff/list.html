@@ -1,0 +1,58 @@
+{% extends "admin/base_site.html" %}
+{% block breadcrumbs %}<div class="breadcrumbs"><a href="{% url 'admin:index' %}">Home</a> &rsaquo; Staff</div>{% endblock %}
+{% block content %}
+<div class="module haat-staff">
+  <h2>Add a staff member</h2>
+  <form method="post" action="{% url 'admin:staff' %}">{% csrf_token %}
+    <p><label for="staff-email">Their email</label><br>
+      <input type="email" id="staff-email" name="email" required class="vTextField" autocomplete="off" placeholder="name@example.com"></p>
+    <p class="help">If they already have a Haat account with this email, they become staff now. If not, they get an invite email with a link to set up their account.</p>
+    <h3>What they can do</h3>
+    {% include "admin/staff/_grid.html" %}
+    <div class="submit-row"><input type="submit" class="default" value="Add staff"></div>
+  </form>
+</div>
+
+<div class="module haat-staff">
+  <h2>Staff ({{ staff|length }})</h2>
+  <table>
+    <thead><tr><th scope="col">Email</th><th scope="col">Username</th><th scope="col">Can do</th><th scope="col">Last login</th><th scope="col"></th></tr></thead>
+    <tbody>
+    {% for s in staff %}
+      <tr>
+        <td>{{ s.user.email|default:"-" }}</td>
+        <td>{{ s.user.username }}</td>
+        <td>{{ s.perms }}{% if s.user.groups.all %} <span class="haat-muted">(plus groups: {{ s.user.groups.all|join:", " }})</span>{% endif %}</td>
+        <td>{{ s.user.last_login|default:"Never" }}</td>
+        <td>{% if s.editable %}<a class="button" href="{% url 'admin:staff_edit' s.user.pk %}">Edit</a>{% elif s.user == user %}<span class="haat-muted">You</span>{% else %}<span class="haat-muted">Has more access than you</span>{% endif %}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5">No staff yet. Add someone above.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if invites %}
+<div class="module haat-staff">
+  <h2>Invites waiting</h2>
+  <table>
+    <thead><tr><th scope="col">Email</th><th scope="col">Will be able to</th><th scope="col">Sent</th><th scope="col"></th></tr></thead>
+    <tbody>
+    {% for i in invites %}
+      <tr>
+        <td>{{ i.invite.email }}</td>
+        <td>{{ i.perms }}</td>
+        <td>{{ i.invite.sent }}{% if i.expired %} <span class="haat-badge haat-cancelled">Expired</span>{% else %} <span class="haat-badge haat-pending">Waiting</span>{% endif %}</td>
+        <td>{% if i.editable %}
+          <form method="post" action="{% url 'admin:staff_invite' i.invite.pk %}" class="haat-inline">{% csrf_token %}
+            <button class="button" name="action" value="resend">Resend</button>
+            <button class="button haat-danger-btn" name="action" value="cancel">Cancel</button>
+          </form>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

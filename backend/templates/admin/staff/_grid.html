@@ -1,0 +1,16 @@
+<table class="haat-perms">
+  <thead><tr><th scope="col">Section</th><th scope="col">View</th><th scope="col">Add</th><th scope="col">Change</th><th scope="col">Delete</th></tr></thead>
+  <tbody>
+  {% for row in grid %}
+    <tr>
+      <th scope="row">{{ row.label }} <span class="haat-muted">{{ row.app }}</span></th>
+      {% for cell in row.cells %}
+        <td>{% if cell %}<input type="checkbox" name="perms" value="{{ cell.pk }}" aria-label="{{ cell.action|capfirst }} {{ row.label }}"{% if cell.checked %} checked{% endif %}>{% else %}<span class="haat-muted" aria-label="Not available">-</span>{% endif %}</td>
+      {% endfor %}
+    </tr>
+  {% empty %}
+    <tr><td colspan="5">You have no permissions to hand out.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+<p class="help">View = see the list. Add = make new ones. Change = edit. Delete = remove. "Users: change" lets someone manage staff too, but only with the permissions they hold themselves.</p>
