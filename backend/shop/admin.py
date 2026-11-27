@@ -9,7 +9,7 @@ from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Count, F, Sum
+from django.db.models import Count, Exists, F, OuterRef, Sum
 from django.db.models.functions import TruncDate
 from django.http import HttpResponse
 from django.utils import timezone
@@ -18,7 +18,7 @@ from django_otp.admin import OTPAdminSite
 
 from .auth import client_ident, locked_out, login_fail_keys, record_login_failure
 from .display import cdn, taka
-from .models import COMMENT_PAGE, LOW_STOCK, Category, Comment, Order, OrderItem, Product, ProductImage, ProductOption, ProductVariant, options_error
+from .models import COMMENT_PAGE, LOW_STOCK, Category, Comment, Order, OrderItem, Product, ProductImage, ProductOption, ProductVariant, options_error, variant_keys
 
 log = logging.getLogger("shop.security")
 
@@ -172,8 +172,16 @@ class OptionFormSet(forms.BaseInlineFormSet):
         names = [d["name"].strip().lower() for d in kept]
         if len(names) != len(set(names)):
             raise forms.ValidationError("Each option needs its own name.")
-        if error := options_error([(d["name"], ProductOption(values=d["values"]).choices) for d in kept]):
+        options = [(d["name"], ProductOption(values=d["values"]).choices) for d in kept]
+        if error := options_error(options):
             raise forms.ValidationError(error)
+        # Renaming an option or fixing a typo in a choice makes new combinations: the old ones, with their stock
+        # and price, would be deleted. Refuse while any of them still holds stock.
+        if self.instance.pk and (lost := self.instance.variants.filter(stock__gt=0).exclude(key__in=variant_keys(options))):
+            raise forms.ValidationError(
+                f"This change removes combinations that still have stock: {', '.join(v.label for v in lost)}. "
+                "Set their stock to 0 and save first, then change the options. New combinations start with 0 stock "
+                "and the product's price.")
 
 
 class ProductOptionInline(admin.TabularInline):
@@ -288,6 +296,22 @@ class ProductAdmin(admin.ModelAdmin):
         # With options, stock is the total of the combinations below; Product.clean() guards the list page too.
         has_variants = obj is not None and obj.variants.exists()
         return [*self.readonly_fields, "stock"] if has_variants else self.readonly_fields
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).annotate(has_variants=Exists(ProductVariant.objects.filter(product=OuterRef("pk"))))
+
+    def get_changelist_form(self, request, **kwargs):
+        class Form(super().get_changelist_form(request, **kwargs)):
+            def __init__(self, *args, **kw):
+                super().__init__(*args, **kw)
+                # A stale stock number from the list page would fail Product.clean() or overwrite a sale.
+                if getattr(self.instance, "has_variants", False):
+                    self.fields["stock"].disabled = True
+        return Form
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        obj.sync_stock()  # the save wrote the stock read before any order placed meanwhile; re-total it
 
     def save_related(self, request, form, formsets, change):
         super().save_related(request, form, formsets, change)

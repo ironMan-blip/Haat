@@ -44,6 +44,13 @@ def options_error(options):
     return None
 
 
+def variant_keys(options):
+    """The key of every combination of options given as (name, choices) pairs; none without options."""
+    names = [name for name, _ in options]
+    return {choice_key(dict(zip(names, combo))) for combo in itertools.product(*(c for _, c in options))} \
+        if options else set()
+
+
 class Category(models.Model):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(unique=True)
@@ -113,27 +120,30 @@ class Product(models.Model):
 
     def clean(self):
         # A product with options sells its variants; its stock is their total, kept by sync_stock().
-        if self.pk and self.variants.exists():
+        # Refuse only an edited number: a stored total that is already wrong is fixed on save, not a reason to refuse.
+        if self.pk and self.variants.exists() and self.stock != Product.objects.get(pk=self.pk).stock:
             total = self.variants.aggregate(s=Sum("stock"))["s"]
             if self.stock != total:
                 raise ValidationError({"stock": f"This product's stock is the total of its option combinations "
                                                 f"({total}). Change it on the product page, per combination."})
 
     def sync_stock(self):
-        """Stock of a product with variants = their total. One UPDATE, so a parallel order can't be overwritten."""
+        """Stock of a product with variants = their total. Checkout holds the product's row lock while it takes
+        variant stock, so wait for that lock first: the total is then summed after any running order commits."""
         if self.variants.exists():
-            total = ProductVariant.objects.filter(product=OuterRef("pk")).values("product").annotate(s=Sum("stock")).values("s")
-            Product.objects.filter(pk=self.pk).update(stock=Coalesce(Subquery(total), 0))
+            with transaction.atomic():
+                list(Product.objects.select_for_update().filter(pk=self.pk).values_list("pk", flat=True))
+                total = ProductVariant.objects.filter(product=OuterRef("pk")).values("product").annotate(s=Sum("stock")).values("s")
+                Product.objects.filter(pk=self.pk).update(stock=Coalesce(Subquery(total), 0))
             self.refresh_from_db(fields=["stock"])
 
     def sync_variants(self, stock=0):
         """One variant per combination of option choices: adds missing ones with `stock`, drops ones no longer
         possible, then re-totals stock. Returns how many were added."""
-        options = list(self.options.all())
-        if error := options_error([(o.name, o.choices) for o in options]):
+        options = [(o.name, o.choices) for o in self.options.all()]
+        if error := options_error(options):
             raise ValidationError(error)
-        keys = {choice_key(dict(zip([o.name for o in options], combo)))
-                for combo in itertools.product(*(o.choices for o in options))} if options else set()
+        keys = variant_keys(options)
         self.variants.exclude(key__in=keys).delete()
         new = keys - set(self.variants.values_list("key", flat=True))
         ProductVariant.objects.bulk_create(ProductVariant(product=self, key=k, stock=stock) for k in new)

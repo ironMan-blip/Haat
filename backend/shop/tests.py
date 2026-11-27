@@ -815,6 +815,38 @@ class AdminPanelTests(TestCase):
         self.assertEqual(sorted(v.label for v in p.variants.all()), ["Color: Black", "Color: Blue"])
         self.assertEqual(p.stock, 0)  # new combinations start empty until staff set their stock
 
+    def test_option_change_that_drops_stocked_combinations_is_refused(self):
+        p = self.phone
+        opt = p.options.create(name="Colour", values="Black, Blue")
+        p.sync_variants(stock=3)
+        p.variants.filter(key="Colour=Blue").update(stock=0)
+        form = {"name": p.name, "slug": p.slug, "category": p.category_id, "description": "", "price": p.price,
+                "original_price": "", "image": "https://example.com/a.jpg", "rating": "0", "reviews": 0,
+                "photos-TOTAL_FORMS": 0, "photos-INITIAL_FORMS": 0, "variants-TOTAL_FORMS": 0, "variants-INITIAL_FORMS": 0,
+                "comments-TOTAL_FORMS": 0, "comments-INITIAL_FORMS": 0, "options-TOTAL_FORMS": 1, "options-INITIAL_FORMS": 1,
+                "options-0-id": opt.pk, "options-0-product": p.pk, "options-0-name": "Color",
+                "options-0-values": "Black, Blue", "options-0-position": 0}
+        url = f"/admin/shop/product/{p.pk}/change/"
+        r = self.post(url, form)  # a rename would delete Black's 3 in stock
+        self.assertContains(r, "still have stock: Colour: Black.")  # Blue has none, so it isn't named
+        self.assertEqual(sorted(p.variants.values_list("key", flat=True)), ["Colour=Black", "Colour=Blue"])
+        p.variants.update(stock=0)  # the product's stored total (3) is now wrong: saving must fix, not refuse
+        self.assertEqual(self.post(url, form).status_code, 302)  # nothing in stock is lost now
+        self.assertEqual(sorted(p.variants.values_list("key", flat=True)), ["Color=Black", "Color=Blue"])
+        p.refresh_from_db()
+        self.assertEqual(p.stock, 0)
+
+    def test_list_page_cannot_overwrite_stock_of_a_product_with_options(self):
+        p = self.phone
+        p.options.create(name="Color", values="Black, Blue")
+        p.sync_variants(stock=3)  # stock 6
+        price = p.price + 1
+        form = {"form-TOTAL_FORMS": 1, "form-INITIAL_FORMS": 1, "form-0-id": p.pk, "form-0-price": price,
+                "form-0-original_price": "", "form-0-stock": 99, "_save": "Save"}
+        self.assertEqual(self.post("/admin/shop/product/", form).status_code, 302)
+        p.refresh_from_db()
+        self.assertEqual((p.price, p.stock), (price, 6))  # the price changed; the typed stock was ignored
+
     def test_lists_show_status_pills_and_theme(self):
         self.assertContains(self.get("/admin/shop/order/"), 'haat-badge haat-pending')
         r = self.get("/admin/shop/product/")
