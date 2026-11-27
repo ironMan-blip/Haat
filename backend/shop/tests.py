@@ -193,6 +193,22 @@ class ShopApiTests(APITestCase):
         self.assertEqual(shirt.sync_variants(stock=2), 4)
         return shirt
 
+    def test_option_text_too_long_to_store_is_refused_and_long_choices_still_sell(self):
+        p = Product.objects.create(category=self.phone.category, name="Kurta", slug="kurta", price=500,
+                                   image="https://x.y/d.jpg")
+        # Bengali is 9 characters per letter once URL-encoded: these overflowed the variant key.
+        p.options.create(name="সাইজ বাছাই করুন", values="অতিরিক্ত বড় মাপের", position=0)
+        p.options.create(name="রঙ বাছাই করুন", values="গাঢ় নীল রঙের জামা", position=1)
+        with self.assertRaisesMessage(DjangoValidationError, "too long"):
+            p.sync_variants()
+        p.options.all().delete()
+        p.options.create(name="Size", values="X" * 150)  # fits the order snapshot, so the cart takes it
+        p.sync_variants(stock=2)
+        r = self.client.post("/api/cart/", {"product": p.pk, "quantity": 1, "options": {"Size": "X" * 150}}, format="json")
+        self.assertEqual(r.status_code, 200)
+        total = self.client.get("/api/cart/").data["total"]
+        self.assertEqual(self.client.post("/api/orders/", {**ADDR, "expected_total": total}, format="json").status_code, 201)
+
     def test_product_options_pick_a_variant_with_its_own_stock_and_price(self):
         from urllib.parse import quote
         shirt = self.shirt()

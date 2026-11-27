@@ -159,7 +159,9 @@ class OrderItemSerializer(serializers.ModelSerializer):
 class CartLineSerializer(serializers.Serializer):
     product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.prefetch_related("options", "variants"))
     quantity = serializers.IntegerField(min_value=1, max_value=MAX_QTY)
-    options = serializers.DictField(child=serializers.CharField(max_length=100), required=False, default=dict)
+    # Any choice the admin accepts fits the order's snapshot of the choices; pick() checks the rest.
+    options = serializers.DictField(child=serializers.CharField(max_length=OrderItem._meta.get_field("options").max_length),
+                                    required=False, default=dict)
 
     def validate(self, attrs):
         attrs["variant"] = pick(attrs["product"], attrs["options"])

@@ -27,6 +27,23 @@ def choice_key(chosen):
     return urlencode(sorted(chosen.items()))
 
 
+def options_error(options):
+    """Why options, as (name, choices) pairs, can't be sold as variants, or None. The admin form asks first;
+    sync_variants() enforces it. Long or Bengali text (9 characters per letter once URL-encoded) can overflow
+    the variant key or the order's snapshot of the choices."""
+    if not all(c for _, c in options):  # ProductOption.clean() reports an option without choices
+        return None
+    if (n := math.prod(len(c) for _, c in options)) > MAX_VARIANTS:
+        return (f"These options make {n} combinations; the most is {MAX_VARIANTS}. "
+                "Use fewer choices, or sell some as separate products.")
+    longest_key = choice_key({name: max(c, key=lambda v: len(choice_key({name: v}))) for name, c in options})
+    longest_label = " · ".join(f"{name}: {max(c, key=len)}" for name, c in options)
+    if len(longest_key) > ProductVariant._meta.get_field("key").max_length \
+            or len(longest_label) > OrderItem._meta.get_field("options").max_length:
+        return "These option names and choices are too long to save together. Shorten them or use fewer options."
+    return None
+
+
 class Category(models.Model):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(unique=True)
@@ -113,8 +130,8 @@ class Product(models.Model):
         """One variant per combination of option choices: adds missing ones with `stock`, drops ones no longer
         possible, then re-totals stock. Returns how many were added."""
         options = list(self.options.all())
-        if math.prod(len(o.choices) for o in options) > MAX_VARIANTS:  # the admin form refuses this first
-            raise ValidationError(f"Options would make more than {MAX_VARIANTS} combinations.")
+        if error := options_error([(o.name, o.choices) for o in options]):
+            raise ValidationError(error)
         keys = {choice_key(dict(zip([o.name for o in options], combo)))
                 for combo in itertools.product(*(o.choices for o in options))} if options else set()
         self.variants.exclude(key__in=keys).delete()

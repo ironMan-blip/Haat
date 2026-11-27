@@ -1,5 +1,4 @@
 import logging
-import math
 from datetime import timedelta
 
 from django import forms
@@ -19,7 +18,7 @@ from django_otp.admin import OTPAdminSite
 
 from .auth import client_ident, locked_out, login_fail_keys, record_login_failure
 from .display import cdn, taka
-from .models import COMMENT_PAGE, LOW_STOCK, MAX_VARIANTS, Category, Comment, Order, OrderItem, Product, ProductImage, ProductOption, ProductVariant
+from .models import COMMENT_PAGE, LOW_STOCK, Category, Comment, Order, OrderItem, Product, ProductImage, ProductOption, ProductVariant, options_error
 
 log = logging.getLogger("shop.security")
 
@@ -173,10 +172,8 @@ class OptionFormSet(forms.BaseInlineFormSet):
         names = [d["name"].strip().lower() for d in kept]
         if len(names) != len(set(names)):
             raise forms.ValidationError("Each option needs its own name.")
-        counts = [len({v.strip() for v in d["values"].split(",") if v.strip()}) for d in kept]
-        if math.prod(counts) > MAX_VARIANTS:
-            raise forms.ValidationError(f"These options make {math.prod(counts)} combinations; the most is "
-                                        f"{MAX_VARIANTS}. Use fewer choices, or sell some as separate products.")
+        if error := options_error([(d["name"], ProductOption(values=d["values"]).choices) for d in kept]):
+            raise forms.ValidationError(error)
 
 
 class ProductOptionInline(admin.TabularInline):
