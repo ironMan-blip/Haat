@@ -412,6 +412,9 @@ class ShopApiTests(APITestCase):
         self.assertEqual(p["summary"], "6GB RAM · 128GB")
         self.assertEqual([r["slug"] for r in p["related"]], ["case"])
         self.assertEqual(p["category"]["slug"], "mobiles")
+        self.assertEqual(p["related_title"], f"More in {self.phone.category.name}")
+        cats = self.client.get("/api/products/?category=mobiles").data["categories"]
+        self.assertEqual([(c["slug"], c["current"]) for c in cats], [("", False), ("mobiles", True)])  # "All" first
         # List payloads carry tiles only: no long description or nested category per product.
         tile = self.client.get("/api/products/").data["results"][0]
         self.assertFalse({"description", "category"} & tile.keys())
@@ -476,11 +479,18 @@ class ShopApiTests(APITestCase):
 
     def test_comment_edit_delete_reply_and_like(self):
         url = "/api/products/phone/comments/"
-        top = self.client.post(url, {"text": "Battery?"}, format="json").data["id"]
+        t0 = self.client.post(url, {"text": "Battery?"}, format="json").data
+        top = t0["id"]
+        self.assertEqual((t0["replies"], t0["reply_count"], t0["replies_label"]), ([], 0, None))  # a new, empty thread
         other = User.objects.create_user("karim", password="pass-1234-word")
         karim = APIClient()
         karim.force_authenticate(other)
-        reply = karim.post(url, {"text": "Lasts a day", "parent": top}, format="json").data["id"]
+        r = karim.post(url, {"text": "Lasts a day", "parent": top}, format="json").data
+        reply = r["id"]
+        self.assertEqual(r["thread"], {"id": top, "reply_count": 1, "replies_label": "View replies (1)"})
+        extra = karim.post(url, {"text": "Two days", "parent": top}, format="json").data
+        self.assertEqual(extra["thread"]["replies_label"], "View replies (2)")
+        self.assertEqual(karim.delete(f"/api/comments/{extra['id']}/").data["thread"]["replies_label"], "View replies (1)")
         self.assertEqual(karim.post(url, {"text": "x", "parent": reply}, format="json").status_code, 400)  # one level
         self.assertEqual(karim.post("/api/products/case/comments/", {"text": "x", "parent": top},
                                     format="json").status_code, 400)  # another product's thread
@@ -514,6 +524,7 @@ class ShopApiTests(APITestCase):
         newest = first["results"][0]
         self.assertEqual([r["text"] for r in newest["replies"]], [f"r{i}" for i in range(10)])  # oldest first
         self.assertEqual((newest["reply_count"], first["results"][1]["reply_count"]), (12, 0))
+        self.assertEqual((newest["replies_label"], first["results"][1]["replies_label"]), ("View replies (12)", None))
         Comment.objects.create(product=self.phone, user=self.user, text="new")  # arrives mid-paging
         second = self.client.get(f"{url}?before={first['next']}").data
         self.assertEqual(([c["text"] for c in second["results"]], second["next"]), (["c1", "c0"], None))

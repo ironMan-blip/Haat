@@ -16,7 +16,7 @@ from rest_framework.response import Response
 from ..auth import AnonThrottle, CommentActionThrottle, CommentThrottle, UserThrottle
 from ..display import cdn, items, num, taka
 from ..models import COMMENT_PAGE, Category, Comment, Order, Product
-from ..serializers import CategorySerializer, CommentSerializer, ProductDetailSerializer, ProductSerializer
+from ..serializers import CategorySerializer, CommentSerializer, ProductDetailSerializer, ProductSerializer, thread_counts
 
 PAYMENT_HINTS = {"cod": "Pay the rider when it arrives"}
 SORTS = {"": "Newest", "price": "Price, low to high", "-price": "Price, high to low", "-rating": "Best rated"}
@@ -61,7 +61,9 @@ class ProductList(generics.ListAPIView):
             "title": title,
             "count_label": items(len(results)),
             "empty": empty,
-            "categories": CategorySerializer(cats, many=True).data,
+            # The category links, "All" first; `current` marks the one being shown.
+            "categories": [{"name": "All", "slug": "", "current": not slug},
+                           *({**d, "current": d["slug"] == slug} for d in CategorySerializer(cats, many=True).data)],
             "results": results,
         })
 
@@ -128,7 +130,6 @@ class ProductComments(generics.ListCreateAPIView):
             "delete_confirm": "Delete this comment? This can't be undone.",
             "more_label": "See more comments",
             "more_replies_label": "See more replies",
-            "show_replies_label": "View replies ({n})",
             "hide_replies_label": "Hide replies",
             "results": CommentSerializer(rows, many=True, context={**self.get_serializer_context(), "threads": True}).data,
             "next": nxt,
@@ -137,13 +138,18 @@ class ProductComments(generics.ListCreateAPIView):
     def create(self, request, *args, **kwargs):
         response = super().create(request, *args, **kwargs)
         response.data["title"] = comments_title(self.product)  # the count went up
+        c = self.created
+        if c.parent_id:
+            response.data["thread"] = thread_counts(c.parent)  # the parent's reply count went up
+        else:  # a new, empty thread
+            response.data.update(replies=[], replies_next=None, **thread_counts(c, 0))
         return response
 
     def perform_create(self, serializer):
         parent = serializer.validated_data.get("parent")
         if parent and parent.product_id != self.product.pk:
             raise ValidationError({"parent": "You can only reply to a comment on this product."})
-        serializer.save(product=self.product, user=self.request.user)
+        self.created = serializer.save(product=self.product, user=self.request.user)
 
 
 @api_view(["GET"])
@@ -175,7 +181,7 @@ class CommentDetail(generics.UpdateAPIView, generics.DestroyAPIView):
     def destroy(self, request, *args, **kwargs):
         """Says what changed, so the page can update the comments it has loaded without reloading them."""
         c = self.get_object()
-        removed, placeholder = [], None
+        removed, placeholder, thread = [], None, None
         if c.replies.exists():  # keep other people's replies: leave a placeholder instead
             c.text, c.deleted = "", True
             c.save(update_fields=["text", "deleted"])
@@ -188,7 +194,9 @@ class CommentDetail(generics.UpdateAPIView, generics.DestroyAPIView):
             if parent and parent.deleted and not parent.replies.exists():  # its last reply went: drop the placeholder
                 removed.append(parent.pk)
                 parent.delete()
-        return Response({"removed": removed, "comment": placeholder, "title": comments_title(c.product)})
+            elif parent:
+                thread = thread_counts(parent)  # its reply count went down
+        return Response({"removed": removed, "comment": placeholder, "thread": thread, "title": comments_title(c.product)})
 
 
 @api_view(["POST", "DELETE"])

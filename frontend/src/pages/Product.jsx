@@ -136,7 +136,7 @@ function ProductPage({ slug }) {
           <Comments slug={slug} />
           {p.related.length > 0 && (
             <Page>
-              <h2 className="mb-6">More in {p.category.name}</h2>
+              <h2 className="mb-6">{p.related_title}</h2>
               <TileGrid products={p.related} />
             </Page>
           )}

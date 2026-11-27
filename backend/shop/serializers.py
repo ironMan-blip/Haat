@@ -58,7 +58,8 @@ class ProductDetailSerializer(ProductSerializer):
                 "gallery": [{**g, "alt": f"{p.name}, photo {i} of {len(gallery)}"} for i, g in enumerate(gallery, 1)],
                 "options": [{"name": o.name, "values": o.choices} for o in p.options.all()],
                 # The page shows the picked combination's price and stock once every option is chosen.
-                "variants": [variant_data(p, v) for v in p.variants.all()]}
+                "variants": [variant_data(p, v) for v in p.variants.all()],
+                "related_title": f"More in {p.category.name}"}
 
     def get_related(self, p):
         others = Product.objects.select_related("category").prefetch_related("options", "variants").filter(category=p.category_id).exclude(pk=p.pk)[:7]
@@ -103,8 +104,14 @@ class CommentSerializer(serializers.ModelSerializer):
             rs = c.first_replies  # prefetched by the view, one past the page to tell if there are more
             data["replies"] = CommentSerializer(rs[:COMMENT_PAGE], many=True, context=self.context).data
             data["replies_next"] = rs[COMMENT_PAGE - 1].pk if len(rs) > COMMENT_PAGE else None
-            data["reply_count"] = c.reply_count  # annotated by the view; the dropdown shows it while closed
+            data.update(thread_counts(c, c.reply_count))  # annotated by the view; the dropdown shows it while closed
         return data
+
+
+def thread_counts(c, n=None):
+    """A thread's reply count and its "View replies (n)" toggle text; sent again whenever a reply comes or goes."""
+    n = c.replies.count() if n is None else n
+    return {"id": c.pk, "reply_count": n, "replies_label": f"View replies ({num(n)})" if n else None}
 
 
 class RegisterSerializer(serializers.ModelSerializer):

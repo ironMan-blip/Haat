@@ -18,12 +18,8 @@ const merge = (list, more, dir) => {
 }
 // Applies a changed comment (edit, like, placeholder) wherever it is in the loaded threads.
 const swap = (list, c) => list.map((t) => (t.id === c.id ? { ...t, ...c } : t.replies ? { ...t, replies: swap(t.replies, c) } : t))
-// Removes comments by id; a thread's reply_count drops by the replies it lost.
-const drop = (list, ids) => list.filter((t) => !ids.includes(t.id)).map((t) => {
-  if (!t.replies) return t
-  const replies = drop(t.replies, ids)
-  return { ...t, replies, reply_count: t.reply_count - (t.replies.length - replies.length) }
-})
+// Removes comments by id, replies included; the server sends the thread's new counts separately.
+const drop = (list, ids) => list.filter((t) => !ids.includes(t.id)).map((t) => (t.replies ? { ...t, replies: drop(t.replies, ids) } : t))
 
 // Anyone reads; only signed-in customers post, reply, like, edit or delete. The server enforces the same rules.
 // Loads 10 threads (each with its first 10 replies, folded behind a toggle); "See more" fetches the next 10 of either.
@@ -53,17 +49,17 @@ export default function Comments({ slug }) {
     page, auth,
     post: (text, parent) => run(path, { method: 'POST', body: { text, parent } }).then((res) => {
       if (!res) return false
-      const { title, ...c } = res
+      const { title, thread, ...c } = res // a reply comes with its thread's new counts; a new thread comes empty
       setPage((p) => ({ ...p, title }))
-      setThreads((ts) => (parent ? ts.map((t) => (t.id === parent ? { ...t, replies: merge(t.replies, [c], 1), reply_count: t.reply_count + 1 } : t))
-        : merge(ts, [{ ...c, replies: [], replies_next: null, reply_count: 0 }], -1)))
+      setThreads((ts) => (parent ? ts.map((t) => (t.id === parent ? { ...t, ...thread, replies: merge(t.replies, [c], 1) } : t))
+        : merge(ts, [c], -1)))
       return true
     }),
     change: (url, opts) => run(url, opts).then((c) => { if (c) setThreads((ts) => swap(ts, c)); return Boolean(c) }),
     remove: (c) => run(`/comments/${c.id}/`, { method: 'DELETE' }).then((res) => {
       if (!res) return
       setPage((p) => ({ ...p, title: res.title }))
-      setThreads((ts) => drop(res.comment ? swap(ts, res.comment) : ts, res.removed))
+      setThreads((ts) => drop([res.comment, res.thread].reduce((l, x) => (x ? swap(l, x) : l), ts), res.removed))
     }),
     moreReplies: (t) => run(`/comments/${t.id}/replies/?after=${t.replies_next}`).then((d) => {
       if (d) setThreads((ts) => ts.map((x) => (x.id === t.id ? { ...x, replies: merge(x.replies, d.results, 1), replies_next: d.next } : x)))
@@ -126,9 +122,9 @@ function Comment({ c, ctx }) {
           )}
         </div>
       )}
-      {c.reply_count > 0 && (
+      {c.replies_label && (
         <Button type="button" variant="link" size="inline" className="justify-self-start" aria-expanded={open} onClick={() => setOpen(!open)}>
-          {open ? page.hide_replies_label : page.show_replies_label.replace('{n}', c.reply_count)} {open ? '▴' : '▾'}
+          {open ? page.hide_replies_label : c.replies_label} {open ? '▴' : '▾'}
         </Button>
       )}
       {open && c.replies?.length > 0 && (

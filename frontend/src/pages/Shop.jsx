@@ -15,7 +15,6 @@ const cat = `${pill} border bg-background hover:border-primary hover:text-primar
 export default function Shop() {
   const [params, setParams] = useSearchParams()
   const { config } = useStore()
-  const category = params.get('category') || ''
   const sort = params.get('sort') || ''
   const qs = params.toString()
   // The server sends the heading, item count, category links and empty-state text with the results.
@@ -36,9 +35,8 @@ export default function Shop() {
       <div className="mb-7 flex flex-wrap items-center justify-between gap-4 border-b pb-5">
         {/* Phones: one swipeable row, so products stay near the top. */}
         <nav aria-label="Categories" className="flex gap-2 *:flex-none max-md:-mx-gutter max-md:w-[calc(100%+2*var(--spacing-gutter))] max-md:overflow-x-auto max-md:px-gutter max-md:[scrollbar-width:none] md:flex-wrap">
-          <Link className={cat} to="/shop" aria-current={!category ? 'page' : undefined}>All</Link>
           {(data?.categories || []).map((c) => (
-            <Link className={cat} key={c.slug} to={`/shop?category=${c.slug}`} aria-current={c.slug === category ? 'page' : undefined}>{c.name}</Link>
+            <Link className={cat} key={c.slug} to={c.slug ? `/shop?category=${c.slug}` : '/shop'} aria-current={c.current ? 'page' : undefined}>{c.name}</Link>
           ))}
         </nav>
         <label className="flex items-center gap-2.5 font-medium">
