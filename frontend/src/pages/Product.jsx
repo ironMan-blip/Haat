@@ -30,7 +30,15 @@ function ProductPage({ slug }) {
               <Link to={`/shop?category=${p.category.slug}`}>{p.category.name}</Link>
             </nav>
             <div className="pdp-media">
-              <div className="pdp-pic">
+              <div
+                className="pdp-pic"
+                // Zoom toward the cursor: CSS reads --zx/--zy as the transform origin.
+                onMouseMove={(e) => {
+                  const r = e.currentTarget.getBoundingClientRect()
+                  e.currentTarget.style.setProperty('--zx', `${((e.clientX - r.left) / r.width) * 100}%`)
+                  e.currentTarget.style.setProperty('--zy', `${((e.clientY - r.top) / r.height) * 100}%`)
+                }}
+              >
                 <img src={p.gallery[shown].image_large} alt={p.gallery[shown].alt} width="800" height="800" />
               </div>
               {p.gallery.length > 1 && (

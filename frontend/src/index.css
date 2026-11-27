@@ -285,8 +285,9 @@ select { min-height: 44px; padding: 0 12px; border: 1px solid var(--line); borde
 .pdp { display: grid; grid-template-columns: 7fr 5fr; gap: clamp(24px, 4vw, 64px); align-items: start; }
 .pdp .crumbs { grid-column: 1 / -1; margin-bottom: 0; }
 .pdp-media { display: grid; gap: 12px; position: sticky; top: 88px; }
-.pdp-pic { background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-lg); display: grid; place-items: center; aspect-ratio: 1; }
-.pdp-pic img { width: 86%; mix-blend-mode: multiply; }
+.pdp-pic { background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-lg); display: grid; place-items: center; aspect-ratio: 1; overflow: hidden; cursor: zoom-in; }
+.pdp-pic img { width: 86%; mix-blend-mode: multiply; transform-origin: var(--zx, 50%) var(--zy, 50%); transition: transform .2s ease; }
+.pdp-pic:hover img { transform: scale(2); }
 .pdp-thumbs { display: flex; gap: 8px; overflow-x: auto; }
 .pdp-thumbs button { flex: 0 0 72px; aspect-ratio: 1; padding: 4px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-sm); cursor: pointer; }
 .pdp-thumbs button[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
