@@ -1,6 +1,12 @@
+import { ShoppingCart, User } from 'lucide-react'
 import { Link, NavLink, useNavigate, useSearchParams } from 'react-router-dom'
+import { cn } from 'cn'
 import { useStore } from '../useStore'
-import { CartIcon, UserIcon } from './icons'
+import { Button } from './ui/button'
+import { Input } from './ui/input'
+
+const nav = 'inline-flex h-11 items-center gap-1.5 rounded-lg px-2.5 font-medium text-foreground no-underline transition-colors hover:bg-muted md:px-3 [&_svg]:size-5.5 [&_svg]:flex-none'
+const navLink = ({ isActive }) => cn(nav, isActive && 'bg-secondary text-primary')
 
 export default function Header() {
   const { cart, count, auth, logout } = useStore()
@@ -12,29 +18,33 @@ export default function Header() {
     navigate(q ? `/shop?q=${encodeURIComponent(q)}` : '/shop')
   }
   return (
-    <header className="bar">
-      <Link to="/" className="wordmark">Haat</Link>
-      <form className="search" role="search" onSubmit={search}>
-        <label htmlFor="q" className="sr-only">Search products</label>
-        <input id="q" name="q" type="search" placeholder="Search phones, rice, bedsheets…" defaultValue={params.get('q') || ''} key={params.get('q')} />
-        <button className="btn">Search</button>
-      </form>
-      <nav className="bar-links" aria-label="Main">
-        <NavLink to="/shop">Shop</NavLink>
-        <NavLink to="/orders">Orders</NavLink>{/* guests see the orders this session placed */}
-        {auth ? (
-          <>
-            <span className="hello">Hi, {auth.username}</span>
-            <button className="link" onClick={logout}>Log out</button>
-          </>
-        ) : (
-          <NavLink to="/login" aria-label="Log in"><UserIcon /><span className="label-wide">Log in</span></NavLink>
-        )}
-        <NavLink to="/cart" aria-label={cart?.count_label ?? 'Cart'}>
-          <CartIcon /><span className="label-wide">Cart</span>
-          <span className="cart-count" data-n={count}>{count}</span>
-        </NavLink>
-      </nav>
+    <header className="sticky top-0 z-20 border-b bg-background/90 backdrop-blur-md backdrop-saturate-150">
+      <div className="mx-auto flex max-w-site flex-wrap items-center gap-x-[clamp(12px,2vw,28px)] gap-y-2.5 px-gutter py-3 md:flex-nowrap">
+        <Link to="/" className="inline-flex items-center gap-2 text-2xl font-bold tracking-[-0.03em] no-underline before:grid before:size-8 before:place-items-center before:rounded-lg before:bg-primary before:text-lg before:text-primary-foreground before:content-['H']">Haat</Link>
+        <form className="order-3 flex flex-1 basis-full md:order-none md:max-w-155 md:basis-auto" role="search" onSubmit={search}>
+          <label htmlFor="q" className="sr-only">Search products</label>
+          <Input id="q" name="q" type="search" placeholder="Search phones, rice, bedsheets…" defaultValue={params.get('q') || ''} key={params.get('q')}
+            className="h-11 rounded-r-none border-r-0 border-border bg-page focus-visible:bg-background focus-visible:ring-0" />
+          <Button className="h-11 rounded-l-none">Search</Button>
+        </form>
+        <nav className="ml-auto flex items-center whitespace-nowrap md:ml-0 md:gap-1" aria-label="Main">
+          <NavLink to="/shop" className={navLink}>Shop</NavLink>
+          <NavLink to="/orders" className={navLink}>Orders</NavLink>{/* guests see the orders this session placed */}
+          {auth ? (
+            <>
+              <span className="hidden pl-2 text-small text-muted-foreground md:inline">Hi, {auth.username}</span>
+              <button className={nav} onClick={logout}>Log out</button>
+            </>
+          ) : (
+            <NavLink to="/login" aria-label="Log in" className={navLink}><User aria-hidden="true" strokeWidth={1.75} /><span className="hidden lg:inline">Log in</span></NavLink>
+          )}
+          <NavLink to="/cart" aria-label={cart?.count_label ?? 'Cart'} className={navLink}>
+            <ShoppingCart aria-hidden="true" strokeWidth={1.75} /><span className="hidden lg:inline">Cart</span>
+            <span className={cn('inline-grid h-5.5 min-w-5.5 place-items-center rounded-full px-1.5 text-xs font-bold',
+              count ? 'bg-primary text-primary-foreground' : 'bg-border text-muted-foreground')}>{count}</span>
+          </NavLink>
+        </nav>
+      </div>
     </header>
   )
 }

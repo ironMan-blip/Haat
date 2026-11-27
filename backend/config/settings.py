@@ -109,6 +109,17 @@ LOGGING = {
 
 OTP_TOTP_ISSUER = 'Haat admin'
 
+# Mail carries the links that add a guest order to the account with its email. Dev prints them to the console.
+if DEBUG:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'localhost')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', '1') == '1'
+EMAIL_TIMEOUT = 10  # sign-in waits on the send; a hung server must not hang it
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'Haat <no-reply@localhost>')
+
 # Frontend talks to /api via the Vite dev proxy, so no CORS setup needed.
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': ['shop.auth.ExpiringTokenAuthentication'],
@@ -127,7 +138,8 @@ REST_FRAMEWORK = {
     # Mobile carriers put many people behind one IP (CGNAT), so this stays loose.
     # guest_order: orders without an account, per IP; loose for CGNAT, the per-phone cap is the real limit.
     'DEFAULT_THROTTLE_RATES': {'anon': '120/min', 'user': '300/min', 'auth': '5/min', 'signup': '50/day',
-                               'guest_order': '30/hour'},
+                               'guest_order': '30/hour', 'comment': '20/hour',
+                               'comment_action': '120/hour'},
     # Client IP comes from REMOTE_ADDR, so a forged X-Forwarded-For can't dodge throttles.
     # Set to the number of reverse proxies in front of Django when deployed behind one.
     'NUM_PROXIES': int(os.environ.get('DJANGO_NUM_PROXIES', '0')),
@@ -137,11 +149,13 @@ FREE_DELIVERY_MIN = 299  # taka; Cartup-style free delivery threshold
 DELIVERY_FEE = 60
 MAX_PENDING_ORDERS = 5  # per buyer and per phone number; COD orders cost nothing, so this stops stock hoarding
 TOKEN_TTL_DAYS = 30  # API tokens die after this; logging in again issues a fresh one
-# Failed logins, then locked out for LOGIN_LOCKOUT_SECONDS. Per username on the API and admin logins
-# together (else the API is a password oracle for admin accounts), and also per IP on the admin login.
-# Tradeoff: anyone can lock a known username out for a while. Mobile carriers share IPs, so the API
-# login keeps only its per-minute IP throttle, not an IP lockout.
+# Failed logins, then locked out for LOGIN_LOCKOUT_SECONDS (see shop.auth.login_fail_keys). Counted on
+# the API and admin logins together (else the API is a password oracle for admin accounts): per username
+# and IP, per username from anywhere, and per IP on the admin login. Mobile carriers share IPs, so the
+# API login keeps only its per-minute IP throttle, not an IP lockout.
+# Tradeoff: locking a customer out takes failures from ~10 IPs, not one; staff stay at LOGIN_MAX_FAILS.
 LOGIN_MAX_FAILS = 5
+LOGIN_MAX_FAILS_PER_ACCOUNT = 50
 LOGIN_LOCKOUT_SECONDS = 15 * 60
 
 ADMIN_PATH = os.environ.get('DJANGO_ADMIN_PATH', 'admin/')  # use a non-default path in production

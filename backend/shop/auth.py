@@ -56,19 +56,40 @@ class GuestOrderThrottle(AnonThrottle):
         return request.method != "POST" or super().allow_request(request, view)
 
 
-def login_fail_keys(username, request=None):
-    """Failure counters shared by the API and admin logins, so neither is a way round the other's lockout.
+class CommentThrottle(UserThrottle):
+    """Comments posted per account; reading them is not counted."""
+    scope = "comment"
+
+    def allow_request(self, request, view):
+        return request.method != "POST" or super().allow_request(request, view)
+
+
+class CommentActionThrottle(UserThrottle):
+    """Edits, deletes, likes and unlikes per account, so a script can't hammer them."""
+    scope = "comment_action"
+
+
+def login_fail_keys(username, request, ip_lock=False):
+    """{failure counter: failures allowed}, shared by the API and admin logins so neither is a way round
+    the other's lockout. Per account and IP at LOGIN_MAX_FAILS, so one IP can't lock a customer out; per
+    account everywhere at LOGIN_MAX_FAILS_PER_ACCOUNT (LOGIN_MAX_FAILS for staff), against many IPs
+    guessing; per IP with `ip_lock` (admin only: mobile carriers share IPs).
     Usernames can't differ only by case (see RegisterSerializer), so one counter per lowercased name.
     Both logins strip spaces, the admin also applies NFKC and DRF takes a JSON number, so the key does
     too: else " rahim" or "ｒａｈｉｍ" would be a fresh counter that still guesses rahim's password."""
     if isinstance(username, (str, int)) and not isinstance(username, bool):
         username = unicodedata.normalize("NFKC", str(username)).strip()[:150].lower()
-    keys = [f"login-fails:user:{username}"] if isinstance(username, str) and username else []
-    return keys + ([f"login-fails:ip:{client_ident(request)}"] if request else [])
+    ip = client_ident(request)
+    keys = {f"login-fails:ip:{ip}": settings.LOGIN_MAX_FAILS} if ip_lock else {}
+    if isinstance(username, str) and username:
+        staff = User.objects.filter(username__iexact=username, is_staff=True).exists()
+        keys[f"login-fails:user:{username}"] = settings.LOGIN_MAX_FAILS if staff else settings.LOGIN_MAX_FAILS_PER_ACCOUNT
+        keys[f"login-fails:user-ip:{username}:{ip}"] = settings.LOGIN_MAX_FAILS
+    return keys
 
 
 def locked_out(keys):
-    return any(cache.get(k, 0) >= settings.LOGIN_MAX_FAILS for k in keys)
+    return any(cache.get(k, 0) >= limit for k, limit in keys.items())
 
 
 def record_login_failure(keys):

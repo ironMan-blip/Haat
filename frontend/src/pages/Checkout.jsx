@@ -1,8 +1,17 @@
 import { useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { api } from '../api'
+import Fail from '../components/Fail'
+import Page from '../components/Page'
 import Status from '../components/Status'
 import Summary from '../components/Summary'
+import { Button } from '../components/ui/button'
+import { Input } from '../components/ui/input'
+import { Label } from '../components/ui/label'
+import { NativeSelect, NativeSelectOption } from '../components/ui/native-select'
+import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group'
+import { Textarea } from '../components/ui/textarea'
+import { checkoutGrid, checkoutHead, formCard, hint } from '../lib/styles'
 import { useStore } from '../useStore'
 
 export default function Checkout() {
@@ -39,31 +48,41 @@ export default function Checkout() {
   }
 
   return (
-    <section className="page checkout-grid">
-      <form className="form form-card" onSubmit={submit}>
-        <h1>Delivery details</h1>
-        {!auth && <p className="soft">Ordering as a guest. <Link to="/login?next=/checkout">Log in</Link> to track orders on any device.</p>}
-        <label>Full name<input name="full_name" required autoComplete="name" /></label>
-        <label>Mobile number
-          <input name="phone" type="tel" required placeholder="01712345678" autoComplete="tel" />
-          <span className="hint">The rider will call this number before delivery.</span>
-        </label>
-        <label>City
-          <select name="city" required>
-            {config.cities.map((c) => <option key={c}>{c}</option>)}
-          </select>
-        </label>
-        <label>Address<textarea name="address" required rows={3} placeholder="House, road, area" autoComplete="street-address" /></label>
+    <Page className={checkoutGrid}>
+      <form className={formCard} onSubmit={submit}>
+        <h1 className={checkoutHead}>Delivery details</h1>
+        {!auth && <p className="text-muted-foreground">Ordering as a guest. <Link to="/login?next=/checkout">Log in</Link> to track orders on any device.</p>}
+        <Label>Full name<Input className="font-normal" name="full_name" required autoComplete="name" /></Label>
+        <Label>Mobile number
+          <Input className="font-normal" name="phone" type="tel" required placeholder="01712345678" autoComplete="tel" />
+          <span className={hint}>The rider will call this number before delivery.</span>
+        </Label>
+        {!auth && (
+          <Label>Email (optional)
+            <Input className="font-normal" name="email" type="email" autoComplete="email" />
+            <span className={hint}>Sign up or log in with this email later and the order moves to your account.</span>
+          </Label>
+        )}
+        <Label>City
+          <NativeSelect className="w-full font-normal" name="city" required>
+            {config.cities.map((c) => <NativeSelectOption key={c}>{c}</NativeSelectOption>)}
+          </NativeSelect>
+        </Label>
+        <Label>Address<Textarea className="resize-y font-normal" name="address" required rows={3} placeholder="House, road, area" autoComplete="street-address" /></Label>
         <fieldset>
-          <legend>Payment</legend>
-          {config.payments.map((m, i) => (
-            <label className="radio" key={m.value}><input type="radio" name="payment" value={m.value} defaultChecked={!i} /> {m.label} {m.hint && <span className="hint">{m.hint}</span>}</label>
-          ))}
+          <legend className="mb-2 text-[0.9375rem] font-semibold">Payment</legend>
+          <RadioGroup name="payment" defaultValue={config.payments[0]?.value}>
+            {config.payments.map((m) => (
+              <Label key={m.value} className="flex items-center gap-3 rounded-lg border border-primary bg-secondary px-4 py-3.5 font-medium">
+                <RadioGroupItem value={m.value} className="size-5" /> {m.label} {m.hint && <span className={hint}>{m.hint}</span>}
+              </Label>
+            ))}
+          </RadioGroup>
         </fieldset>
-        {error && <p className="alert" role="alert">{error}</p>}
-        <button className="btn btn--wide" disabled={busy}>{busy ? 'Placing order…' : 'Place order'}</button>
+        {error && <Fail>{error}</Fail>}
+        <Button className="w-full" disabled={busy}>{busy ? 'Placing order…' : 'Place order'}</Button>
       </form>
       <Summary />
-    </section>
+    </Page>
   )
 }

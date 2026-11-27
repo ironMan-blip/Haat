@@ -1,6 +1,13 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { cn } from 'cn'
 import { api } from '../api'
+import Fail from '../components/Fail'
+import Page from '../components/Page'
+import { Button } from '../components/ui/button'
+import { Input } from '../components/ui/input'
+import { Label } from '../components/ui/label'
+import { formCard, hint } from '../lib/styles'
 import { useStore } from '../useStore'
 
 export default function Login() {
@@ -28,30 +35,31 @@ export default function Login() {
   }
 
   return (
-    <section className="page auth">
-      <form className="form form-card" onSubmit={submit}>
+    <Page className="grid min-h-[60vh] place-items-center">
+      <form className={cn(formCard, 'max-w-110')} onSubmit={submit}>
         <div>
-          <h1>{mode === 'login' ? 'Welcome back' : 'Create an account'}</h1>
-          <p className="soft">{mode === 'login' ? 'Log in to track your orders on any device.' : 'It takes less than a minute.'}</p>
+          <h1 className="text-[1.75rem]">{mode === 'login' ? 'Welcome back' : 'Create an account'}</h1>
+          <p className="mt-1.5 text-muted-foreground">{mode === 'login' ? 'Log in to track your orders on any device.' : 'It takes less than a minute.'}</p>
         </div>
         <input type="hidden" name="next" value={params.get('next') || ''} />
-        <label>Username<input name="username" required autoComplete="username" /></label>
-        {mode === 'register' && <label>Email <span className="hint">(optional)</span><input name="email" type="email" autoComplete="email" /></label>}
-        <label>Password
-          <span className="pw">
-            <input name="password" type={show ? 'text' : 'password'} required
+        <Label>{mode === 'login' ? 'Username or email' : 'Username'}<Input className="font-normal" name="username" required autoComplete="username" /></Label>
+        {mode === 'register' && <Label>Email<Input className="font-normal" name="email" type="email" required autoComplete="email" /></Label>}
+        <Label>Password
+          <span className="relative block">
+            <Input className="pr-18 font-normal" name="password" type={show ? 'text' : 'password'} required
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'} />
-            <button type="button" className="link" onClick={() => setShow(!show)} aria-pressed={show}>{show ? 'Hide' : 'Show'}</button>
+            <Button type="button" variant="link" size="inline" className="absolute top-1/2 right-1 h-10 -translate-y-1/2 px-3 text-small"
+              onClick={() => setShow(!show)} aria-pressed={show}>{show ? 'Hide' : 'Show'}</Button>
           </span>
-          {mode === 'register' && config && <span className="hint">{config.password_rules.join(' ')}</span>}
-        </label>
-        {error && <p className="alert" role="alert">{error}</p>}
-        <button className="btn btn--wide" disabled={busy}>{busy ? 'Please wait…' : mode === 'login' ? 'Log in' : 'Create account'}</button>
-        <button type="button" className="link" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError('') }}>
+          {mode === 'register' && config && <span className={hint}>{config.password_rules.join(' ')}</span>}
+        </Label>
+        {error && <Fail>{error}</Fail>}
+        <Button className="w-full" disabled={busy}>{busy ? 'Please wait…' : mode === 'login' ? 'Log in' : 'Create account'}</Button>
+        <Button type="button" variant="link" size="inline" className="justify-self-center" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError('') }}>
           {mode === 'login' ? 'New here? Create an account' : 'Have an account? Log in'}
-        </button>
-        {params.get('next') === '/checkout' && <Link to="/checkout" className="link">Continue as guest</Link>}
+        </Button>
+        {params.get('next') === '/checkout' && <Button asChild variant="link" size="inline" className="justify-self-center"><Link to="/checkout">Continue as guest</Link></Button>}
       </form>
-    </section>
+    </Page>
   )
 }

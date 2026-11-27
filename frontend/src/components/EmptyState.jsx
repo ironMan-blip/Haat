@@ -1,10 +1,10 @@
 export default function EmptyState({ icon, title, children, action }) {
   return (
-    <div className="state">
-      <span className="state-icon" aria-hidden="true">{icon}</span>
+    <div className="grid justify-items-center gap-3.5 px-gutter py-[clamp(48px,10vw,120px)] text-center">
+      <span className="mb-1 grid size-18 place-items-center rounded-full bg-muted text-muted-foreground [&_svg]:size-8" aria-hidden="true">{icon}</span>
       <h1>{title}</h1>
-      {children && <p>{children}</p>}
-      {action}
+      {children && <p className="max-w-[44ch] text-muted-foreground">{children}</p>}
+      {action && <div className="mt-2">{action}</div>}
     </div>
   )
 }

@@ -1,6 +1,6 @@
 # Haat — MVP e-commerce
 
-A simple general store for Bangladesh. React (Vite) frontend, Django + DRF backend, PostgreSQL.
+A simple general store for Bangladesh. React (Vite, Tailwind CSS, shadcn/ui) frontend, Django + DRF backend, PostgreSQL.
 "Haat" (হাট) is the open village market; the design lays products out like goods at a haat stall.
 
 ## Features
@@ -8,7 +8,9 @@ A simple general store for Bangladesh. React (Vite) frontend, Django + DRF backe
 **Buyers**
 - Home page with deals, best rated products and a category menu
 - Shop by category, search, and sort by price or rating
-- Product pages with discount, specs, stock level, max quantity and related products
+- Product pages with discount, specs, stock level, max quantity, photo gallery and related products
+- Product options (e.g. Size, Color): each combination is a variant with its own stock and optional price
+- Comments on product pages for signed-in buyers: one-level replies, likes, edit (marked edited), delete (kept as a placeholder when it has replies); cursor-paged
 - Quick-add buttons on product tiles; out-of-stock states
 - Guest session cart with totals and a free-delivery meter (free at ৳299+, else ৳60)
 - Register / login with password visibility toggle; tokens expire after 30 days
@@ -17,8 +19,8 @@ A simple general store for Bangladesh. React (Vite) frontend, Django + DRF backe
 - Phone numbers typed in Bengali digits (০১৭…) are accepted and stored as ASCII
 - Cart auto-fixes itself (sold out, less stock, max qty) and tells the buyer why; header shows "Cart, N items"
 - Payment options and their hints come from `/api/config/` (cash on delivery for now)
-- Order history (own orders only) with status badges; guest orders from the same browser move to the account on login when the phone matches a past order
-- Toast messages, empty states, scroll-reveal animations, star rating labels
+- Order history (own orders only) with status badges; guest orders from the same browser move to the account on login or sign-up when their phone got an earlier account order delivered, or, when their optional email is the account's, after the buyer opens the link mailed to that address
+- Lucide icons, lazy-loaded routes (stale chunks after a deploy reload the page), toast messages, empty states, scroll-reveal animations, star rating labels
 - Responsive product images (200/400/800px copies from the Daraz CDN)
 - Every price, date, badge and label comes pre-formatted from the API (taka, Indian digit grouping)
 - Safe `next` redirect after login/register
@@ -29,7 +31,9 @@ A simple general store for Bangladesh. React (Vite) frontend, Django + DRF backe
   (search by id/name/phone, bulk mark shipped/delivered/cancelled), users with their orders, API tokens, 2FA devices
 - Admin 2FA (authenticator app) with lockout after 5 failures
 - Cancelling a pending order restores stock once; cancelled orders can't be reopened; orders can't be deleted
-- Live image preview when editing a product
+- Live image preview when editing a product; product options, variant stock/price and extra photos inline
+- Admin product saves refuse to overwrite stock sold since the page loaded
+- Remove abusive comments
 - `seed` command loads 47 cleaned Daraz products; `scripts/fetch_daraz.py` re-pulls them
 - `admin_totp` command sets up or resets a seller's authenticator
 
@@ -53,6 +57,7 @@ createdb haat                                # PostgreSQL; local socket by defau
                                              # other DB: POSTGRES_DB/USER/PASSWORD/HOST/PORT
 .venv/bin/python manage.py migrate
 .venv/bin/python manage.py seed              # 47 sample products from Daraz listings
+DJANGO_DEBUG=1 .venv/bin/python manage.py demo_data  # demo users, orders, comments, stock edge cases (password: see --help)
 .venv/bin/python manage.py createsuperuser   # for /admin
 .venv/bin/python manage.py admin_totp <username>  # admin needs an authenticator-app code; scan the printed URL
 .venv/bin/python manage.py runserver 127.0.0.1:8000
@@ -77,7 +82,7 @@ frontend `npm audit`, lint and build.
 ```mermaid
 flowchart LR
   subgraph FE["Frontend · React 19 + Vite :5174"]
-    Pages["Pages: Home · Shop · Product<br/>Cart · Checkout · Login · Orders"]
+    Pages["Pages: Home · Shop · Product<br/>Cart · Checkout · Login · Orders · ClaimOrders"]
     Store["store.jsx<br/>auth token · last cart and config responses"]
     Pages --- Store
   end
@@ -85,14 +90,14 @@ flowchart LR
   FE -- "/api (Vite proxy)" --> API
 
   subgraph BE["Backend · Django 5.2 + DRF :8000"]
-    API["shop app REST API<br/>config · home · categories · products · cart<br/>auth register/login/logout · orders"]
+    API["shop app REST API<br/>config · home · categories · products · comments · cart<br/>auth register/login/logout · orders"]
     Rules["Cart + order rules (session cart)<br/>DB prices · stock lock · free delivery ≥ ৳299 else ৳60<br/>COD only · BD phone · listed city · max 5 pending<br/>auth throttle 5/min"]
     Admin["Django admin<br/>products · order status"]
     API --> Rules
   end
 
   subgraph DB["PostgreSQL"]
-    Models["Category → Product → OrderItem ← Order ← User"]
+    Models["Category → Product (options, variants, photos, comments)<br/>→ OrderItem ← Order ← User"]
   end
 
   Buyer([Buyer]) --> FE
@@ -108,10 +113,11 @@ flowchart LR
 frontend/  React 19 + react-router 7, no state library
   src/api.js         fetch wrapper, useFetch hook
   src/store.jsx      StoreProvider: auth token, the server's cart and config responses (hook: useStore.js)
-  src/components/    one file per shared component (Header, TileGrid, Summary, Qty, Footer, Status, Toast, ...)
-  src/pages/         Home, Shop (category/search/sort), Product, Cart, Checkout, Login, Orders
+  src/components/    one file per shared component (Header, TileGrid, Summary, Qty, Comments, Toast, ...); ui/ holds shadcn/ui
+  src/pages/         Home, Shop (category/search/sort), Product, Cart, Checkout, Login, Orders, ClaimOrders (emailed link)
 backend/   Django 5.2 LTS + DRF, one app: shop
-  shop/models.py      Category, Product (discount, stock level, specs, rank), Order, OrderItem
+  shop/models.py      Category, Product (discount, stock level, specs, rank), ProductOption, ProductVariant,
+                      ProductImage, Comment, Order, OrderItem
   shop/display.py     taka, Indian digit grouping, dates, image sizes: the API sends every string ready to print
   shop/cart.py        session cart: quantities, totals, delivery fee, free-delivery meter
   shop/auth.py        token expiry, CSRF check, client IP, login lockout
@@ -128,12 +134,17 @@ backend/   Django 5.2 LTS + DRF, one app: shop
 | `/api/config/` | GET | - | cities, sort options, payment options, password rules, footer copy and photo |
 | `/api/home/` | GET | - | wall, deals, best rated, category menu |
 | `/api/products/?category=&q=&sort=` | GET | - | `{title, count_label, empty, categories, results}`; sort: `price`, `-price`, `-rating` |
-| `/api/products/<slug>/` | GET | - | adds specs, stock level and label, max qty, related |
-| `/api/cart/` | GET, POST | - | session cart with totals; POST `{product, quantity}` adds |
-| `/api/cart/<id>/` | PATCH, DELETE | - | set `{quantity}` or remove a line |
+| `/api/products/<slug>/` | GET | - | adds specs, stock level and label, max qty, options, variants, photos, related |
+| `/api/products/<slug>/comments/` | GET, POST | POST: Token | top-level comments, cursor-paged, with reply counts |
+| `/api/comments/<id>/` | PATCH, DELETE | Token | edit or delete your own comment |
+| `/api/comments/<id>/replies/` | GET | - | replies to a comment |
+| `/api/comments/<id>/like/` | POST | Token | toggle your like |
+| `/api/cart/` | GET, POST | - | session cart with totals; POST `{product, quantity, options}` adds |
+| `/api/cart/<key>/` | PATCH, DELETE | - | set `{quantity}` or remove a line (key = product + chosen options) |
 | `/api/auth/register/` | POST | - | returns token, username, safe `next` path |
-| `/api/auth/login/` | POST | - | returns token, username, safe `next` path; claims matching guest orders |
+| `/api/auth/login/` | POST | - | returns token, username, safe `next` path; claims matching guest orders (sign-up too) |
 | `/api/auth/logout/` | POST | Token | revokes the token and wipes the session (cart, guest orders) |
+| `/api/orders/claim/` | POST | Token | takes the `token` from the emailed claim link; adds those guest orders if the link names this account and its email |
 | `/api/orders/` | GET, POST | optional | account's orders, or a guest's orders from this session; POST (CSRF) takes the address and `expected_total`, and orders the session cart |
 
 Every error response carries `message`: the one line the app shows. The frontend only renders: prices (`*_display`),
@@ -144,8 +155,8 @@ and decremented in one transaction; delivery is free at ৳299 and above, otherw
 cash on delivery; phone must be a Bangladeshi mobile number; city must be a listed city; a buyer can
 have at most 5 pending orders, and so can a phone number across all accounts and guests. Guest orders
 are throttled to 30 per hour per IP, rotate the session key, and are listed only to the session that
-placed them. On login they move to the account only if it has ordered to the same phone before (so a shared
-browser never hands one person's address to another); a new account claims none, and the session key rotates.
+placed them. On login or sign-up they move to the account only if they give the account's email or a phone it has
+ordered to before (so a shared browser never hands one person's address to another), and the session key rotates.
 If checkout's `expected_total` no longer matches the server total, the order is refused. Product price is at
 least ৳1. Deleting a user keeps their orders (user set to null). Login and register are
 throttled to 5 per minute per IP, and sign-ups to 50 per day per IP. Login tokens expire after 30 days and
@@ -169,6 +180,7 @@ and HTTPS redirect, HSTS and secure cookies turn on.
 | `DJANGO_ALLOWED_HOSTS` | comma-separated hostnames |
 | `DJANGO_ADMIN_PATH` | non-default admin path, e.g. `seller-x7k2/` |
 | `REDIS_URL` | e.g. `redis://localhost:6379/0`; required with more than one worker, so throttle and lockout counts are shared |
+| `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS`, `DEFAULT_FROM_EMAIL` | SMTP for the guest-order claim links (dev prints mail to the console) |
 | `DJANGO_NUM_PROXIES` | number of reverse proxies in front of Django (throttling uses the real client IP); above 0 also trusts the proxy's `X-Forwarded-Proto` for HTTPS |
 
 Run `manage.py collectstatic` (into `backend/staticfiles/`) so the admin has its CSS, and run
@@ -187,6 +199,6 @@ Also:
 
 ## Not in the MVP
 
-Online payment (bKash/SSLCommerz), product variants, reviews, pagination, order emails/SMS,
+Online payment (bKash/SSLCommerz), star reviews from buyers, product list pagination, order emails/SMS,
 returns, seller accounts. Product images are hotlinked from Daraz's CDN and listings copied from
 Daraz for demo only: replace them with your own before any public launch.

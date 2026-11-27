@@ -1,14 +1,25 @@
 [
  {
   "category": "Mobiles",
-  "name": "realme Note 80 4/64 | 6300mAh Battery | Official Warranty",
+  "name": "realme Note 80 | 6300mAh Battery | Official Warranty",
   "price": 16580,
   "original_price": 17999,
   "image": "https://bd-live-21.slatic.net/kf/S79071e4dcfe942c79bb65dc22075dafd4.jpg",
   "rating": 0.0,
-  "description": "OS: Realme UI 5.0 Based on Android 15\nChipset: Unisoc T7250 (12 nm)\nGPU: Mali-G57 MP1\nRAM: 4GB\nROM: 64GB\nSize: 6.74”\nDisplay Type: LCD\nResolution: HD+ (720 x 1600 pixels)\nRefresh Rate: Up to 90Hz\nScreen-to-Body Ratio: 85.6%\nRear Camera: 8MP; f/2.0; FOV 78°; 4P lens; AF Supported\nFront Camera: 5MP; f/2.2; FOV 77°; 3P lens\nCapacity: 6300mAh\nCharging: 15W Charging Supported\nPort: Type-C\nSIM Card Slot: Dual Nano SIM\nWLAN: Wi-Fi 802.11 a/b/g/n/ac, dual-band\nBluetooth: 5.2\nUSB Interface: USB Type-C\nNFC: Not-Supported\nOTG: Supported\nFingerprint (side-mounted) | accelerometer | gyro | proximity | compass",
+  "description": "OS: Realme UI 5.0 Based on Android 15\nChipset: Unisoc T7250 (12 nm)\nGPU: Mali-G57 MP1\nRAM and storage: 4GB + 64GB or 4GB + 128GB\nSize: 6.74”\nDisplay Type: LCD\nResolution: HD+ (720 x 1600 pixels)\nRefresh Rate: Up to 90Hz\nScreen-to-Body Ratio: 85.6%\nRear Camera: 8MP; f/2.0; FOV 78°; 4P lens; AF Supported\nFront Camera: 5MP; f/2.2; FOV 77°; 3P lens\nCapacity: 6300mAh\nCharging: 15W Charging Supported\nPort: Type-C\nSIM Card Slot: Dual Nano SIM\nWLAN: Wi-Fi 802.11 a/b/g/n/ac, dual-band\nBluetooth: 5.2\nUSB Interface: USB Type-C\nNFC: Not-Supported\nOTG: Supported\nFingerprint (side-mounted) | accelerometer | gyro | proximity | compass",
   "stock": 50,
-  "reviews": 0
+  "reviews": 0,
+  "options": {
+   "Storage": {
+    "4GB + 64GB": 0,
+    "4GB + 128GB": 2000
+   },
+   "Color": [
+    "Glacier Blue",
+    "Storm Black"
+   ]
+  },
+  "slug": "realme-note-80-464-6300mah-battery-official-warranty-1"
  },
  {
   "category": "Mobiles",
@@ -19,7 +30,13 @@
   "rating": 0.0,
   "description": "17 pro maxM-horse( mhorse) smartphoneColor: orange / Dark BlueNETWORK - Technology: GSM /WCDMA / LTE2G bands: GSM 850 / 900 / 1800 / 1900 ;3G bands: WCDMA B1/5/8;4G bands: LTE B1/3/5/7/8/20/38/40;BODY - Dimensions: 168.5 x 78.1 x 8.8 mm ;DISPLAY - Type: Punch-Hole Screen;DISPLAY - Size: 6.8'' HD + incell;DISPLAY - Resolution: 720 x 1600 pixels;PLATFORM - OS: Android 14.0 ; CPU: Octa-Core ;MEMORY - RAM/ROM: RAM 6+6= 12 GBROM 128GBCAMERA-Dual:32MP ,Front+13MP ,Rear 32Battery: 5000mAh Battery fast  charging ",
   "stock": 50,
-  "reviews": 0
+  "reviews": 0,
+  "options": {
+   "Color": [
+    "Orange",
+    "Dark Blue"
+   ]
+  }
  },
  {
   "category": "Mobiles",
@@ -30,7 +47,13 @@
   "rating": 3.0,
   "description": "Proton Glory i30+ Smartphone 12GB RAM 128GB ROM | Android 16 | 6000mAh Battery | 90Hz Display | 50MP Triple CameraPower That Keeps UpMTK G50 processor with 12GB Boosted RAM for smooth everyday multitasking.Big. Smooth. Immersive.Enjoy a spacious 6.745\" display with 90Hz refresh rate for fluid scrolling and entertainment.Capture More in Every ShotA 50MP Triple Rear Camera setup lets you capture your moments with impressive detail.Built for Longer DaysThe massive 6000mAh battery keeps you connected and entertained for longer.More Space, More FreedomWith 128GB internal storage, keep your apps, photos, videos and files close at hand.Modern Android ExperiencePowered by Android 16 for a fresh and user-friendly smartphone experience.Quick &amp; Secure AccessThe side-mounted fingerprint sensor provides convenient and secure unlocking.Premium Look &amp; FinishAvailable in sophisticated Dark Mirror and Titanium Storm colors.Peace of Mind IncludedComes with 1 Year Official Brand Warranty.",
   "stock": 50,
-  "reviews": 2
+  "reviews": 2,
+  "options": {
+   "Color": [
+    "Grey",
+    "Black"
+   ]
+  }
  },
  {
   "category": "Mobiles",
@@ -45,25 +68,49 @@
  },
  {
   "category": "Mobiles",
-  "name": "Realme C100i 4/64GB Smartphone – 7000mAh Battery, HD+ Display | Official Warranty",
+  "name": "Realme C100i Smartphone – 7000mAh Battery, HD+ Display | Official Warranty",
   "price": 18330,
   "original_price": 19999,
   "image": "https://bd-live-21.slatic.net/kf/Scea61ab5bb9b40b480d5528d2126b01cV.jpg",
   "rating": 4.9,
-  "description": "Performance: T7250 Octa-core Processor | 4GB LPDDR4X RAM | 128GB eMMC 5.1 Storage | realme UI (Android 16).\nDisplay: 6.8\" Eye-Comfort LCD | 120Hz Refresh Rate | 900 nits Peak Brightness (HBM) | 240Hz Touch Sampling Rate.\nCamera: 8MP Wide-angle Rear Camera (f/2.0) | 5MP Selfie Camera | Dual-view Video &amp; 10x Digital Zoom.\nBattery: 7000mAh Massive Titan Battery | 15W Fast Charging | Supports PD, QC, and Reverse Charging.  \nDesign: 8.38mm Slim Body | 208g Weight | Corning® Gorilla® Glass+ | Panda MN228 Protection.\nDurability: IP64 Dust &amp; Water Resistance | ArmorShell™ Protection | Military-Grade Shock Resistance.  \nAudio: 3.5mm Headphone Jack | 300% Ultra Volume Mode | LDAC &amp; Hi-Res Audio Codec Support.  \nSecurity: Side-mounted Fingerprint Sensor | AI Face Unlock.\nConnectivity: 4G LTE Dual SIM | Wi-Fi 5 | Bluetooth 5.2 | USB Type-C (OTG).",
+  "description": "Performance: T7250 Octa-core Processor | 4GB LPDDR4X RAM | 64GB or 128GB eMMC 5.1 Storage | realme UI (Android 16).\nDisplay: 6.8\" Eye-Comfort LCD | 120Hz Refresh Rate | 900 nits Peak Brightness (HBM) | 240Hz Touch Sampling Rate.\nCamera: 8MP Wide-angle Rear Camera (f/2.0) | 5MP Selfie Camera | Dual-view Video &amp; 10x Digital Zoom.\nBattery: 7000mAh Massive Titan Battery | 15W Fast Charging | Supports PD, QC, and Reverse Charging.  \nDesign: 8.38mm Slim Body | 208g Weight | Corning® Gorilla® Glass+ | Panda MN228 Protection.\nDurability: IP64 Dust &amp; Water Resistance | ArmorShell™ Protection | Military-Grade Shock Resistance.  \nAudio: 3.5mm Headphone Jack | 300% Ultra Volume Mode | LDAC &amp; Hi-Res Audio Codec Support.  \nSecurity: Side-mounted Fingerprint Sensor | AI Face Unlock.\nConnectivity: 4G LTE Dual SIM | Wi-Fi 5 | Bluetooth 5.2 | USB Type-C (OTG).",
   "stock": 50,
-  "reviews": 50
+  "reviews": 50,
+  "options": {
+   "Storage": {
+    "4GB + 64GB": 0,
+    "4GB + 128GB": 2000
+   },
+   "Color": [
+    "Dawn Purple",
+    "Dusk Gray"
+   ]
+  },
+  "slug": "realme-c100i-464gb-smartphone-7000mah-battery-hd-display-official-warranty-5"
  },
  {
   "category": "Mobiles",
-  "name": "Infinix XPAD 20 | 6GB RAM + 128GB ROM | 11\" Display | 1 Year Official Warranty",
+  "name": "Infinix XPAD 20 | 11\" Display | 1 Year Official Warranty",
   "price": 17999,
   "original_price": 19999,
   "image": "https://bd-live-21.slatic.net/kf/Sc14f82004a724d26a09d67e81023b0d6L.jpg",
   "rating": 4.8,
-  "description": "6GB RAM + 128GB ROM — smooth multitasking &amp; large storage capacity\n11\" Full HD Display — wide, vibrant, and perfect for entertainment or work\n8000mAh Battery — long-lasting power for all-day use\n8MP Rear Camera + 5MP Front Camera — clear photos and video calls\nQuad Speakers with DTS Audio — immersive sound experience\nMediaTek Helio G99 Processor — efficient and responsive performance\nAndroid 13 — clean, fast, and user-friendly interface\n1 Year Official Warranty",
+  "description": "6GB RAM + 128GB ROM or 8GB RAM + 256GB ROM — smooth multitasking &amp; large storage capacity\n11\" Full HD Display — wide, vibrant, and perfect for entertainment or work\n8000mAh Battery — long-lasting power for all-day use\n8MP Rear Camera + 5MP Front Camera — clear photos and video calls\nQuad Speakers with DTS Audio — immersive sound experience\nMediaTek Helio G99 Processor — efficient and responsive performance\nAndroid 13 — clean, fast, and user-friendly interface\n1 Year Official Warranty",
   "stock": 50,
-  "reviews": 5
+  "reviews": 5,
+  "options": {
+   "Storage": {
+    "6GB + 128GB": 0,
+    "8GB + 256GB": 3000
+   },
+   "Color": [
+    "Stellar Grey",
+    "Forest Green",
+    "Dreamy Purple",
+    "Rising Red"
+   ]
+  },
+  "slug": "infinix-xpad-20-6gb-ram-128gb-rom-11-display-1-year-official-warranty-6"
  },
  {
   "category": "Mobiles",
@@ -74,7 +121,13 @@
   "rating": 4.7,
   "description": "Powerful 8-Cores Processor\n13MP Main Camera\n5260mAh Long Lasting Battery\nOS: MagicOS 9.0 (Based on Android 15)\nChipset: MediaTek Helio G81\nCPU: Octa-core (2× Cortex-A75 @2.0GHz + 6× Cortex-A55 @1.7GHz)\nGPU: ARM Mali-G52 MC2\nRAM: 6GB (Expandable up to 6GB)\nStorage: 64GB\nSize: 6.74”\nType: TFTLCD\nRefresh Rate: 90Hz\nResolution: 1600 × 720\nColor Depth: 16.7 million colors\nAspect Ratio: 20:9\nTouch Support: Multi-touch, up to 10 touch points\nRear Camera: Main Camera: 13MP, f/2.2| Secondary Lens: QVGA 0.08MP\nRare Image Resolution: 4160x3120p\nFront Camera: Resolution: 5MP, f/2.2\nRare Image Resolution: 2592x1936p\nCapacity: 5260mAh\nCharging: 15W\nPort: USB Type-C\nSIM Card Slot: Dual Nano SIM\nWi-Fi: 802.11 a/b/g/n/ac (2.4GHz &amp; 5GHz)\nBluetooth: v5.1\nUSB: Type-C, USB 2.0\nGravity Sensor\nFingerprint Sensor\nAcceleration Sensor\nAmbient Light Sensor\nProximity Sensor",
   "stock": 50,
-  "reviews": 27
+  "reviews": 27,
+  "options": {
+   "Color": [
+    "Ocean Cyan",
+    "Midnight Black"
+   ]
+  }
  },
  {
   "category": "Mobiles",
@@ -173,7 +226,14 @@
   "rating": 4.5,
   "description": "Bluetooth 5.3 Latest Version for Stable Connection\nDeep Bass &amp; Environmental Noise Cancellation (ENC)\nTouch Control for Easy Music &amp; Call Handling\nLong 4 Hours Battery Life with Fast Type-C Charging\nComfortable &amp; Lightweight Design for All-Day Use",
   "stock": 50,
-  "reviews": 47
+  "reviews": 47,
+  "options": {
+   "Color": [
+    "Black",
+    "White",
+    "Blue"
+   ]
+  }
  },
  {
   "category": "Fashion",
@@ -184,7 +244,15 @@
   "rating": 4.6,
   "description": "Product Type: POLO SHIRT      \nMaterial: Cotton     \nGender: For Men     \nFit Type: Regular Fit    \nStylish Design    \n100% QC Pass.    \nQuality 100%    \n7 days Return Easy Return    \nMade in : Bangladesh                                   ",
   "stock": 50,
-  "reviews": 337
+  "reviews": 337,
+  "options": {
+   "Size": [
+    "M",
+    "L",
+    "XL",
+    "XXL"
+   ]
+  }
  },
  {
   "category": "Fashion",
@@ -195,7 +263,21 @@
   "rating": 4.6,
   "description": "NEW Stylish Premium Quality Fashionable POLO Shirt For MenProduct Type: POLO SHIRT  Material: Cotton Gender: For Men Fit Type: Regular FitStylish Design100% QC Pass.Quality 100%7 days Return Easy ReturnMade in : Bangladesh ",
   "stock": 50,
-  "reviews": 232
+  "reviews": 232,
+  "options": {
+   "Size": [
+    "M",
+    "L",
+    "XL",
+    "XXL"
+   ],
+   "Color": [
+    "Black",
+    "White",
+    "Navy",
+    "Maroon"
+   ]
+  }
  },
  {
   "category": "Fashion",
@@ -206,7 +288,14 @@
   "rating": 4.4,
   "description": "Sizes: M, L, XL*M-Length(দৈর্ঘ্য) 28\" chest(বুকে) 38\"L-Length(দৈর্ঘ্য) 29\" chest(বুকে) 40\"XL-Length (দৈর্ঘ্য) 30\" chest (বুকে) 42#polo t-shirtPremium-quality Polo shirt with 100% QC-pass product. The fabric and swing are of very high quality. This polo shirt is suitable for any condition of winter. It's casual-looking and also very stylish.About : Fabrify Wear is a trusted and reliable fashion product seller in all of Bangladesh. Dhaka Fashion Wear manufactures quality products. Always, we follow our quality. We provide premium-quality, 100% QC-pass products and always remind customers that “a return customer is our business asset.",
   "stock": 50,
-  "reviews": 101
+  "reviews": 101,
+  "options": {
+   "Size": [
+    "M",
+    "L",
+    "XL"
+   ]
+  }
  },
  {
   "category": "Fashion",
@@ -217,7 +306,15 @@
   "rating": 4.2,
   "description": "Product Type: Polo\nMaterial:100%(Cotton)\nGender: Men\nSoft and smooth fabric\nComfortable to wear\nRegular fit\nQuality 100%",
   "stock": 50,
-  "reviews": 224
+  "reviews": 224,
+  "options": {
+   "Size": [
+    "M",
+    "L",
+    "XL",
+    "XXL"
+   ]
+  }
  },
  {
   "category": "Fashion",
@@ -228,7 +325,20 @@
   "rating": 4.5,
   "description": "Sizes: M, L, XL*M-Length(দৈর্ঘ্য) 28\" chest(বুকে) 38\"L-Length(দৈর্ঘ্য) 29\" chest(বুকে) 40\"XL-Length (দৈর্ঘ্য) 30\" chest (বুকে) 42#polo t-shirtPremium-quality Polo shirt with 100% QC-pass product. The fabric and swing are of very high quality. This polo shirt is suitable for any condition of winter. It's casual-looking and also very stylish.About :Fabrify Wear is a trusted and reliable fashion product seller in all of Bangladesh. Dhaka Fashion Wear manufactures quality products. Always, we follow our quality. We provide premium-quality, 100% QC-pass products and always remind customers that “a return customer is our business asset.",
   "stock": 50,
-  "reviews": 156
+  "reviews": 156,
+  "options": {
+   "Size": [
+    "M",
+    "L",
+    "XL"
+   ],
+   "Color": [
+    "Black",
+    "White",
+    "Navy",
+    "Maroon"
+   ]
+  }
  },
  {
   "category": "Fashion",
@@ -239,7 +349,21 @@
   "rating": 4.7,
   "description": "NEW Stylish Premium Quality Fashionable POLO Shirt For MenProduct Type: POLO SHIRT  Material: Cotton Gender: For Men Fit Type: Regular FitStylish Design100% QC Pass.Quality 100%7 days Return Easy ReturnMade in : Bangladesh ",
   "stock": 50,
-  "reviews": 513
+  "reviews": 513,
+  "options": {
+   "Size": [
+    "M",
+    "L",
+    "XL",
+    "XXL"
+   ],
+   "Color": [
+    "Black",
+    "White",
+    "Navy",
+    "Maroon"
+   ]
+  }
  },
  {
   "category": "Fashion",
@@ -250,7 +374,15 @@
   "rating": 4.6,
   "description": "Brand : GoodMan\nProduct Type: Men's Polo Shirt.\nSummer Collection\nFabric: S/J - 200 GSM, Cotton Fabric, Soft Hand feel.\nWash: Softener and Silicon wash.\nFabric Test: Shrinkage Test, Color Fastness, Tear Strength, Pilling Resistance.\nStyle: Casual\nType: Polo Shirt.\nGender: Men\nProduction Country: Bangladesh\n100% Export Quality.\nColor: Brown (Same as Picture)",
   "stock": 50,
-  "reviews": 8
+  "reviews": 8,
+  "options": {
+   "Size": [
+    "M",
+    "L",
+    "XL",
+    "XXL"
+   ]
+  }
  },
  {
   "category": "Fashion",
@@ -261,7 +393,20 @@
   "rating": 0.0,
   "description": "English HighlightsMesh FabricSoft, Comfortable &amp; Breathable100% Color GuaranteeNo Color Fade After Repeated WashSuitable for Soap &amp; Bleach WashLight Iron RecommendedHalf Sleeve Polo T-ShirtComfortable for All SeasonsIdeal for Restaurant Staff, Company Branding, Office Uniform, Events &amp; Party CenterAvailable Sizes: M, L, XL, XXLAvailable Colors: White, Black, Navy Blue &amp; Moreবাংলা Highlightsমেশ ফেব্রিকনরম, আরামদায়ক ও বাতাস চলাচল উপযোগী১০০% কালার গ্যারান্টিবারবার ধুলেও রং ফেড হবে নাসাবান ও ব্লিচ দিয়ে ধোয়া যাবেহালকা তাপে আয়রন করুনহাফ স্লিভ পোলো টি-শার্টসব ঋতুতে পরার উপযোগীরেস্টুরেন্ট স্টাফ, কোম্পানি ব্র্যান্ডিং, অফিস ইউনিফর্ম, ইভেন্ট ও পার্টি সেন্টারের জন্য উপযুক্তসাইজ: M, L, XL, XXLরং: সাদা, কালো, নেভি ব্লু ও অন্যান্যWhite color Mesh Fabric Polo T-shirt for man&#39;s Fabric: Mesh Color: White , 100% Color GuaranteeSize: M to XXL Available Qty: 1000 pcs Gsm: 160+",
   "stock": 50,
-  "reviews": 0
+  "reviews": 0,
+  "options": {
+   "Size": [
+    "M",
+    "L",
+    "XL",
+    "XXL"
+   ],
+   "Color": [
+    "White",
+    "Black",
+    "Navy Blue"
+   ]
+  }
  },
  {
   "category": "Home & Living",
@@ -272,7 +417,14 @@
   "rating": 4.5,
   "description": "কাপড়ে পানা ৫ ফিট হয় ৬ ফিট করার জন্য এক সাইডে জয়েন্ট হবে যেটা খুব সুন্দর করে সেলাই করা বুজা যায়না\nকলার প্রতিনিয়ত পরিবর্তন হয় মেসেজ এর মাধ্যমে দেখে নিতে পারেন\nভীষণ ঠান্ডা ও আরামদায়ক হবে, মোটেও গরম ফিল হবে না\nময়লা হবে না সহজেই\nপানি লিক করার সম্ভাবনা ০%\nকিং সাইজ (৬ ফিট × ৭ ফিট) আপনার বিছানায় পুরোপুরি ফিট হবে\nটেকসই এবং দীর্ঘস্থায়ী অনেক দিন ধরে নিশ্চিন্তে ব্যবহার করতে পারবেন\nইজিলি ওয়াশেবল পরিষ্কার করতে কোনো\nঝামেলা নেই\nদুর্দান্ত ফিনিশিং ও মজবুত সেলাই মান নিয়ে কোনো আপোষ নয়..\nঅসাধারণ কালার এবং ডিজাইনের মধ্যে আপনার পছন্দসই বেডশীট বেছে নিন। স্টক শেষ হওয়ার আগে ঝটপট অর্ডার করুন এবং আপনার ঘরকে করে তুলুন ঝামেলামুক্ত ও স্টাইলিশ।\nএবার ঝামেলাহীন থাকতে এখনই ঘরে রাখুন ওয়াটারপ্রুফ এই বেডশীটগুলো।\nMetarial - soft leather lear rexin plastic\nWaterproof full bed rexin type protector.\nThe bed cover is made of durable PVC material combined with linen fabric for easy maintenance and long-term use.\nlong lasting\ncpmfot mat\nlong lasting\nsize - 6/7 fit\nfull bed",
   "stock": 50,
-  "reviews": 164
+  "reviews": 164,
+  "options": {
+   "Color": [
+    "Blue",
+    "Pink",
+    "Gray"
+   ]
+  }
  },
  {
   "category": "Home & Living",

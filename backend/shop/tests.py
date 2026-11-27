@@ -2,12 +2,16 @@ import io
 from datetime import timedelta
 from unittest import mock
 
+from urllib.parse import parse_qs, urlparse
+
 from django.contrib.auth.models import User
+from django.core import mail
 from django.core.cache import cache
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.management import CommandError, call_command
 from django.db import IntegrityError, transaction
-from django.test import TestCase
+from django.conf import settings
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from django_otp.oath import TOTP
 from django_otp.plugins.otp_totp.models import TOTPDevice
@@ -16,11 +20,12 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIClient, APITestCase
 
 from .admin import change
+from .cart import MAX_LINES
 from .display import cdn, day, num, taka
-from .models import Category, Order, Product
+from .models import Category, Comment, Order, Product, ProductImage, ProductVariant
 from .serializers import RegisterSerializer
 from .api.accounts import SignupThrottle
-from .auth import GuestOrderThrottle
+from .auth import CommentActionThrottle, GuestOrderThrottle, ScopedThrottle
 
 ADDR = {"full_name": "Rahim", "phone": "01712345678", "address": "House 1, Road 2", "city": "Dhaka"}
 
@@ -185,6 +190,106 @@ class ShopApiTests(APITestCase):
         self.assertEqual(r.status_code, 400)
         self.assertIn("cart", r.data)
 
+    def shirt(self):
+        shirt = Product.objects.create(category=self.phone.category, name="Shirt", slug="shirt", price=500,
+                                       image="https://x.y/c.jpg")
+        shirt.options.create(name="Size", values="S, M", position=0)
+        shirt.options.create(name="Color", values="Red, Blue / Navy", position=1)
+        self.assertEqual(shirt.sync_variants(stock=2), 4)
+        return shirt
+
+    def test_option_text_too_long_to_store_is_refused_and_long_choices_still_sell(self):
+        p = Product.objects.create(category=self.phone.category, name="Kurta", slug="kurta", price=500,
+                                   image="https://x.y/d.jpg")
+        # Bengali is 9 characters per letter once URL-encoded: these overflowed the variant key.
+        p.options.create(name="সাইজ বাছাই করুন", values="অতিরিক্ত বড় মাপের", position=0)
+        p.options.create(name="রঙ বাছাই করুন", values="গাঢ় নীল রঙের জামা", position=1)
+        with self.assertRaisesMessage(DjangoValidationError, "too long"):
+            p.sync_variants()
+        p.options.all().delete()
+        p.options.create(name="Size", values="X" * 150)  # fits the order snapshot, so the cart takes it
+        p.sync_variants(stock=2)
+        r = self.client.post("/api/cart/", {"product": p.pk, "quantity": 1, "options": {"Size": "X" * 150}}, format="json")
+        self.assertEqual(r.status_code, 200)
+        total = self.client.get("/api/cart/").data["total"]
+        self.assertEqual(self.client.post("/api/orders/", {**ADDR, "expected_total": total}, format="json").status_code, 201)
+
+    def test_product_options_pick_a_variant_with_its_own_stock_and_price(self):
+        from urllib.parse import quote
+        shirt = self.shirt()
+        self.assertEqual(shirt.stock, 8)  # the total of its 4 combinations
+        m_red = shirt.variants.get(key="Color=Red&Size=M")
+        m_red.price, m_red.stock = 650, 3
+        m_red.save()
+        shirt.sync_stock()
+        d = self.client.get("/api/products/shirt/").data
+        self.assertEqual(d["options"], [{"name": "Size", "values": ["S", "M"]}, {"name": "Color", "values": ["Red", "Blue / Navy"]}])
+        self.assertEqual({v["price_display"] for v in d["variants"] if v["choices"] == {"Size": "M", "Color": "Red"}}, {taka(650)})
+        post = lambda opts, q=1: self.client.post("/api/cart/", {"product": shirt.pk, "quantity": q, "options": opts}, format="json")
+        self.assertEqual(self.add(shirt, 1).status_code, 400)  # nothing picked
+        self.assertEqual(post({"Size": "XL", "Color": "Red"}).status_code, 400)
+        self.assertEqual(post({"Size": "S", "Color": "Red", "Fit": "Slim"}).status_code, 400)
+        post({"Size": "M", "Color": "Red"}, 3)
+        c = post({"Size": "S", "Color": "Blue / Navy"}, 5).data  # that combination has 2
+        self.assertEqual([(l["options_line"], l["quantity"], l["each_line"]) for l in c["lines"]],
+                         [("Size: M · Color: Red", 3, f"{taka(650)} each"), ("Size: S · Color: Blue / Navy", 2, f"{taka(500)} each")])
+        self.assertIn("Only 2 of Shirt (Size: S · Color: Blue / Navy)", c["notice"])
+        blue = c["lines"][1]["id"]
+        self.assertEqual(self.client.patch(f"/api/cart/{quote(blue, safe='')}/", {"quantity": 1}, format="json").status_code, 200)
+        r = self.checkout()
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual(r.data["subtotal"], 3 * 650 + 500)
+        self.assertEqual(sorted(i["options"] for i in r.data["items"]), ["Size: M · Color: Red", "Size: S · Color: Blue / Navy"])
+        shirt.refresh_from_db()
+        self.assertEqual((shirt.stock, shirt.variants.get(pk=m_red.pk).stock), (5, 0))
+        self.assertEqual(post({"Size": "M", "Color": "Red"}).status_code, 400)  # that combination sold out
+        # Cancelling puts stock back on the variants it came from, and the product total follows.
+        order = Order.objects.get(pk=r.data["id"])
+        order.status = "cancelled"
+        order.save()
+        shirt.refresh_from_db()
+        self.assertEqual((shirt.stock, shirt.variants.get(pk=m_red.pk).stock), (9, 3))
+        # Staff drop a choice someone has in their cart: the line goes, with a note.
+        post({"Size": "M", "Color": "Red"})
+        shirt.options.filter(name="Color").update(values="Blue / Navy")
+        shirt.sync_variants()
+        self.assertEqual(shirt.variants.count(), 2)
+        c = self.client.get("/api/cart/").data
+        self.assertEqual(c["lines"], [])
+        self.assertIn("choices for Shirt changed", c["notice"])
+
+    def test_stock_of_a_product_with_options_is_not_edited_directly(self):
+        shirt = self.shirt()
+        shirt.stock = 50
+        with self.assertRaises(DjangoValidationError):
+            shirt.full_clean()
+
+    def test_seed_keeps_options_staff_edited(self):
+        call_command("seed", stdout=io.StringIO())
+        p = Product.objects.filter(options__name="Size").first()
+        p.options.filter(name="Size").update(values="Free size")
+        p.sync_variants()
+        edited = list(p.options.values_list("name", "values"))
+        call_command("seed", stdout=io.StringIO())
+        self.assertEqual(list(p.options.values_list("name", "values")), edited)
+        p.refresh_from_db()
+        self.assertEqual(p.stock, sum(p.variants.values_list("stock", flat=True)))
+        # Choices that cost more get their own price, and a reworded title keeps its old slug (links, orders).
+        phone = Product.objects.get(slug="realme-note-80-464-6300mah-battery-official-warranty-1")
+        self.assertEqual(phone.name, "realme Note 80 | 6300mAh Battery | Official Warranty")
+        prices = {v.label: v.unit_price for v in phone.variants.all()}
+        self.assertEqual(prices["Storage: 4GB + 64GB · Color: Storm Black"], phone.price)
+        self.assertEqual(prices["Storage: 4GB + 128GB · Color: Storm Black"], phone.price + 2000)
+
+    def test_tiles_show_from_price_and_sort_by_it(self):
+        shirt = self.shirt()
+        shirt.variants.update(price=90)  # every combination costs less than the product's 500
+        shirt.variants.filter(key="Color=Red&Size=M").update(price=700)
+        tile = next(t for t in self.client.get("/api/products/").data["results"] if t["slug"] == "shirt")
+        self.assertEqual(tile["price_display"], f"From {taka(90)}")
+        cheapest = self.client.get("/api/products/?sort=price").data["results"][0]
+        self.assertEqual(cheapest["slug"], "shirt")
+
     def test_cart_totals_meter_and_clamping(self):
         self.client.force_authenticate(None)  # guests can use the cart
         c = self.add(self.case, 2).data
@@ -221,6 +326,26 @@ class ShopApiTests(APITestCase):
         self.assertEqual(r.status_code, 201)
         r = self.client.post("/api/auth/login/", {"username": "new", "password": "pass-1234-word"})
         self.assertIn("token", r.data)
+
+    def test_login_by_email(self):
+        self.client.force_authenticate(None)
+        self.client.post("/api/auth/register/", {"username": "mail", "email": "mail@x.com", "password": "pass-1234-word"})
+        r = self.client.post("/api/auth/login/", {"username": "MAIL@x.com", "password": "pass-1234-word"})
+        self.assertEqual(r.data["username"], "mail")
+        r = self.client.post("/api/auth/login/", {"username": "mail@x.com", "password": "wrong"})
+        self.assertEqual(r.status_code, 400)
+
+    def test_register_requires_unique_email(self):
+        self.client.force_authenticate(None)
+        r = self.client.post("/api/auth/register/", {"username": "noemail", "password": "pass-1234-word"})
+        self.assertIn("email", r.data)
+        r = self.client.post("/api/auth/register/", {"username": "first", "email": "Same@x.com", "password": "pass-1234-word"})
+        self.assertEqual(r.status_code, 201)
+        r = self.client.post("/api/auth/register/", {"username": "second", "email": "same@X.com", "password": "pass-1234-word"})
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("email", r.data)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            User.objects.create_user("third", email="SAME@x.com")
 
     def test_bad_city_and_long_address_rejected(self):
         r = self.order((self.case, 1), city="Atlantis", address="x" * 301)
@@ -287,9 +412,22 @@ class ShopApiTests(APITestCase):
         self.assertEqual(p["summary"], "6GB RAM · 128GB")
         self.assertEqual([r["slug"] for r in p["related"]], ["case"])
         self.assertEqual(p["category"]["slug"], "mobiles")
+        self.assertEqual(p["related_title"], f"More in {self.phone.category.name}")
+        cats = self.client.get("/api/products/?category=mobiles").data["categories"]
+        self.assertEqual([(c["slug"], c["current"]) for c in cats], [("", False), ("mobiles", True)])  # "All" first
         # List payloads carry tiles only: no long description or nested category per product.
         tile = self.client.get("/api/products/").data["results"][0]
         self.assertFalse({"description", "category"} & tile.keys())
+
+    def test_product_gallery(self):
+        # Main image first, then extra photos by position; one photo means a one-item gallery.
+        self.assertEqual([g["image_large"] for g in self.client.get("/api/products/phone/").data["gallery"]],
+                         ["https://x.y/a.jpg"])
+        ProductImage.objects.create(product=self.phone, url="https://x.y/late.jpg", position=2)
+        ProductImage.objects.create(product=self.phone, url="https://x.y/early.jpg", position=1)
+        g = self.client.get("/api/products/phone/").data["gallery"]
+        self.assertEqual([x["image_large"] for x in g], ["https://x.y/a.jpg", "https://x.y/early.jpg", "https://x.y/late.jpg"])
+        self.assertEqual(g[1]["alt"], "Phone, photo 2 of 3")
 
     def test_home_sections(self):
         other = Category.objects.create(name="Rice", slug="rice")
@@ -326,6 +464,81 @@ class ShopApiTests(APITestCase):
         self.assertTrue(o["meta_line"].startswith(day(Order.objects.get(pk=o["id"]).created) + " · "))
         self.assertEqual(self.client.get("/api/home/").data["wall"][0][0].keys(), {"tag", "field"})
 
+    def test_comments_need_login_to_post_but_anyone_reads(self):
+        url = "/api/products/phone/comments/"
+        r = self.client.post(url, {"text": "  Great phone  "}, format="json")
+        self.assertEqual((r.status_code, r.data["author"], r.data["text"]), (201, "rahim", "Great phone"))
+        self.assertEqual(self.client.post(url, {"text": "   "}, format="json").status_code, 400)
+        self.assertEqual(self.client.post(url, {"text": "x" * 1001}, format="json").status_code, 400)
+        self.assertEqual(self.client.post("/api/products/nope/comments/", {"text": "hi"}, format="json").status_code, 404)
+        guest = APIClient()
+        self.assertEqual(guest.post(url, {"text": "spam"}, format="json").status_code, 401)
+        listed = guest.get(url).data
+        self.assertEqual((listed["title"], [c["text"] for c in listed["results"]]), ("Comments (1)", ["Great phone"]))
+        self.assertEqual(guest.get("/api/products/case/comments/").data["results"], [])
+
+    def test_comment_edit_delete_reply_and_like(self):
+        url = "/api/products/phone/comments/"
+        t0 = self.client.post(url, {"text": "Battery?"}, format="json").data
+        top = t0["id"]
+        self.assertEqual((t0["replies"], t0["reply_count"], t0["replies_label"]), ([], 0, None))  # a new, empty thread
+        other = User.objects.create_user("karim", password="pass-1234-word")
+        karim = APIClient()
+        karim.force_authenticate(other)
+        r = karim.post(url, {"text": "Lasts a day", "parent": top}, format="json").data
+        reply = r["id"]
+        self.assertEqual(r["thread"], {"id": top, "reply_count": 1, "replies_label": "View replies (1)"})
+        extra = karim.post(url, {"text": "Two days", "parent": top}, format="json").data
+        self.assertEqual(extra["thread"]["replies_label"], "View replies (2)")
+        self.assertEqual(karim.delete(f"/api/comments/{extra['id']}/").data["thread"]["replies_label"], "View replies (1)")
+        self.assertEqual(karim.post(url, {"text": "x", "parent": reply}, format="json").status_code, 400)  # one level
+        self.assertEqual(karim.post("/api/products/case/comments/", {"text": "x", "parent": top},
+                                    format="json").status_code, 400)  # another product's thread
+        self.assertEqual(karim.patch(f"/api/comments/{top}/", {"text": "hacked"}, format="json").status_code, 404)
+        self.assertEqual(karim.delete(f"/api/comments/{top}/").status_code, 404)
+        for body in [{}, {"text": Comment.objects.get(pk=top).text}]:  # nothing changed: not "edited"
+            self.assertIsNone(self.client.patch(f"/api/comments/{top}/", body, format="json").data["edited_label"])
+        self.assertEqual(self.client.patch(f"/api/comments/{top}/", {"text": "Battery life?"}, format="json").status_code, 200)
+        for _ in range(2):  # liking twice still counts once
+            self.assertEqual(karim.post(f"/api/comments/{top}/like/").data["likes"], 1)
+        self.assertEqual(APIClient().post(f"/api/comments/{top}/like/").status_code, 401)
+        t = karim.get(url).data["results"][0]
+        self.assertEqual((t["text"], t["edited_label"], t["liked"], t["mine"]), ("Battery life?", "edited", True, False))
+        self.assertEqual([(r["text"], r["mine"]) for r in t["replies"]], [("Lasts a day", True)])
+        gone = self.client.delete(f"/api/comments/{top}/").data  # has a reply: placeholder
+        self.assertEqual((gone["removed"], gone["comment"]["deleted"]), ([], True))
+        t = karim.get(url).data["results"][0]
+        self.assertEqual((t["deleted"], t["author"], t["likes"], len(t["replies"])), (True, None, 0, 1))
+        self.assertEqual(karim.delete(f"/api/comments/{reply}/").data["removed"], [reply, top])  # placeholder too
+        self.assertEqual(karim.post(url, {"text": "x", "parent": top}, format="json").status_code, 400)  # deleted parent
+        self.assertEqual(karim.get(url).data["results"], [])  # last reply gone: the placeholder goes too
+
+    def test_comments_and_replies_come_ten_at_a_time(self):
+        top = [Comment.objects.create(product=self.phone, user=self.user, text=f"c{i}").pk for i in range(12)]
+        for i in range(12):
+            Comment.objects.create(product=self.phone, user=self.user, parent_id=top[-1], text=f"r{i}")
+        url = "/api/products/phone/comments/"
+        first = self.client.get(url).data
+        self.assertEqual(([c["text"] for c in first["results"]], first["title"]),
+                         ([f"c{i}" for i in range(11, 1, -1)], "Comments (12)"))  # newest first, no cap
+        newest = first["results"][0]
+        self.assertEqual([r["text"] for r in newest["replies"]], [f"r{i}" for i in range(10)])  # oldest first
+        self.assertEqual((newest["reply_count"], first["results"][1]["reply_count"]), (12, 0))
+        self.assertEqual((newest["replies_label"], first["results"][1]["replies_label"]), ("View replies (12)", None))
+        Comment.objects.create(product=self.phone, user=self.user, text="new")  # arrives mid-paging
+        second = self.client.get(f"{url}?before={first['next']}").data
+        self.assertEqual(([c["text"] for c in second["results"]], second["next"]), (["c1", "c0"], None))
+        more = self.client.get(f"/api/comments/{newest['id']}/replies/?after={newest['replies_next']}").data
+        self.assertEqual(([r["text"] for r in more["results"]], more["next"]), (["r10", "r11"], None))
+        self.assertEqual(self.client.get(f"{url}?before=x").status_code, 400)
+
+    def test_comment_edits_and_likes_are_throttled(self):
+        c = self.client.post("/api/products/phone/comments/", {"text": "Hi"}, format="json").data["id"]
+        with mock.patch.object(CommentActionThrottle, "THROTTLE_RATES", {"comment_action": "2/hour"}):
+            self.assertEqual(self.client.post(f"/api/comments/{c}/like/").status_code, 200)
+            self.assertEqual(self.client.patch(f"/api/comments/{c}/", {"text": "Hey"}, format="json").status_code, 200)
+            self.assertEqual(self.client.delete(f"/api/comments/{c}/like/").status_code, 429)
+
     def test_config_lists_cities_and_sorts(self):
         c = self.client.get("/api/config/").data
         self.assertEqual(c["cities"][0], "Dhaka")  # the checkout's default
@@ -352,10 +565,24 @@ class SecurityTests(APITestCase):
         return self.client.post("/api/auth/login/", {"username": username, "password": password}, REMOTE_ADDR=ip)
 
     def test_login_locks_the_account_whatever_ip_guesses(self):
-        codes = [self.login("wrong", f"10.0.0.{i}").status_code for i in range(5)]
-        self.assertEqual(codes, [400] * 5)  # each IP is under its own per-minute throttle
-        self.assertEqual(self.login("pass-1234-word", "10.0.1.1").status_code, 429)  # even the right password waits
-        self.assertEqual(self.login("pass-1234-word", "10.0.1.2", username="RAHIM").status_code, 429)
+        n = settings.LOGIN_MAX_FAILS_PER_ACCOUNT
+        codes = [self.login("wrong", f"10.0.{i // 250}.{i % 250}").status_code for i in range(n)]
+        self.assertEqual(codes, [400] * n)  # each IP is under its own per-minute throttle
+        self.assertEqual(self.login("pass-1234-word", "10.1.0.1").status_code, 429)  # even the right password waits
+        self.assertEqual(self.login("pass-1234-word", "10.1.0.2", username="RAHIM").status_code, 429)
+
+    @mock.patch.dict(ScopedThrottle.THROTTLE_RATES, {"auth": "100/min"})  # only the lockout may refuse here
+    def test_one_ip_cannot_lock_a_customer_out(self):
+        codes = [self.login("wrong", "10.0.0.1").status_code for _ in range(6)]
+        self.assertEqual(codes, [400] * 5 + [429])
+        self.assertEqual(self.login("pass-1234-word", "10.0.0.1").status_code, 429)
+        self.assertEqual(self.login("pass-1234-word", "10.0.1.1").status_code, 200)  # the owner, elsewhere
+
+    def test_staff_lock_after_few_failures_from_anywhere(self):
+        User.objects.filter(pk=self.user.pk).update(is_staff=True)
+        for i in range(settings.LOGIN_MAX_FAILS):
+            self.login("wrong", f"10.0.0.{i}")
+        self.assertEqual(self.login("pass-1234-word", "10.0.1.1").status_code, 429)
 
     def test_successful_login_resets_the_failure_count(self):
         for i in range(4):
@@ -363,12 +590,32 @@ class SecurityTests(APITestCase):
         self.assertEqual(self.login("pass-1234-word", "10.0.1.1").status_code, 200)
         self.assertEqual(self.login("wrong", "10.0.1.2").status_code, 400)  # counting starts again
 
+    @override_settings(LOGIN_MAX_FAILS_PER_ACCOUNT=5)  # one counter per account, whatever the spelling
     def test_padded_or_unicode_spellings_share_the_lockout(self):
         # Both logins strip spaces (and the admin applies NFKC) before checking, so these all guess "rahim".
         for i, name in enumerate([" rahim", "rahim ", "\trahim", "ｒａｈｉｍ", "  rahim  "]):
             self.login("wrong", f"10.0.0.{i}", username=name)
         self.assertEqual(self.login("pass-1234-word", "10.0.1.1").status_code, 429)
 
+    def test_username_cannot_look_like_an_email(self):
+        # Login tries a username before an email, so "victim@x.com" as a username would block the victim's email login.
+        User.objects.filter(pk=self.user.pk).update(email="rahim@x.com")
+        r = self.client.post("/api/auth/register/", {"username": "rahim@x.com", "email": "e@x.com", "password": "pass-1234-word"})
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("username", r.data)
+        self.assertEqual(self.login("pass-1234-word", "10.0.1.1", username="rahim@x.com").status_code, 200)
+
+    def test_cart_lines_are_capped(self):
+        # Each line costs session space and work on every cart read, and lets one order hoard everything.
+        cat = self.case.category
+        for i in range(MAX_LINES + 1):
+            p = Product.objects.create(category=cat, name=f"P{i}", slug=f"p{i}", price=10, image="https://x.y/b.jpg", stock=5)
+            r = self.client.post("/api/cart/", {"product": p.pk, "quantity": 1}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(self.client.get("/api/cart/").data["count"], MAX_LINES)
+        self.assertEqual(self.client.post("/api/cart/", {"product": p.pk - 1, "quantity": 1}, format="json").status_code, 200)  # more of a line already in
+
+    @override_settings(LOGIN_MAX_FAILS_PER_ACCOUNT=5)  # one counter per account, whatever the spelling
     def test_numeric_username_shares_the_lockout(self):
         User.objects.create_user("12345", password="pass-1234-word")
         for i in range(5):
@@ -433,7 +680,7 @@ class SecurityTests(APITestCase):
 
     def test_signup_has_a_daily_cap_per_ip(self):
         with mock.patch.object(SignupThrottle, "THROTTLE_RATES", {"signup": "2/day"}):
-            codes = [self.client.post("/api/auth/register/", {"username": f"u{i}", "password": "pass-1234-word"}).status_code
+            codes = [self.client.post("/api/auth/register/", {"username": f"u{i}", "email": f"u{i}@x.com", "password": "pass-1234-word"}).status_code
                      for i in range(3)]
         self.assertEqual(codes, [201, 201, 429])
 
@@ -521,6 +768,16 @@ class AdminPanelTests(TestCase):
         self.order = Order.objects.create(user=self.admin, subtotal=200, delivery_fee=60, total=260, **ADDR)
         self.order.items.create(product=self.phone, name="Phone", price=100, quantity=2)
 
+    def test_admin_user_needs_unique_email(self):
+        User.objects.create_user("taken", email="taken@x.com")
+        form = {"username": "staffer", "usable_password": "true", "password1": "pass-1234-word", "password2": "pass-1234-word",
+                "orders-TOTAL_FORMS": "0", "orders-INITIAL_FORMS": "0"}  # the orders inline
+        self.assertContains(self.post("/admin/auth/user/add/", form), "This field is required")
+        self.assertContains(self.post("/admin/auth/user/add/", {**form, "email": "TAKEN@x.com"}), "already exists")
+        r = self.post("/admin/auth/user/add/", {**form, "email": "Staff@x.com"})
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(User.objects.get(username="staffer").email, "staff@x.com")
+
     def test_dashboard_shows_sales_and_low_stock(self):
         r = self.get("/admin/")
         self.assertContains(r, "Pending orders")
@@ -542,6 +799,146 @@ class AdminPanelTests(TestCase):
         self.order.status = "cancelled"
         self.order.save()
         self.assertContains(self.get(f"/admin/shop/order/{self.order.pk}/change/"), 'class="is-now">Cancelled')
+
+    def test_product_page_lists_its_comments(self):
+        top = Comment.objects.create(product=self.phone, user=self.admin, text="Battery lasts all day")
+        top.likes.add(self.admin)
+        Comment.objects.create(product=self.phone, user=self.admin, parent=top, text="Agreed")
+        r = self.get(f"/admin/shop/product/{self.phone.pk}/change/")
+        self.assertContains(r, "Battery lasts all day")
+        self.assertContains(r, "boss: Battery lasts all day")  # the reply says what it answers
+        self.assertEqual(self.get("/admin/shop/comment/").status_code, 404)  # no separate comments page
+
+    def test_product_page_shows_comments_ten_at_a_time(self):
+        for i in range(12):
+            Comment.objects.create(product=self.phone, user=self.admin, text=f"note-{i:02}")
+        page = lambda q="": self.get(f"/admin/shop/product/{self.phone.pk}/change/{q}").content.decode()
+        first = page()
+        self.assertEqual([f"note-{i:02}" in first for i in range(12)], [False] * 2 + [True] * 10)  # newest 10
+        self.assertIn("?comments=20#comments-group", first)
+        rest = page("?comments=20")
+        self.assertTrue(all(f"note-{i:02}" in rest for i in range(12)))
+        self.assertNotIn("Show 10 more", rest)
+        self.assertIn("note-11", page("?comments=junk"))  # a bad count falls back to the first page
+
+    def test_staff_edit_and_delete_comments_from_the_product_page(self):
+        cs = [Comment.objects.create(product=self.phone, user=self.admin, text=f"note-{i}") for i in range(12)]
+        shown = cs[:1:-1]  # the 10 newest, as the page lists them
+        Comment.objects.create(product=self.phone, user=self.admin, text="arrived while editing")
+        p = self.phone
+        form = {"name": p.name, "slug": p.slug, "category": p.category_id, "description": "", "price": p.price,
+                "original_price": "", "stock": p.stock, "image": "https://example.com/a.jpg", "rating": "0", "reviews": 0,
+                "photos-TOTAL_FORMS": 0, "photos-INITIAL_FORMS": 0, "options-TOTAL_FORMS": 0, "options-INITIAL_FORMS": 0,
+                "variants-TOTAL_FORMS": 0, "variants-INITIAL_FORMS": 0,
+                "comments-TOTAL_FORMS": len(shown), "comments-INITIAL_FORMS": len(shown)}
+        for i, c in enumerate(shown):
+            form.update({f"comments-{i}-id": c.pk, f"comments-{i}-product": p.pk, f"comments-{i}-text": c.text})
+        form["comments-0-text"] = "fixed by staff"
+        form["comments-1-DELETE"] = "on"
+        # A comment arrived after the page loaded, so the 10 newest changed: saving must still find every row.
+        self.assertEqual(self.post(f"/admin/shop/product/{p.pk}/change/", form).status_code, 302)
+        self.assertEqual(Comment.objects.get(pk=shown[0].pk).text, "fixed by staff")
+        self.assertFalse(Comment.objects.filter(pk=shown[1].pk).exists())
+
+    def test_options_making_too_many_combinations_are_refused(self):
+        p = self.phone
+        form = {"name": p.name, "slug": p.slug, "category": p.category_id, "description": "", "price": p.price,
+                "original_price": "", "stock": p.stock, "image": "https://example.com/a.jpg", "rating": "0", "reviews": 0,
+                "photos-TOTAL_FORMS": 0, "photos-INITIAL_FORMS": 0, "variants-TOTAL_FORMS": 0, "variants-INITIAL_FORMS": 0,
+                "comments-TOTAL_FORMS": 0, "comments-INITIAL_FORMS": 0, "options-TOTAL_FORMS": 3, "options-INITIAL_FORMS": 0}
+        many = ", ".join(str(i) for i in range(5))
+        for i, name in enumerate(["A", "B", "C"]):  # 5 x 5 x 5 = 125
+            form.update({f"options-{i}-name": name, f"options-{i}-values": many, f"options-{i}-position": i})
+        r = self.post(f"/admin/shop/product/{p.pk}/change/", form)
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "make 125 combinations")
+        self.assertFalse(p.options.exists())
+
+    def test_saving_options_makes_their_combinations(self):
+        p = self.phone
+        form = {"name": p.name, "slug": p.slug, "category": p.category_id, "description": "", "price": p.price,
+                "original_price": "", "stock": p.stock, "image": "https://example.com/a.jpg", "rating": "0", "reviews": 0,
+                "photos-TOTAL_FORMS": 0, "photos-INITIAL_FORMS": 0, "variants-TOTAL_FORMS": 0, "variants-INITIAL_FORMS": 0,
+                "comments-TOTAL_FORMS": 0, "comments-INITIAL_FORMS": 0,
+                "options-TOTAL_FORMS": 1, "options-INITIAL_FORMS": 0,
+                "options-0-name": "Color", "options-0-values": "Black, Blue", "options-0-position": 0}
+        self.assertEqual(self.post(f"/admin/shop/product/{p.pk}/change/", form).status_code, 302)
+        p.refresh_from_db()
+        self.assertEqual(sorted(v.label for v in p.variants.all()), ["Color: Black", "Color: Blue"])
+        self.assertEqual(p.stock, 0)  # new combinations start empty until staff set their stock
+
+    def test_option_change_that_drops_stocked_combinations_is_refused(self):
+        p = self.phone
+        opt = p.options.create(name="Colour", values="Black, Blue")
+        p.sync_variants(stock=3)
+        p.variants.filter(key="Colour=Blue").update(stock=0)
+        form = {"name": p.name, "slug": p.slug, "category": p.category_id, "description": "", "price": p.price,
+                "original_price": "", "image": "https://example.com/a.jpg", "rating": "0", "reviews": 0,
+                "photos-TOTAL_FORMS": 0, "photos-INITIAL_FORMS": 0, "variants-TOTAL_FORMS": 0, "variants-INITIAL_FORMS": 0,
+                "comments-TOTAL_FORMS": 0, "comments-INITIAL_FORMS": 0, "options-TOTAL_FORMS": 1, "options-INITIAL_FORMS": 1,
+                "options-0-id": opt.pk, "options-0-product": p.pk, "options-0-name": "Color",
+                "options-0-values": "Black, Blue", "options-0-position": 0}
+        url = f"/admin/shop/product/{p.pk}/change/"
+        r = self.post(url, form)  # a rename would delete Black's 3 in stock
+        self.assertContains(r, "still have stock: Colour: Black.")  # Blue has none, so it isn't named
+        self.assertEqual(sorted(p.variants.values_list("key", flat=True)), ["Colour=Black", "Colour=Blue"])
+        p.variants.update(stock=0)  # the product's stored total (3) is now wrong: saving must fix, not refuse
+        self.assertEqual(self.post(url, form).status_code, 302)  # nothing in stock is lost now
+        self.assertEqual(sorted(p.variants.values_list("key", flat=True)), ["Color=Black", "Color=Blue"])
+        p.refresh_from_db()
+        self.assertEqual(p.stock, 0)
+
+    def test_list_page_cannot_overwrite_stock_of_a_product_with_options(self):
+        p = self.phone
+        p.options.create(name="Color", values="Black, Blue")
+        p.sync_variants(stock=3)  # stock 6
+        price = p.price + 1
+        form = {"form-TOTAL_FORMS": 1, "form-INITIAL_FORMS": 1, "form-0-id": p.pk, "form-0-price": price,
+                "form-0-original_price": "", "form-0-stock": 99, "_save": "Save"}
+        self.assertEqual(self.post("/admin/shop/product/", form).status_code, 302)
+        p.refresh_from_db()
+        self.assertEqual((p.price, p.stock), (price, 6))  # the price changed; the typed stock was ignored
+
+    def test_editing_a_product_keeps_stock_sold_since_the_page_loaded(self):
+        p = self.phone  # the page showed stock 2
+        form = {"name": "Phone v2", "slug": p.slug, "category": p.category_id, "description": "", "price": p.price,
+                "original_price": "", "stock": 2, "initial-stock": 2, "image": "https://example.com/a.jpg", "rating": "0",
+                "reviews": 0, "photos-TOTAL_FORMS": 0, "photos-INITIAL_FORMS": 0, "options-TOTAL_FORMS": 0,
+                "options-INITIAL_FORMS": 0, "variants-TOTAL_FORMS": 0, "variants-INITIAL_FORMS": 0,
+                "comments-TOTAL_FORMS": 0, "comments-INITIAL_FORMS": 0}
+        Product.objects.filter(pk=p.pk).update(stock=1)  # a buyer took one meanwhile
+        self.assertEqual(self.post(f"/admin/shop/product/{p.pk}/change/", form).status_code, 302)
+        p.refresh_from_db()
+        self.assertEqual((p.name, p.stock), ("Phone v2", 1))
+        self.assertContains(self.get(f"/admin/shop/product/{p.pk}/change/"), 'name="initial-stock"')
+        self.post(f"/admin/shop/product/{p.pk}/change/", {**form, "stock": 9})  # staff restock: that one is written
+        p.refresh_from_db()
+        self.assertEqual(p.stock, 9)
+        list_form = {"form-TOTAL_FORMS": 1, "form-INITIAL_FORMS": 1, "form-0-id": p.pk, "form-0-price": p.price + 1,
+                     "form-0-original_price": "", "form-0-stock": 2, "initial-form-0-stock": 2,
+                     "_save": "Save"}  # a stale list page
+        Product.objects.filter(pk=p.pk).update(stock=0)
+        self.assertEqual(self.post("/admin/shop/product/", list_form).status_code, 302)
+        p.refresh_from_db()
+        self.assertEqual((p.price, p.stock), (101, 0))
+
+    def test_editing_a_combinations_price_keeps_stock_sold_since_the_page_loaded(self):
+        p = self.phone
+        p.options.create(name="Color", values="Black")
+        p.sync_variants(stock=3)
+        v = p.variants.get()
+        form = {"name": p.name, "slug": p.slug, "category": p.category_id, "description": "", "price": p.price,
+                "original_price": "", "image": "https://example.com/a.jpg", "rating": "0", "reviews": 0,
+                "photos-TOTAL_FORMS": 0, "photos-INITIAL_FORMS": 0, "comments-TOTAL_FORMS": 0, "comments-INITIAL_FORMS": 0,
+                "options-TOTAL_FORMS": 1, "options-INITIAL_FORMS": 1, "options-0-id": p.options.get().pk,
+                "options-0-product": p.pk, "options-0-name": "Color", "options-0-values": "Black", "options-0-position": 0,
+                "variants-TOTAL_FORMS": 1, "variants-INITIAL_FORMS": 1, "variants-0-id": v.pk,
+                "variants-0-product": p.pk, "variants-0-price": 150, "variants-0-stock": 3, "initial-variants-0-stock": 3}
+        ProductVariant.objects.filter(pk=v.pk).update(stock=2)  # a buyer took one meanwhile
+        self.assertEqual(self.post(f"/admin/shop/product/{p.pk}/change/", form).status_code, 302)
+        v.refresh_from_db()
+        p.refresh_from_db()
+        self.assertEqual((v.price, v.stock, p.stock), (150, 2, 2))
 
     def test_lists_show_status_pills_and_theme(self):
         self.assertContains(self.get("/admin/shop/order/"), 'haat-badge haat-pending')
@@ -673,11 +1070,80 @@ class GuestCheckoutTests(APITestCase):
         self.login()
         self.assertEqual(Order.objects.get(pk=r.data["id"]).user, None)
 
-    def test_new_account_claims_no_guest_orders(self):
+    def test_pending_order_to_a_phone_claims_nothing(self):
+        # Anyone can place an order to a phone they read off the browser's guest list; only a delivery proves it.
+        Order.objects.create(user=self.user, full_name="R", phone=ADDR["phone"], address="A", city="Dhaka",
+                             subtotal=100, delivery_fee=60, total=160, status="pending")
         r = self.order()
-        reg = self.client.post("/api/auth/register/", {"username": "karim", "password": "pass-1234-word"}, format="json")
-        self.assertEqual(reg.status_code, 201, reg.data)
-        self.assertEqual(Order.objects.get(pk=r.data["id"]).user, None)  # no past phone to match yet
+        self.login()
+        self.assertEqual(Order.objects.get(pk=r.data["id"]).user, None)
+
+    def register(self, email, username="karim"):
+        r = self.client.post("/api/auth/register/", {"username": username, "email": email, "password": "pass-1234-word"},
+                             format="json")
+        self.assertEqual(r.status_code, 201, r.data)
+        return User.objects.get(username=username), r.data["token"]
+
+    def claim(self, token, link=None):
+        link = link or mail.outbox[-1].body.split("\n\n")[1]
+        return self.client.post("/api/orders/claim/", {"token": parse_qs(urlparse(link).query)["t"][0]},
+                                format="json", HTTP_AUTHORIZATION=f"Token {token}")
+
+    def test_new_account_claims_guest_orders_with_its_email_by_link(self):
+        mine = self.order(email="Karim@X.com").data["id"]
+        other = self.order(email="someone@x.com").data["id"]  # another person on this browser
+        blank = self.order().data["id"]  # no email, and a new account has no past phone
+        karim, token = self.register("karim@x.com")
+        self.assertFalse(karim.orders.exists())  # nothing joins before the inbox answers
+        self.assertEqual(mail.outbox[-1].to, ["karim@x.com"])
+        self.assertIn("/orders/claim?t=", mail.outbox[-1].body)
+        r = self.claim(token)
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertEqual(list(karim.orders.values_list("pk", flat=True)), [mine])
+        self.assertEqual(Order.objects.filter(pk__in=[other, blank], user=None).count(), 2)
+        self.assertIn("already", self.claim(token).data["notice"])  # a second click adds nothing
+
+    def test_shared_browser_cant_claim_by_typing_the_orders_email(self):
+        victim = self.order(email="victim@x.com").data["id"]
+        seen = self.client.get("/api/orders/").data[0]["email"]  # the next person on this browser reads it
+        _, token = self.register(seen, username="taker")
+        link = mail.outbox[-1].body.split("\n\n")[1]  # went to the victim's inbox, not the taker's
+        self.assertEqual(Order.objects.get(pk=victim).user, None)
+        # The victim opening it, signed in as themselves, adds nothing to either account.
+        _, own = self.register("other@x.com", username="victim")
+        self.assertEqual(self.claim(own, link).status_code, 403)
+        self.assertEqual(Order.objects.get(pk=victim).user, None)
+
+    def test_claim_link_refuses_tampering_age_and_changed_email(self):
+        r = self.order(email="karim@x.com")
+        karim, token = self.register("karim@x.com")
+        link = mail.outbox[-1].body.split("\n\n")[1]
+        self.assertEqual(self.claim(token, link.replace("t=", "t=x")).status_code, 400)
+        self.assertEqual(self.client.post("/api/orders/claim/", {"token": 5}, format="json").status_code, 401)
+        with mock.patch("django.core.signing.time.time", return_value=timezone.now().timestamp() + 4 * 86400):
+            self.assertEqual(self.claim(token, link).status_code, 400)
+        User.objects.filter(pk=karim.pk).update(email="new@x.com")
+        self.assertEqual(self.claim(token, link).status_code, 403)
+        self.assertEqual(Order.objects.get(pk=r.data["id"]).user, None)
+
+    def test_mail_outage_does_not_break_sign_in(self):
+        self.order(email="karim@x.com")
+        with mock.patch("shop.api.checkout.send_mail", side_effect=OSError("smtp down")), self.assertLogs("shop.security"):
+            self.register("karim@x.com")
+
+    def test_login_claims_guest_orders_with_the_accounts_email_by_link(self):
+        self.user.email = "rahim@x.com"
+        self.user.save()
+        r = self.order(email="rahim@x.com")
+        self.login()
+        self.assertEqual(Order.objects.get(pk=r.data["id"]).user, None)
+        self.assertEqual(self.claim(Token.objects.get(user=self.user).key).status_code, 200)
+        self.assertEqual(Order.objects.get(pk=r.data["id"]).user, self.user)
+
+    def test_blank_account_email_matches_no_blank_order_email(self):
+        r = self.order()  # self.user has no email, the order none either
+        self.login()
+        self.assertEqual(Order.objects.get(pk=r.data["id"]).user, None)
 
     def test_login_rotates_session_key(self):
         self.client.get("/api/cart/")

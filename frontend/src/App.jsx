@@ -1,39 +1,48 @@
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
+import { FileQuestion } from 'lucide-react'
 import { Link, Route, Routes, useLocation } from 'react-router-dom'
+import { Button } from './components/ui/button'
 import EmptyState from './components/EmptyState'
 import Footer from './components/Footer'
 import Header from './components/Header'
+import Status from './components/Status'
 import Toast from './components/Toast'
 import Home from './pages/Home'
-import Shop from './pages/Shop'
-import Product from './pages/Product'
-import Cart from './pages/Cart'
-import Checkout from './pages/Checkout'
-import Login from './pages/Login'
-import Orders from './pages/Orders'
+
+// Home is the landing page, so it ships in the first bundle; the rest load on first visit.
+const Shop = lazy(() => import('./pages/Shop'))
+const Product = lazy(() => import('./pages/Product'))
+const Cart = lazy(() => import('./pages/Cart'))
+const Checkout = lazy(() => import('./pages/Checkout'))
+const Login = lazy(() => import('./pages/Login'))
+const Orders = lazy(() => import('./pages/Orders'))
+const ClaimOrders = lazy(() => import('./pages/ClaimOrders'))
 
 export default function App() {
   const { pathname } = useLocation()
   useEffect(() => { window.scrollTo(0, 0) }, [pathname])
   return (
     <>
-      <a href="#main" className="skip">Skip to content</a>
+      <a href="#main" className="sr-only z-30 rounded-lg bg-foreground px-4 py-2 text-background focus:not-sr-only focus:fixed focus:top-2 focus:left-2">Skip to content</a>
       <Header />
       <main id="main">
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/shop" element={<Shop />} />
-          <Route path="/p/:slug" element={<Product />} />
-          <Route path="/cart" element={<Cart />} />
-          <Route path="/checkout" element={<Checkout />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/orders" element={<Orders />} />
-          <Route path="*" element={
-            <EmptyState icon="?" title="Page not found" action={<Link to="/" className="btn">Back to the home page</Link>}>
-              The link may be old or mistyped. Search above or browse the shop.
-            </EmptyState>
-          } />
-        </Routes>
+        <Suspense fallback={<Status loading />}>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/shop" element={<Shop />} />
+            <Route path="/p/:slug" element={<Product />} />
+            <Route path="/cart" element={<Cart />} />
+            <Route path="/checkout" element={<Checkout />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/orders" element={<Orders />} />
+            <Route path="/orders/claim" element={<ClaimOrders />} />
+            <Route path="*" element={
+              <EmptyState icon={<FileQuestion strokeWidth={1.5} />} title="Page not found" action={<Button asChild><Link to="/">Back to the home page</Link></Button>}>
+                The link may be old or mistyped. Search above or browse the shop.
+              </EmptyState>
+            } />
+          </Routes>
+        </Suspense>
       </main>
       <Footer />
       <Toast />

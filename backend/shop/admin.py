@@ -4,11 +4,12 @@ from datetime import timedelta
 from django import forms
 from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth.forms import AdminUserCreationForm, UserChangeForm
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Count, F, Sum
+from django.db.models import Count, Exists, F, OuterRef, Sum
 from django.db.models.functions import TruncDate
 from django.http import HttpResponse
 from django.utils import timezone
@@ -17,7 +18,7 @@ from django_otp.admin import OTPAdminSite
 
 from .auth import client_ident, locked_out, login_fail_keys, record_login_failure
 from .display import cdn, taka
-from .models import LOW_STOCK, Category, Order, OrderItem, Product
+from .models import COMMENT_PAGE, LOW_STOCK, Category, Comment, Order, OrderItem, Product, ProductImage, ProductOption, ProductVariant, options_error, variant_keys
 
 log = logging.getLogger("shop.security")
 
@@ -32,13 +33,13 @@ class HaatAdminSite(OTPAdminSite):
             return super().login(request, extra_context)
         username = request.POST.get("username", "")[:150]
         ip = client_ident(request)
-        keys = login_fail_keys(username, request)  # user counter shared with the API login
+        keys = login_fail_keys(username, request, ip_lock=True)  # user counters shared with the API login
         if locked_out(keys):
             log.warning("admin login locked out: ip=%s username=%r", ip, username)
             return HttpResponse("Too many failed logins. Try again later.", status=429, content_type="text/plain")
         response = super().login(request, extra_context)
         if response.status_code == 302:  # logged in
-            cache.delete_many(login_fail_keys(username))
+            cache.delete_many(login_fail_keys(username, request))  # the IP counter stays: other names it guessed
         else:
             log.warning("admin login failed: ip=%s username=%r", ip, username)
             record_login_failure(keys)
@@ -151,8 +152,123 @@ class StockFilter(admin.SimpleListFilter):
                 "in": queryset.filter(stock__gte=LOW_STOCK)}.get(self.value(), queryset)
 
 
+class ProductImageInline(admin.TabularInline):
+    model = ProductImage
+    extra = 1
+    fields = ["thumb", "url", "position"]
+    readonly_fields = ["thumb"]
+    verbose_name_plural = "More photos (shown after the main image on the product page)"
+
+    @admin.display(description="Photo")
+    def thumb(self, obj):
+        return format_html('<span class="haat-frame haat-thumb"><img src="{}" alt="" loading="lazy"></span>',
+                           cdn(obj.url, 120)) if obj.url else "-"
+
+
+class OptionFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        kept = [f.cleaned_data for f in self.forms if f.cleaned_data and not f.cleaned_data.get("DELETE")]
+        names = [d["name"].strip().lower() for d in kept]
+        if len(names) != len(set(names)):
+            raise forms.ValidationError("Each option needs its own name.")
+        options = [(d["name"], ProductOption(values=d["values"]).choices) for d in kept]
+        if error := options_error(options):
+            raise forms.ValidationError(error)
+        # Renaming an option or fixing a typo in a choice makes new combinations: the old ones, with their stock
+        # and price, would be deleted. Refuse while any of them still holds stock.
+        if self.instance.pk and (lost := self.instance.variants.filter(stock__gt=0).exclude(key__in=variant_keys(options))):
+            raise forms.ValidationError(
+                f"This change removes combinations that still have stock: {', '.join(v.label for v in lost)}. "
+                "Set their stock to 0 and save first, then change the options. New combinations start with 0 stock "
+                "and the product's price.")
+
+
+class ProductOptionInline(admin.TabularInline):
+    model = ProductOption
+    formset = OptionFormSet
+    extra = 1
+    fields = ["name", "values", "position"]
+    verbose_name_plural = "Options the buyer picks when ordering (e.g. Size: S, M, L)"
+
+
+def stock_field(field, db_field):
+    """Posts back the stock the page showed, so `changed_data` tells a staff edit from orders placed since
+    (Django's own initial is read again on save). Without it, saving the page would undo those sales."""
+    if db_field.name == "stock" and field:
+        field.show_hidden_initial = True
+    return field
+
+
+class ProductVariantInline(admin.TabularInline):
+    """Every combination of the options above, made on save; staff set each one's stock and price here."""
+    model = ProductVariant
+    extra = 0
+    can_delete = False  # change the options instead: combinations follow them
+    fields = ["combination", "price", "stock"]
+    readonly_fields = ["combination"]
+    verbose_name_plural = "Stock and price per combination (the product's stock is their total)"
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        return stock_field(super().formfield_for_dbfield(db_field, request, **kwargs), db_field)
+
+    @admin.display(description="Combination")
+    def combination(self, obj):
+        return obj.label
+
+
+class CommentInline(admin.TabularInline):
+    """Customers' comments on this product, newest first. Staff fix or remove abuse; deleting a comment
+    also deletes its replies. Comments are written by customers, so staff can't add them here."""
+    model = Comment
+    fk_name = "product"
+    extra = 0
+    fields = ["created", "user", "reply_to", "text", "like_count", "edited", "deleted"]
+    readonly_fields = ["created", "user", "reply_to", "like_count", "edited", "deleted"]
+    formfield_overrides = {models.TextField: {"widget": forms.Textarea(attrs={"rows": 2, "cols": 60})}}
+    verbose_name_plural = "Customer comments (deleting one also deletes its replies)"
+    ordering = ["-id"]
+    template = "admin/shop/comment_inline.html"  # the stock table plus a "Show more" link
+    more_url = None
+    page_size = COMMENT_PAGE
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request).select_related("user", "parent").annotate(n_likes=Count("likes"))
+        if request.method != "GET":  # saving: every comment the page showed must be found, even if new ones came
+            return qs
+        # Viewing: the newest COMMENT_PAGE, and COMMENT_PAGE more each time staff click "Show more" (?comments=N).
+        try:
+            shown = max(int(request.GET.get("comments", COMMENT_PAGE)), COMMENT_PAGE)
+        except ValueError:
+            shown = COMMENT_PAGE
+        product = request.resolver_match.kwargs.get("object_id")
+        ids = list(Comment.objects.filter(product_id=product).order_by("-id").values_list("pk", flat=True)[:shown + 1])
+        if len(ids) > shown:  # Django makes a fresh inline per request, so this is per page view
+            params = request.GET.copy()
+            params["comments"] = shown + COMMENT_PAGE
+            self.more_url = f"?{params.urlencode()}#comments-group"
+        return qs.filter(pk__in=ids[:shown])
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    @admin.display(description="Reply to")
+    def reply_to(self, obj):
+        if not obj.parent:
+            return "-"
+        return "(deleted comment)" if obj.parent.deleted else f"{obj.parent.user}: {obj.parent.text[:40]}"
+
+    @admin.display(description="Likes")
+    def like_count(self, obj):
+        return obj.n_likes
+
+
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
+    inlines = [ProductImageInline, ProductOptionInline, ProductVariantInline, CommentInline]
     list_display = ["thumb", "name", "category", "price", "original_price", "discount_badge", "stock",
                     "stock_status", "rating", "created"]
     list_display_links = ["thumb", "name"]
@@ -167,7 +283,7 @@ class ProductAdmin(admin.ModelAdmin):
     fieldsets = [
         (None, {"fields": ["name", "slug", "category", "description"]}),
         ("Price and stock", {"fields": ["price", "original_price", "stock"]}),
-        ("Image", {"fields": ["image", "preview"],
+        ("Main image", {"fields": ["image", "preview"],
                    "description": "Paste an image URL. The preview updates as you type."}),
         ("Reviews", {"fields": ["rating", "reviews", "created"]}),
     ]
@@ -187,6 +303,50 @@ class ProductAdmin(admin.ModelAdmin):
             '<a class="haat-original" href="{}" target="_blank" rel="noopener"{}>Open full size</a>',
             cdn(obj.image, 600), obj.image, "" if obj.image else " hidden")
 
+    def get_readonly_fields(self, request, obj=None):
+        # With options, stock is the total of the combinations below; Product.clean() guards the list page too.
+        has_variants = obj is not None and obj.variants.exists()
+        return [*self.readonly_fields, "stock"] if has_variants else self.readonly_fields
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).annotate(has_variants=Exists(ProductVariant.objects.filter(product=OuterRef("pk"))))
+
+    def get_changelist_form(self, request, **kwargs):
+        class Form(super().get_changelist_form(request, **kwargs)):
+            def __init__(self, *args, **kw):
+                super().__init__(*args, **kw)
+                # A stale stock number from the list page would fail Product.clean() or overwrite a sale.
+                if getattr(self.instance, "has_variants", False):
+                    self.fields["stock"].disabled = True
+        return Form
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        return stock_field(super().formfield_for_dbfield(db_field, request, **kwargs), db_field)
+
+    def save_model(self, request, obj, form, change):
+        # The form's stock is what the page read; orders placed since lowered it. Write it only if staff changed it.
+        if change and "stock" not in form.changed_data:
+            obj.save(update_fields=[f.name for f in obj._meta.concrete_fields if not f.primary_key and f.name != "stock"])
+            obj.refresh_from_db(fields=["stock"])
+        else:
+            super().save_model(request, obj, form, change)
+        obj.sync_stock()  # the save wrote the stock read before any order placed meanwhile; re-total it
+
+    def save_formset(self, request, form, formset, change):
+        if formset.model is not ProductVariant:
+            return super().save_formset(request, form, formset, change)
+        formset.new_objects, formset.changed_objects, formset.deleted_objects = [], [], []  # read by the change log
+        for f in formset.forms:  # same as save_model: a price edit must not write back the stock the page read
+            if fields := [n for n in ("price", "stock") if n in f.changed_data]:
+                f.instance.save(update_fields=fields)
+                formset.changed_objects.append((f.instance, fields))
+
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        if added := form.instance.sync_variants():
+            self.message_user(request, f"{added} new option combination(s) start with 0 stock: set their stock below.",
+                              messages.WARNING)
+
     @admin.display(description="Discount", ordering="original_price")
     def discount_badge(self, obj):
         return badge(f"-{obj.discount}%", "sale") if obj.discount else "-"
@@ -201,7 +361,7 @@ class OrderItemInline(admin.TabularInline):
     model = OrderItem
     extra = 0
     can_delete = False
-    fields = ["product", "name", "price", "quantity", "line_total"]
+    fields = ["product", "name", "options", "price", "quantity", "line_total"]
     readonly_fields = fields
 
     @admin.display(description="Line total")
@@ -250,7 +410,7 @@ class OrderAdmin(admin.ModelAdmin):
     inlines = [OrderItemInline]
     fieldsets = [
         (None, {"fields": ["progress", "status", "user", "created"]}),
-        ("Delivery", {"fields": ["full_name", "phone", "address", "city"]}),
+        ("Delivery", {"fields": ["full_name", "phone", "email", "address", "city"]}),
         ("Payment", {"fields": ["payment", "subtotal", "delivery_fee", "total"]}),
     ]
     # Money and buyer are what the order was placed with; stock was taken for these amounts.
@@ -306,7 +466,50 @@ class OrderInline(admin.TabularInline):
         return False
 
 
+def clean_unique_email(form):
+    """Admin twin of RegisterSerializer.validate_email: required, lowercased, one account per email."""
+    email = form.cleaned_data["email"].lower()
+    if User.objects.filter(email__iexact=email).exclude(pk=form.instance.pk).exists():
+        raise ValidationError("An account with that email already exists.")
+    return email
+
+
+def no_at_sign(username):
+    """Admin twin of RegisterSerializer.validate_username's "@" rule."""
+    if "@" in username:
+        raise ValidationError("A username can't contain @.")
+    return username
+
+
+class HaatUserCreationForm(AdminUserCreationForm):
+    class Meta(AdminUserCreationForm.Meta):
+        fields = ["username", "email"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["email"].required = True
+
+    clean_email = clean_unique_email
+
+    def clean_username(self):
+        return no_at_sign(super().clean_username())
+
+
+class HaatUserChangeForm(UserChangeForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["email"].required = True  # older accounts without one get it filled on next edit
+
+    clean_email = clean_unique_email
+
+    def clean_username(self):
+        return no_at_sign(self.cleaned_data["username"])
+
+
 class HaatUserAdmin(UserAdmin):
+    form = HaatUserChangeForm
+    add_form = HaatUserCreationForm
+    add_fieldsets = [(None, {"classes": ["wide"], "fields": ["username", "email", "usable_password", "password1", "password2"]})]
     list_display = ["username", "email", "first_name", "last_name", "order_count", "is_staff", "is_active",
                     "date_joined", "last_login"]
     list_filter = UserAdmin.list_filter + ("date_joined",)

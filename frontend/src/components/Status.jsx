@@ -1,25 +1,30 @@
+import { CircleAlert } from 'lucide-react'
 import EmptyState from './EmptyState'
+import Page from './Page'
+import { Grid } from './TileGrid'
+import { Button } from './ui/button'
+import { Skeleton } from './ui/skeleton'
 
-function Skeleton({ n = 8 }) {
+function Loading({ n = 8 }) {
   return (
-    <div className="tiles" aria-busy="true" aria-label="Loading">
+    <Grid aria-busy="true" aria-label="Loading">
       {Array.from({ length: n }, (_, i) => (
-        <div className="skel-tile" key={i}>
-          <span className="skel skel-pic" />
-          <span className="skel skel-line" />
-          <span className="skel skel-line short" />
+        <div className="grid gap-2.5" key={i}>
+          <Skeleton className="aspect-square rounded-xl" />
+          <Skeleton className="h-3.5" />
+          <Skeleton className="h-3.5 w-2/5" />
         </div>
       ))}
-    </div>
+    </Grid>
   )
 }
 
 export default function Status({ loading, error, children }) {
-  if (loading) return <div className="page"><Skeleton /></div>
+  if (loading) return <Page as="div"><Loading /></Page>
   if (error)
     return (
-      <EmptyState icon="!" title="We couldn't load this page"
-        action={<button className="btn" onClick={() => location.reload()}>Try again</button>}>
+      <EmptyState icon={<CircleAlert strokeWidth={1.5} />} title="We couldn't load this page"
+        action={<Button onClick={() => location.reload()}>Try again</Button>}>
         Check your connection and try again. ({error.message})
       </EmptyState>
     )
