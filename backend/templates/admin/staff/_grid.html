@@ -6,7 +6,7 @@
       <th scope="row">{{ row.label }} <span class="haat-muted">{{ row.app }}</span></th>
       {% for cell in row.cells %}
         <td>{% if cell %}<input type="checkbox" name="perms" value="{{ cell.pk }}" aria-label="{{ cell.action|capfirst }} {{ row.label }}"{% if cell.checked %} checked{% endif %}>
-          <span class="haat-tip"><button type="button" class="haat-tip-btn" aria-label="What {{ cell.action }} {{ row.label|lower }} allows" aria-describedby="perm-tip-{{ cell.pk }}">i</button><span role="tooltip" id="perm-tip-{{ cell.pk }}">{{ cell.help }}</span></span>{% else %}<span class="haat-muted" aria-label="Not available">-</span>{% endif %}</td>
+          <span class="haat-info"><button type="button" class="haat-info-btn" aria-label="What {{ cell.action }} {{ row.label|lower }} allows" aria-describedby="perm-tip-{{ cell.pk }}">i</button><span role="tooltip" id="perm-tip-{{ cell.pk }}">{{ cell.help }}</span></span>{% else %}<span class="haat-muted" aria-label="Not available">-</span>{% endif %}</td>
       {% endfor %}
     </tr>
   {% empty %}
