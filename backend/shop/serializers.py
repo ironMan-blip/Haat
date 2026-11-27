@@ -92,6 +92,7 @@ class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, max_length=128)  # bounds hashing and similarity checks
     # ASCII only: Unicode look-alikes ("rafi" with a Cyrillic "а") would pass as a different user.
     username = serializers.CharField(max_length=150, validators=[ASCIIUsernameValidator()])
+    email = serializers.EmailField(max_length=254)  # required: accounts are tracked by email
 
     class Meta:
         model = User
@@ -103,16 +104,24 @@ class RegisterSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("A user with that username already exists.")
         return value
 
+    def validate_email(self, value):
+        value = value.lower()
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError("An account with that email already exists.")
+        return value
+
     def validate(self, attrs):
         # Pass the would-be user so the "too similar to your username/email" check runs.
-        validate_password(attrs["password"], User(username=attrs["username"], email=attrs.get("email", "")))
+        validate_password(attrs["password"], User(username=attrs["username"], email=attrs["email"]))
         return attrs
 
     def create(self, data):
         try:
             with transaction.atomic():
                 return User.objects.create_user(**data)
-        except IntegrityError:  # a parallel sign-up took the name; the case-insensitive index caught it
+        except IntegrityError:  # a parallel sign-up took the name or email; a case-insensitive index caught it
+            if data.get("email") and User.objects.filter(email__iexact=data["email"]).exists():
+                raise serializers.ValidationError({"email": "An account with that email already exists."})
             raise serializers.ValidationError({"username": "A user with that username already exists."})
 
 

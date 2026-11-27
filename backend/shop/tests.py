@@ -222,6 +222,18 @@ class ShopApiTests(APITestCase):
         r = self.client.post("/api/auth/login/", {"username": "new", "password": "pass-1234-word"})
         self.assertIn("token", r.data)
 
+    def test_register_requires_unique_email(self):
+        self.client.force_authenticate(None)
+        r = self.client.post("/api/auth/register/", {"username": "noemail", "password": "pass-1234-word"})
+        self.assertIn("email", r.data)
+        r = self.client.post("/api/auth/register/", {"username": "first", "email": "Same@x.com", "password": "pass-1234-word"})
+        self.assertEqual(r.status_code, 201)
+        r = self.client.post("/api/auth/register/", {"username": "second", "email": "same@X.com", "password": "pass-1234-word"})
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("email", r.data)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            User.objects.create_user("third", email="SAME@x.com")
+
     def test_bad_city_and_long_address_rejected(self):
         r = self.order((self.case, 1), city="Atlantis", address="x" * 301)
         self.assertEqual(r.status_code, 400)
@@ -508,7 +520,7 @@ class SecurityTests(APITestCase):
 
     def test_signup_has_a_daily_cap_per_ip(self):
         with mock.patch.object(SignupThrottle, "THROTTLE_RATES", {"signup": "2/day"}):
-            codes = [self.client.post("/api/auth/register/", {"username": f"u{i}", "password": "pass-1234-word"}).status_code
+            codes = [self.client.post("/api/auth/register/", {"username": f"u{i}", "email": f"u{i}@x.com", "password": "pass-1234-word"}).status_code
                      for i in range(3)]
         self.assertEqual(codes, [201, 201, 429])
 
@@ -789,7 +801,7 @@ class GuestCheckoutTests(APITestCase):
 
     def test_new_account_claims_no_guest_orders(self):
         r = self.order()
-        reg = self.client.post("/api/auth/register/", {"username": "karim", "password": "pass-1234-word"}, format="json")
+        reg = self.client.post("/api/auth/register/", {"username": "karim", "email": "karim@x.com", "password": "pass-1234-word"}, format="json")
         self.assertEqual(reg.status_code, 201, reg.data)
         self.assertEqual(Order.objects.get(pk=r.data["id"]).user, None)  # no past phone to match yet
 

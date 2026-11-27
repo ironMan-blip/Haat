@@ -36,7 +36,7 @@ export default function Login() {
         </div>
         <input type="hidden" name="next" value={params.get('next') || ''} />
         <label>Username<input name="username" required autoComplete="username" /></label>
-        {mode === 'register' && <label>Email <span className="hint">(optional)</span><input name="email" type="email" autoComplete="email" /></label>}
+        {mode === 'register' && <label>Email<input name="email" type="email" required autoComplete="email" /></label>}
         <label>Password
           <span className="pw">
             <input name="password" type={show ? 'text' : 'password'} required
