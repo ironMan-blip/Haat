@@ -57,6 +57,7 @@ createdb haat                                # PostgreSQL; local socket by defau
                                              # other DB: POSTGRES_DB/USER/PASSWORD/HOST/PORT
 .venv/bin/python manage.py migrate
 .venv/bin/python manage.py seed              # 47 sample products from Daraz listings
+DJANGO_DEBUG=1 .venv/bin/python manage.py demo_data  # demo users, orders, comments, stock edge cases (password: see --help)
 .venv/bin/python manage.py createsuperuser   # for /admin
 .venv/bin/python manage.py admin_totp <username>  # admin needs an authenticator-app code; scan the printed URL
 .venv/bin/python manage.py runserver 127.0.0.1:8000
