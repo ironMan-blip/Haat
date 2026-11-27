@@ -114,7 +114,7 @@ function ProductPage({ slug }) {
                 <>
                   <Stock item={item} />
                   {/* Phones: the buy row stays pinned to the screen bottom while the details scroll. */}
-                  <div className="z-10 flex flex-wrap items-center gap-2.5 max-md:sticky max-md:bottom-0 max-md:-mx-gutter max-md:flex-nowrap max-md:bg-background max-md:px-gutter max-md:py-3 max-md:shadow-float">
+                  <div className="flex flex-wrap items-center gap-2.5 max-md:sticky max-md:z-10 max-md:bottom-0 max-md:-mx-gutter max-md:flex-nowrap max-md:bg-background max-md:px-gutter max-md:py-3 max-md:shadow-float">
                     <Qty value={n} max={item.max_qty} onChange={setQty} label="Quantity" />
                     <Button className="h-12.5 min-w-0 flex-1 max-md:px-3" onClick={() => add(p, n, chosen)}>Add to cart</Button>
                     <Button variant="line" className="h-12.5 min-w-0 flex-1 max-md:px-3" onClick={() => add(p, n, chosen).then((ok) => ok && navigate('/cart'))}>Buy now</Button>
