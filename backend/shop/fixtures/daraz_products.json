@@ -10,10 +10,14 @@
   "stock": 50,
   "reviews": 0,
   "options": {
+   "Storage": {
+    "4GB + 64GB": 0,
+    "4GB + 128GB": 1500,
+    "6GB + 128GB": 2800
+   },
    "Color": [
-    "Black",
-    "Blue",
-    "Green"
+    "Obsidian Black",
+    "Beach Gold"
    ]
   }
  },
@@ -29,9 +33,8 @@
   "reviews": 0,
   "options": {
    "Color": [
-    "Black",
-    "Blue",
-    "Green"
+    "Orange",
+    "Dark Blue"
    ]
   }
  },
@@ -47,10 +50,13 @@
   "reviews": 2,
   "options": {
    "Color": [
-    "Black",
-    "Blue",
-    "Green"
-   ]
+    "Midnight Black",
+    "Ocean Blue"
+   ],
+   "Warranty": {
+    "1 year official": 0,
+    "2 years official": 990
+   }
   }
  },
  {
@@ -65,10 +71,13 @@
   "reviews": 0,
   "options": {
    "Color": [
-    "Black",
-    "Blue",
-    "Green"
-   ]
+    "Shadow Black",
+    "Neon Green"
+   ],
+   "Warranty": {
+    "1 year official": 0,
+    "2 years official": 990
+   }
   }
  },
  {
@@ -82,10 +91,13 @@
   "stock": 50,
   "reviews": 50,
   "options": {
+   "Storage": {
+    "4GB + 64GB": 0,
+    "4GB + 128GB": 1500
+   },
    "Color": [
-    "Black",
-    "Blue",
-    "Green"
+    "Ink Black",
+    "Jade Green"
    ]
   }
  },
@@ -100,9 +112,17 @@
   "stock": 50,
   "reviews": 5,
   "options": {
+   "Storage": {
+    "6GB + 128GB": 0,
+    "8GB + 256GB": 3000
+   },
+   "Connectivity": {
+    "Wi-Fi": 0,
+    "Wi-Fi + 4G": 2000
+   },
    "Color": [
-    "Gray",
-    "Blue"
+    "Titan Gray",
+    "Frost Blue"
    ]
   }
  },
@@ -117,10 +137,13 @@
   "stock": 50,
   "reviews": 27,
   "options": {
+   "Storage": {
+    "4GB + 64GB": 0,
+    "4GB + 128GB": 1500
+   },
    "Color": [
-    "Black",
-    "Blue",
-    "Green"
+    "Midnight Black",
+    "Emerald Green"
    ]
   }
  },
@@ -137,9 +160,12 @@
   "options": {
    "Color": [
     "Black",
-    "Blue",
-    "Green"
-   ]
+    "Blue"
+   ],
+   "Warranty": {
+    "1 year official": 0,
+    "2 years official": 990
+   }
   }
  },
  {
@@ -156,7 +182,11 @@
    "Color": [
     "White",
     "Black"
-   ]
+   ],
+   "Bundle": {
+    "Earbuds only": 0,
+    "With silicone case": 80
+   }
   }
  },
  {
@@ -171,8 +201,9 @@
   "reviews": 46,
   "options": {
    "Color": [
-    "White",
-    "Black"
+    "Black",
+    "Beige",
+    "Pink"
    ]
   }
  },
@@ -190,7 +221,11 @@
    "Color": [
     "White",
     "Black"
-   ]
+   ],
+   "Bundle": {
+    "Earbuds only": 0,
+    "With silicone case": 80
+   }
   }
  },
  {
@@ -207,7 +242,11 @@
    "Color": [
     "White",
     "Black"
-   ]
+   ],
+   "Bundle": {
+    "Earbuds only": 0,
+    "With silicone case": 80
+   }
   }
  },
  {
@@ -224,7 +263,11 @@
    "Color": [
     "White",
     "Black"
-   ]
+   ],
+   "Bundle": {
+    "Earbuds only": 0,
+    "With silicone case": 80
+   }
   }
  },
  {
@@ -239,8 +282,12 @@
   "reviews": 20,
   "options": {
    "Color": [
-    "White",
-    "Black"
+    "Black",
+    "White"
+   ],
+   "Style": [
+    "Ear clip",
+    "In-ear"
    ]
   }
  },
@@ -256,8 +303,8 @@
   "reviews": 175,
   "options": {
    "Color": [
-    "White",
-    "Black"
+    "Black",
+    "White"
    ]
   }
  },
@@ -273,8 +320,9 @@
   "reviews": 47,
   "options": {
    "Color": [
+    "Black",
     "White",
-    "Black"
+    "Blue"
    ]
   }
  },
@@ -289,12 +337,12 @@
   "stock": 50,
   "reviews": 337,
   "options": {
-   "Size": [
-    "M",
-    "L",
-    "XL",
-    "XXL"
-   ],
+   "Size": {
+    "M": 0,
+    "L": 0,
+    "XL": 0,
+    "XXL": 20
+   },
    "Color": [
     "Black",
     "White",
@@ -314,17 +362,17 @@
   "stock": 50,
   "reviews": 232,
   "options": {
-   "Size": [
-    "M",
-    "L",
-    "XL",
-    "XXL"
-   ],
+   "Size": {
+    "M": 0,
+    "L": 0,
+    "XL": 0,
+    "XXL": 20
+   },
    "Color": [
     "Black",
-    "White",
-    "Navy",
-    "Maroon"
+    "Olive",
+    "Sky Blue",
+    "Red"
    ]
   }
  },
@@ -342,14 +390,12 @@
    "Size": [
     "M",
     "L",
-    "XL",
-    "XXL"
+    "XL"
    ],
    "Color": [
     "Black",
     "White",
-    "Navy",
-    "Maroon"
+    "Navy"
    ]
   }
  },
@@ -372,9 +418,9 @@
    ],
    "Color": [
     "Black",
-    "White",
+    "Ash",
     "Navy",
-    "Maroon"
+    "Bottle Green"
    ]
   }
  },
@@ -392,13 +438,11 @@
    "Size": [
     "M",
     "L",
-    "XL",
-    "XXL"
+    "XL"
    ],
    "Color": [
     "Black",
     "White",
-    "Navy",
     "Maroon"
    ]
   }
@@ -414,17 +458,17 @@
   "stock": 50,
   "reviews": 513,
   "options": {
-   "Size": [
-    "M",
-    "L",
-    "XL",
-    "XXL"
-   ],
+   "Size": {
+    "M": 0,
+    "L": 0,
+    "XL": 0,
+    "XXL": 20
+   },
    "Color": [
     "Black",
-    "White",
     "Navy",
-    "Maroon"
+    "Coffee",
+    "Mint"
    ]
   }
  },
@@ -465,10 +509,11 @@
     "XXL"
    ],
    "Color": [
-    "Black",
     "White",
-    "Navy",
-    "Maroon"
+    "Black",
+    "Navy Blue",
+    "Maroon",
+    "Sky Blue"
    ]
   }
  },
@@ -481,7 +526,19 @@
   "rating": 4.5,
   "description": "কাপড়ে পানা ৫ ফিট হয় ৬ ফিট করার জন্য এক সাইডে জয়েন্ট হবে যেটা খুব সুন্দর করে সেলাই করা বুজা যায়না\nকলার প্রতিনিয়ত পরিবর্তন হয় মেসেজ এর মাধ্যমে দেখে নিতে পারেন\nভীষণ ঠান্ডা ও আরামদায়ক হবে, মোটেও গরম ফিল হবে না\nময়লা হবে না সহজেই\nপানি লিক করার সম্ভাবনা ০%\nকিং সাইজ (৬ ফিট × ৭ ফিট) আপনার বিছানায় পুরোপুরি ফিট হবে\nটেকসই এবং দীর্ঘস্থায়ী অনেক দিন ধরে নিশ্চিন্তে ব্যবহার করতে পারবেন\nইজিলি ওয়াশেবল পরিষ্কার করতে কোনো\nঝামেলা নেই\nদুর্দান্ত ফিনিশিং ও মজবুত সেলাই মান নিয়ে কোনো আপোষ নয়..\nঅসাধারণ কালার এবং ডিজাইনের মধ্যে আপনার পছন্দসই বেডশীট বেছে নিন। স্টক শেষ হওয়ার আগে ঝটপট অর্ডার করুন এবং আপনার ঘরকে করে তুলুন ঝামেলামুক্ত ও স্টাইলিশ।\nএবার ঝামেলাহীন থাকতে এখনই ঘরে রাখুন ওয়াটারপ্রুফ এই বেডশীটগুলো।\nMetarial - soft leather lear rexin plastic\nWaterproof full bed rexin type protector.\nThe bed cover is made of durable PVC material combined with linen fabric for easy maintenance and long-term use.\nlong lasting\ncpmfot mat\nlong lasting\nsize - 6/7 fit\nfull bed",
   "stock": 50,
-  "reviews": 164
+  "reviews": 164,
+  "options": {
+   "Size": {
+    "5 × 7 ft": -100,
+    "6 × 7 ft": 0,
+    "7 × 8 ft": 150
+   },
+   "Color": [
+    "Blue",
+    "Pink",
+    "Gray"
+   ]
+  }
  },
  {
   "category": "Home & Living",
@@ -492,7 +549,15 @@
   "rating": 4.4,
   "description": "Product Type: Bed Sheet\nKing size Bedsheet with Two pillow cover set.\nKing size Bedsheet 1pcs:7 × 8.5Feet.\nStandard Pillow cover 2pcs: 20×26 inch.\nMain Material: Cotton\nGSM :130",
   "stock": 50,
-  "reviews": 27
+  "reviews": 27,
+  "options": {
+   "Design": [
+    "Floral",
+    "Paisley",
+    "Geometric",
+    "Checked"
+   ]
+  }
  },
  {
   "category": "Home & Living",
@@ -503,7 +568,19 @@
   "rating": 4.4,
   "description": "Product Details:Item Code: B2nKing size Bedsheet with Two pillow cover set.King size Bedsheet 1pcs:7.5×8.25Feet.Standard Pillow cover 2pcs: 18×26 inch.Made with full cotton soft fabric.Full king size Bedsheet with 2pcs machine Head pillow cover.Full washable ,and color will not rise.Manufacturer by our own manufacturer, it's more quality full than usual other Bedsheet set in local market.Full QC pass with best stitching quality.#bedsheetKing size Bedsheet with Two Pillow cover set.King size Bedsheet 1pcs:7.5×8.25Feet.Excellent Quality.Very Soft &amp; Comfortable to Use.Color: Green and white art (As Given Picture)",
   "stock": 50,
-  "reviews": 31
+  "reviews": 31,
+  "options": {
+   "Bed size": {
+    "Double (6.5 × 7.5 ft)": -60,
+    "King (7.5 × 8.25 ft)": 0
+   },
+   "Design": [
+    "Floral",
+    "Paisley",
+    "Geometric",
+    "Checked"
+   ]
+  }
  },
  {
   "category": "Home & Living",
@@ -514,7 +591,14 @@
   "rating": 5.0,
   "description": "Product Type: Bed Sheet with Pillow Covers● Color: Multicolor● Main Material: Cotton Blend● Bed Sheet Size: 7 x .8 Feet● Pillow Cover Size:18 x 24 Inch● Double Size Bed Sheet● Bed Sheet with Matching 2 Pillow Covers.● Product color may slightly vary due to photographic lighting sources or your monitor settings.",
   "stock": 50,
-  "reviews": 4
+  "reviews": 4,
+  "options": {
+   "Design": [
+    "Yellow multicolor",
+    "Blue multicolor",
+    "Green multicolor"
+   ]
+  }
  },
  {
   "category": "Home & Living",
@@ -525,7 +609,14 @@
   "rating": 4.5,
   "description": "Product details of King Size Premium Bed Sheet 88\" x 98\" with 2 Pillow Covers | Multicolor Motif Print with Yellow Border\nKing Size Premium Bed Sheet 88\" x 98\" with 2 Pillow Covers | Multicolor Motif Print with Yellow Border1. Product details of King Size Premium Bed Sheet 88\" x 98\" with 2 Pillow Covers | Multicolor Motif Print with Yellow Border\n1. Product details of King Size Premium Bed Sheet 88\" x 98\" with 2 Pillow Covers | Multicolor Motif Print with Yellow Border",
   "stock": 50,
-  "reviews": 35
+  "reviews": 35,
+  "options": {
+   "Design": [
+    "Yellow border motif",
+    "Red border motif",
+    "Green border motif"
+   ]
+  }
  },
  {
   "category": "Home & Living",
@@ -536,7 +627,18 @@
   "rating": 5.0,
   "description": "Product Type: Bed Sheet\nMain Material: Cotton\nBed Sheet Size: 7.5x8.33 Feet\n2 Pillow Case\nPillow Cover Size: 18 x 28 Inch\nMachine Washable\nQuick Dry\n#BedSheet",
   "stock": 50,
-  "reviews": 2
+  "reviews": 2,
+  "options": {
+   "Bed size": {
+    "Double (6.5 × 7.5 ft)": -80,
+    "King (7.5 × 8.33 ft)": 0
+   },
+   "Color": [
+    "White",
+    "Sky Blue",
+    "Ash"
+   ]
+  }
  },
  {
   "category": "Home & Living",
@@ -547,7 +649,15 @@
   "rating": 4.6,
   "description": "",
   "stock": 50,
-  "reviews": 55
+  "reviews": 55,
+  "options": {
+   "Design": [
+    "Floral",
+    "Paisley",
+    "Geometric",
+    "Checked"
+   ]
+  }
  },
  {
   "category": "Home & Living",
@@ -558,7 +668,15 @@
   "rating": 4.4,
   "description": "",
   "stock": 50,
-  "reviews": 50
+  "reviews": 50,
+  "options": {
+   "Design": [
+    "Floral",
+    "Paisley",
+    "Geometric",
+    "Checked"
+   ]
+  }
  },
  {
   "category": "Beauty",
@@ -569,7 +687,14 @@
   "rating": 3.8,
   "description": "🌊 Muuchstac Ocean Face Wash For Men! 🌊Say goodbye to acne, pimples, and excess oil with our multi-action formula. Muuchstac Ocean Face Wash is designed to:✅ Control acne, pimples, and excess oil✅ Keep your skin cool and refreshed✅ Reduce dryness, dandruff, and dullness✅ Brighten your skin and improve its tone✅ Remove blemishes and dark spotsExperience the refreshing feel of Muuchstac Ocean Face Wash and see the difference it makes!",
   "stock": 50,
-  "reviews": 38
+  "reviews": 38,
+  "options": {
+   "Pack": {
+    "1 pc": 0,
+    "Pack of 2": 130,
+    "Pack of 3": 260
+   }
+  }
  },
  {
   "category": "Beauty",
@@ -580,7 +705,14 @@
   "rating": 4.6,
   "description": "Introducing ZM Foaming Face Wash for Men – a dynamic 100 ML formulation enriched with the invigorating combination of Tea Tree and Salicylic Acid. Experience the power of thorough yet gentle cleansing that leaves your skin feeling refreshed and revitalized. ZM Foaming Face Wash is your essential companion for a clear and energized complexion.",
   "stock": 50,
-  "reviews": 169
+  "reviews": 169,
+  "options": {
+   "Pack": {
+    "1 pc": 0,
+    "Pack of 2": 190,
+    "Pack of 3": 360
+   }
+  }
  },
  {
   "category": "Beauty",
@@ -591,7 +723,14 @@
   "rating": 4.1,
   "description": "Comedolytic against impurities\nOil control formula\nHighly moisturizing effect\nSuitable for acne scar\nSpecial formula for acne skin\nMade in Thiland\n100% Original Product\nOfficial Store Product",
   "stock": 50,
-  "reviews": 26
+  "reviews": 26,
+  "options": {
+   "Pack": {
+    "1 pc": 0,
+    "Pack of 2": 130,
+    "Pack of 3": 250
+   }
+  }
  },
  {
   "category": "Beauty",
@@ -602,7 +741,14 @@
   "rating": 4.7,
   "description": "Product Type: Pimple Clear Neem Face Wash\nBrand: Himalaya\nCapacity:100ml\nGender: Men",
   "stock": 50,
-  "reviews": 1701
+  "reviews": 1701,
+  "options": {
+   "Pack": {
+    "1 pc": 0,
+    "Pack of 2": 100,
+    "Pack of 3": 200
+   }
+  }
  },
  {
   "category": "Beauty",
@@ -613,7 +759,14 @@
   "rating": 4.8,
   "description": "জাপানি সাকুরা ইনফিউজড ক্লিনজার: লাইকুরার সাকুরা ক্লিনজারের সাথে জাপানি সাকুরার জাদু অনুভব করুন।সাকুরার সারাংশের সাথে মিশ্রিত, এটি একটি সতেজ এবং পুনরুজ্জীবিত পরিষ্কারের প্রস্তাব দেয়।",
   "stock": 50,
-  "reviews": 693
+  "reviews": 693,
+  "options": {
+   "Pack": {
+    "1 pc": 0,
+    "Pack of 2": 160,
+    "Pack of 3": 320
+   }
+  }
  },
  {
   "category": "Beauty",
@@ -624,7 +777,14 @@
   "rating": 4.4,
   "description": "- **Deep Cleansing**: Removes dirt, oil, and impurities, leaving your skin fresh and clean. \n- **Natural Ingredients**: Enriched with oceanic minerals and natural extracts for gentle care. \n- **Hydrating Formula**: Maintains skin&#39;s moisture balance without over-drying. \n- **All Skin Types**: Suitable for oily, dry, and combination skin, making it versatile for every man. \n- **Refreshing Fragrance**: Invigorating oceanic scent for an energizing start or end to your day.",
   "stock": 50,
-  "reviews": 18
+  "reviews": 18,
+  "options": {
+   "Pack": {
+    "1 pc": 0,
+    "Pack of 2": 130,
+    "Pack of 3": 250
+   }
+  }
  },
  {
   "category": "Beauty",
@@ -635,7 +795,14 @@
   "rating": 4.8,
   "description": "Product Type: Intense Oil Clear Face Wash\nBrand: Himalaya\nCapacity:100ml\nGender: Men",
   "stock": 50,
-  "reviews": 1325
+  "reviews": 1325,
+  "options": {
+   "Pack": {
+    "1 pc": 0,
+    "Pack of 2": 100,
+    "Pack of 3": 200
+   }
+  }
  },
  {
   "category": "Beauty",
@@ -657,7 +824,14 @@
   "rating": 4.8,
   "description": " Fortune Biryani Special Basmati Rice - 1 kg. \nNet Weight: 1 kg. \nKey product features:\nExtra long basmati grain. \nEnticing aroma. \nNon‐sticky after cooking; fluffy long grain. \nHygienically packed.\nPricing on Daraz (snapshot): ~ ৳ 559 in one listing. \nMultiple listing prices exist (various sellers). Example: one listing ~৳ 480.\nCategory: Rice → Basmati rice → Ideal for biryani/pulao. \nRice\nBasmati rice\nBiryani\nBiryani Rice\nQuality Rice\nSpecial Rice",
   "stock": 50,
-  "reviews": 345
+  "reviews": 345,
+  "options": {
+   "Weight": {
+    "1 kg": 0,
+    "2 kg": 290,
+    "5 kg": 1150
+   }
+  }
  },
  {
   "category": "Groceries",
@@ -668,7 +842,14 @@
   "rating": 4.5,
   "description": "Buniyadi Dhekichata Rice - 1Kg\nPremium quality rice from Bangladesh\nflavorful\nBrand: Buniyadi\nCategory: Rice\nWeight: 1 KG",
   "stock": 50,
-  "reviews": 70
+  "reviews": 70,
+  "options": {
+   "Weight": {
+    "1 kg": 0,
+    "2 kg": 100,
+    "5 kg": 370
+   }
+  }
  },
  {
   "category": "Groceries",
@@ -679,7 +860,14 @@
   "rating": 3.0,
   "description": " থায়ামিন, নায়াসিন, পেন্টোথেনিক অ্যাসিড, ম্যাঙ্গানিজ, আয়রণ, জিঙ্ক, সেলেনিয়াম ইত্যাদি উপস্থিত থাকে।\nএতে রয়েছে যথেষ্ট পরিমাণে ডায়েটারি ফাইবার বা খাদ্য আঁশ যা আমাদের জন্য আবশ্যক। \nএর গ্লাইসেমিক ইনডেক্স কম,যার ফলে ডায়াবেটিক রোগীদের জন্য এই চাল বেশ উপযোগী।\nএটি অ্যান্টিঅক্সিডেন্ট এর খুব ভালো উৎস।\n কোলেস্টেরলের মাত্রা নিয়ন্ত্রণে রাখে ফলে হৃদরোগের ঝুঁকি অনেকাংশেই হ্রাস করা সম্ভব।\nএটি নিয়মিত গ্রহণ করলে গলগণ্ড, ক্যান্সার এর মতন রোগের ঝুঁকি কমে।\nএটি অনেকটা সময় পেট ভরা রাখে এবং ক্ষুধা কমায়।\nপাকস্থলী এবং সর্বপরি পরিপাক তন্ত্রের ক্রিয়া সচল রাখতে বেশ কার্যকরী।এতে বিদ্যমান বিভিন্ন উপাদান দেহের রোগ প্রতিরোধ ক্ষমতা বৃদ্ধি করে।। এতে বিদ্যমান ক্যালসিয়াম হাঁড় ও দাঁতের সুস্থতায় ভীষণ উপযোগী।    ",
   "stock": 50,
-  "reviews": 1
+  "reviews": 1,
+  "options": {
+   "Weight": {
+    "1 kg": 0,
+    "2 kg": 100,
+    "5 kg": 410
+   }
+  }
  },
  {
   "category": "Groceries",
@@ -690,7 +878,14 @@
   "rating": 0.0,
   "description": "Product details of Red Rice 5 kg\nRED RICE is a highly nutritious food. It is a whole grain that is relatively low in calories high Volume in fiber, gluten-free and can be incorporated into a variety of dishes ORIGINAL Rice That Maintain Balance Of Your Health Directly COLLECTED FROM The VILLAGE FARMERS\nProperties of our Red Rice: \nIts Natural Red Rice. \nNo color chemicals &amp; Preservatives. \nManually Extracted.",
   "stock": 50,
-  "reviews": 0
+  "reviews": 0,
+  "options": {
+   "Weight": {
+    "5 kg": 0,
+    "10 kg": 180,
+    "25 kg": 670
+   }
+  }
  },
  {
   "category": "Groceries",
@@ -701,7 +896,14 @@
   "rating": 0.0,
   "description": "pre { white-space: pre-wrap; }• Premium quality white rice for traditional pitha making.• Atop cal (Atap rice) in a convenient 5 kg pack.• Ideal for preparing delicious and authentic rice-based dishes.• Perfect choice for households and commercial food establishments.",
   "stock": 50,
-  "reviews": 0
+  "reviews": 0,
+  "options": {
+   "Weight": {
+    "5 kg": 0,
+    "10 kg": 110,
+    "25 kg": 410
+   }
+  }
  },
  {
   "category": "Groceries",
@@ -712,7 +914,14 @@
   "rating": 0.0,
   "description": "Atop Rice\n5kg\nProduct off Bangladesh,\nThere are two kind of rice, boiled rice (regular rice) and non boiled(Atop rice)\nYou can get those type of rice from same paddy. Atop rice is very popular for traditional festive for makeing ckae (pitha), Payes etc.",
   "stock": 50,
-  "reviews": 0
+  "reviews": 0,
+  "options": {
+   "Weight": {
+    "5 kg": 0,
+    "10 kg": 110,
+    "25 kg": 410
+   }
+  }
  },
  {
   "category": "Groceries",
@@ -723,7 +932,14 @@
   "rating": 4.9,
   "description": "Our products are made from completely natural ingredients, no chemical additives. • High Quality Assurance: Each product is manufactured through the highest quality control process. • Credibility and Quality: We have been serving customers for a long time, and are known for the quality of our products. • Varied Cargo: We have a wide variety of products to meet your daily needs. • Customer Satisfaction: Our goal is to provide complete customer satisfaction, and we always value their suggestions and opinions. • Competitive Pricing: We provide high quality products at competitive prices, which are accessible to all. • Fast and reliable delivery: Our delivery service is fast and reliable, so that you get your product on time. • Hassle-free delivery and service assuranceOur customers' satisfaction is our first priority. So, if for any reason the delivery goes wrong, the product goes bad or you receive a damaged product, we will resolve it quickly.",
   "stock": 50,
-  "reviews": 10
+  "reviews": 10,
+  "options": {
+   "Weight": {
+    "5 kg": 0,
+    "10 kg": 1180,
+    "25 kg": 4480
+   }
+  }
  },
  {
   "category": "Groceries",
@@ -734,6 +950,13 @@
   "rating": 5.0,
   "description": "Aaush grows in medium high fresh water of river Padma both side of banks. It is one of the native rice grows in Bengal.\nWholemeal rice has high fibre. Most of the carbohydrates is contained as fibre which are never digested. Therefore flushing out your gut &amp; promoting healthy “gutflora”.\nYou also feel full &amp; satisfied because it is slow digestive. Thus, you always eat less than white rice.\nIt is naturally LOW GI, great for DIABETIC, HIGH BLOOD SUGAR patients &amp; if you want to maintain a healthy eating habit.",
   "stock": 50,
-  "reviews": 3
+  "reviews": 3,
+  "options": {
+   "Weight": {
+    "5 kg": 0,
+    "10 kg": 570,
+    "25 kg": 2160
+   }
+  }
  }
 ]

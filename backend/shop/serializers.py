@@ -10,7 +10,7 @@ from rest_framework import serializers
 
 from .cart import Cart, delivery_fee, describe, max_qty, pick, unit_price
 from .display import cdn, day, images, num, taka
-from .models import COMMENT_PAGE, LOW_STOCK, MAX_QTY, Category, Comment, Order, OrderItem, Product, ProductVariant, percent_off
+from .models import COMMENT_PAGE, LOW_STOCK, MAX_QTY, Category, Comment, Order, OrderItem, Product, ProductVariant
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -28,12 +28,16 @@ class ProductSerializer(serializers.ModelSerializer):
                   "image", "rating", "reviews", "stock", "stock_level"]
 
     def to_representation(self, p):
+        low, high = p.price_range  # variants may cost more or less than the product's own price
+        # The "before discount" price is the product's own: never compare it against a cheaper choice.
+        off = p.discount if low == p.price else 0
         return {
             **super().to_representation(p),
             **images(p.image),
-            "price_display": taka(p.price),
-            "original_price_display": taka(p.original_price) if p.discount else None,  # struck-through price
-            "badge": "Sold out" if p.stock_level == "out" else f"−{p.discount}%" if p.discount else None,
+            "price_display": taka(low) if low == high else f"From {taka(low)}",
+            "original_price_display": taka(p.original_price) if off else None,  # struck-through price
+            "discount_label": f"{off}% off" if off else None,
+            "badge": "Sold out" if p.stock_level == "out" else f"−{off}%" if off else None,
             "reviews_display": num(p.reviews),
             "rating_label": f"Rated {p.rating} out of 5 by {num(p.reviews)} buyers" if p.reviews else None,
             # Set when the buyer must pick options first: tiles link to the product page instead of adding.
@@ -50,19 +54,19 @@ class ProductDetailSerializer(ProductSerializer):
 
     def to_representation(self, p):
         gallery = [images(url) for url in [p.image, *(ph.url for ph in p.photos.all())]]  # main photo first
-        return {**super().to_representation(p), "discount_label": f"{p.discount}% off" if p.discount else None,
+        return {**super().to_representation(p),
                 "gallery": [{**g, "alt": f"{p.name}, photo {i} of {len(gallery)}"} for i, g in enumerate(gallery, 1)],
                 "options": [{"name": o.name, "values": o.choices} for o in p.options.all()],
                 # The page shows the picked combination's price and stock once every option is chosen.
                 "variants": [variant_data(p, v) for v in p.variants.all()]}
 
     def get_related(self, p):
-        others = Product.objects.select_related("category").prefetch_related("options").filter(category=p.category_id).exclude(pk=p.pk)[:7]
+        others = Product.objects.select_related("category").prefetch_related("options", "variants").filter(category=p.category_id).exclude(pk=p.pk)[:7]
         return ProductSerializer(others, many=True).data
 
 
 def variant_data(p, v):
-    price, off = v.unit_price, percent_off(v.unit_price, p.original_price)
+    price, off = v.unit_price, p.discount if v.unit_price == p.price else 0  # see ProductSerializer
     return {"choices": v.choices, "price_display": taka(price),
             "original_price_display": taka(p.original_price) if off else None,
             "discount_label": f"{off}% off" if off else None, "max_qty": v.max_qty,

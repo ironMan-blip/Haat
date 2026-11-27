@@ -1,4 +1,5 @@
 import logging
+import math
 from datetime import timedelta
 
 from django import forms
@@ -18,7 +19,7 @@ from django_otp.admin import OTPAdminSite
 
 from .auth import client_ident, locked_out, login_fail_keys, record_login_failure
 from .display import cdn, taka
-from .models import COMMENT_PAGE, LOW_STOCK, Category, Comment, Order, OrderItem, Product, ProductImage, ProductOption, ProductVariant
+from .models import COMMENT_PAGE, LOW_STOCK, MAX_VARIANTS, Category, Comment, Order, OrderItem, Product, ProductImage, ProductOption, ProductVariant
 
 log = logging.getLogger("shop.security")
 
@@ -165,8 +166,22 @@ class ProductImageInline(admin.TabularInline):
                            cdn(obj.url, 120)) if obj.url else "-"
 
 
+class OptionFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        kept = [f.cleaned_data for f in self.forms if f.cleaned_data and not f.cleaned_data.get("DELETE")]
+        names = [d["name"].strip().lower() for d in kept]
+        if len(names) != len(set(names)):
+            raise forms.ValidationError("Each option needs its own name.")
+        counts = [len({v.strip() for v in d["values"].split(",") if v.strip()}) for d in kept]
+        if math.prod(counts) > MAX_VARIANTS:
+            raise forms.ValidationError(f"These options make {math.prod(counts)} combinations; the most is "
+                                        f"{MAX_VARIANTS}. Use fewer choices, or sell some as separate products.")
+
+
 class ProductOptionInline(admin.TabularInline):
     model = ProductOption
+    formset = OptionFormSet
     extra = 1
     fields = ["name", "values", "position"]
     verbose_name_plural = "Options the buyer picks when ordering (e.g. Size: S, M, L)"

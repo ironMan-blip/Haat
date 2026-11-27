@@ -3,7 +3,8 @@ from functools import cached_property
 
 from django.conf import settings
 from django.contrib.auth.password_validation import password_validators_help_texts
-from django.db.models import Count, Q
+from django.db.models import Count, Min, Q
+from django.db.models.functions import Coalesce
 from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
 from rest_framework import generics
@@ -30,14 +31,16 @@ class ProductList(generics.ListAPIView):
     serializer_class = ProductSerializer
 
     def get_queryset(self):
-        qs = Product.objects.select_related("category").prefetch_related("options")
+        # from_price: what the cheapest variant costs (a variant without its own price costs the product's).
+        qs = (Product.objects.select_related("category").prefetch_related("options", "variants")
+              .annotate(from_price=Min(Coalesce("variants__price", "price"))))
         params = self.request.query_params
         if params.get("category"):
             qs = qs.filter(category__slug=params["category"])
         if q := search_term(self.request):
             qs = qs.filter(Q(name__icontains=q) | Q(description__icontains=q))
         if params.get("sort") and params["sort"] in SORTS:
-            qs = qs.order_by(params["sort"], "id")
+            qs = qs.order_by(params["sort"].replace("price", "from_price"), "id")
         return qs
 
     def list(self, request, *args, **kwargs):
@@ -207,7 +210,7 @@ def wall(products):
         row = []
         for c in range(16):
             p = products[(r * 11 + c * 5) % len(products)]
-            row.append({"tag": taka(p.price), "field": f"f{c // 3 % 3 + 1}"} if (r + c) % 3 == 0
+            row.append({"tag": taka(p.price_range[0]), "field": f"f{c // 3 % 3 + 1}"} if (r + c) % 3 == 0
                        else {"image": cdn(p.image, 200)})
         rows.append(row)
     return rows
@@ -216,7 +219,7 @@ def wall(products):
 @api_view(["GET"])
 def home(request):
     # shortcut: ranks every product in Python, fine for a few hundred; move to DB annotations beyond that.
-    products = list(Product.objects.select_related("category").prefetch_related("options"))
+    products = list(Product.objects.select_related("category").prefetch_related("options", "variants"))
     best, seen = [], set()
     for p in sorted(products, key=lambda p: p.rank, reverse=True):
         if p.category_id not in seen:  # top item of each category, two categories
@@ -232,7 +235,7 @@ def home(request):
         "wall": wall(products[:48]),
         "deals": ser(sorted((p for p in products if p.stock), key=lambda p: p.discount, reverse=True)[:14]),
         "best": [{**d, "panel_name": f"{p.name[:54].rstrip()}…" if len(p.name) > 56 else p.name,
-                  "panel_fact": f"{taka(p.price)} · rated {p.rating} by {num(p.reviews)} buyers"}
+                  "panel_fact": f"{d['price_display']} · rated {p.rating} by {num(p.reviews)} buyers"}
                  for p, d in zip(best, ser(best))],
         "menu": [{"name": c.name, "slug": c.slug, "count_label": items(len(by_cat[c.pk])),
                   "items": [{**d, "note": f"{p.discount}% below the usual {taka(p.original_price)}" if p.discount else None}

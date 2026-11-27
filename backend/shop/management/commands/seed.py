@@ -3,7 +3,7 @@ import json
 import re
 from pathlib import Path
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils.text import slugify
 
@@ -44,9 +44,18 @@ class Command(BaseCommand):
             })
             # Options are sample data only until staff edit them: never overwrite options a product already has.
             if row.get("options") and not product.options.exists():
+                if any("," in c for vals in row["options"].values() for c in vals):
+                    raise CommandError(f"{name}: an option choice can't contain a comma (choices are stored comma-separated).")
+                # Each option is a list of choices, or {choice: taka more (or less) than the listing price}.
+                extra = {(opt, c): add for opt, vals in row["options"].items() if isinstance(vals, dict)
+                         for c, add in vals.items()}
                 ProductOption.objects.bulk_create(ProductOption(product=product, name=opt, values=", ".join(vals), position=n)
                                                   for n, (opt, vals) in enumerate(row["options"].items()))
                 product.sync_variants(stock=row["stock"])  # each sample combination gets the listing's stock
+                for v in product.variants.all():
+                    if add := sum(extra.get(pair, 0) for pair in v.choices.items()):
+                        v.price = max(1, product.price + add)
+                        v.save(update_fields=["price"])
             product.sync_stock()  # with variants, stock is their total, not the file's number
         # Drop old seed products that are gone from the file, unless someone ordered them.
         stale = Product.objects.exclude(slug__in=slugs).filter(orderitem__isnull=True)

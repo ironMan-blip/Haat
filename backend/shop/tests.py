@@ -248,10 +248,25 @@ class ShopApiTests(APITestCase):
         p = Product.objects.filter(options__name="Size").first()
         p.options.filter(name="Size").update(values="Free size")
         p.sync_variants()
+        edited = list(p.options.values_list("name", "values"))
         call_command("seed", stdout=io.StringIO())
-        self.assertEqual(list(p.options.values_list("name", "values")), [("Size", "Free size"), ("Color", "Black, White, Navy, Maroon")])
+        self.assertEqual(list(p.options.values_list("name", "values")), edited)
         p.refresh_from_db()
         self.assertEqual(p.stock, sum(p.variants.values_list("stock", flat=True)))
+        # Choices that cost more get their own price: a bigger rice bag, more phone storage.
+        rice = Product.objects.get(name="Buniyadi Dhekichata Rice 1 Kg")
+        prices = {v.label: v.unit_price for v in rice.variants.all()}
+        self.assertEqual(prices["Weight: 1 kg"], rice.price)
+        self.assertGreater(prices["Weight: 5 kg"], prices["Weight: 2 kg"])
+
+    def test_tiles_show_from_price_and_sort_by_it(self):
+        shirt = self.shirt()
+        shirt.variants.update(price=90)  # every combination costs less than the product's 500
+        shirt.variants.filter(key="Color=Red&Size=M").update(price=700)
+        tile = next(t for t in self.client.get("/api/products/").data["results"] if t["slug"] == "shirt")
+        self.assertEqual(tile["price_display"], f"From {taka(90)}")
+        cheapest = self.client.get("/api/products/?sort=price").data["results"][0]
+        self.assertEqual(cheapest["slug"], "shirt")
 
     def test_cart_totals_meter_and_clamping(self):
         self.client.force_authenticate(None)  # guests can use the cart
@@ -755,6 +770,20 @@ class AdminPanelTests(TestCase):
         self.assertEqual(self.post(f"/admin/shop/product/{p.pk}/change/", form).status_code, 302)
         self.assertEqual(Comment.objects.get(pk=shown[0].pk).text, "fixed by staff")
         self.assertFalse(Comment.objects.filter(pk=shown[1].pk).exists())
+
+    def test_options_making_too_many_combinations_are_refused(self):
+        p = self.phone
+        form = {"name": p.name, "slug": p.slug, "category": p.category_id, "description": "", "price": p.price,
+                "original_price": "", "stock": p.stock, "image": "https://example.com/a.jpg", "rating": "0", "reviews": 0,
+                "photos-TOTAL_FORMS": 0, "photos-INITIAL_FORMS": 0, "variants-TOTAL_FORMS": 0, "variants-INITIAL_FORMS": 0,
+                "comments-TOTAL_FORMS": 0, "comments-INITIAL_FORMS": 0, "options-TOTAL_FORMS": 3, "options-INITIAL_FORMS": 0}
+        many = ", ".join(str(i) for i in range(5))
+        for i, name in enumerate(["A", "B", "C"]):  # 5 x 5 x 5 = 125
+            form.update({f"options-{i}-name": name, f"options-{i}-values": many, f"options-{i}-position": i})
+        r = self.post(f"/admin/shop/product/{p.pk}/change/", form)
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "make 125 combinations")
+        self.assertFalse(p.options.exists())
 
     def test_saving_options_makes_their_combinations(self):
         p = self.phone

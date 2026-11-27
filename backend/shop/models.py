@@ -12,6 +12,7 @@ from django.db.models.functions import Coalesce
 MAX_QTY = 20  # most of one product per cart line or order
 LOW_STOCK = 10  # below this the shop says "only N left"
 COMMENT_PAGE = 10  # comments, and replies per comment, sent per page
+MAX_VARIANTS = 100  # most option combinations per product: each is a row staff must stock and price
 
 
 def percent_off(price, original):
@@ -63,6 +64,12 @@ class Product(models.Model):
         return percent_off(self.price, self.original_price)
 
     @property
+    def price_range(self):
+        """Lowest and highest price a buyer can pay: variants may cost more or less. Prefetch variants for lists."""
+        prices = [v.price or self.price for v in self.variants.all()] or [self.price]
+        return min(prices), max(prices)
+
+    @property
     def max_qty(self):
         return min(self.stock, MAX_QTY)
 
@@ -106,6 +113,8 @@ class Product(models.Model):
         """One variant per combination of option choices: adds missing ones with `stock`, drops ones no longer
         possible, then re-totals stock. Returns how many were added."""
         options = list(self.options.all())
+        if math.prod(len(o.choices) for o in options) > MAX_VARIANTS:  # the admin form refuses this first
+            raise ValidationError(f"Options would make more than {MAX_VARIANTS} combinations.")
         keys = {choice_key(dict(zip([o.name for o in options], combo)))
                 for combo in itertools.product(*(o.choices for o in options))} if options else set()
         self.variants.exclude(key__in=keys).delete()
