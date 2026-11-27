@@ -18,6 +18,7 @@ function ProductPage({ slug }) {
   const { add, config } = useStore()
   const navigate = useNavigate()
   const [qty, setQty] = useState(1) // Qty stops at max_qty; the server caps it again
+  const [shown, setShown] = useState(0) // index into p.gallery
 
   return (
     <Status loading={loading} error={error}>
@@ -28,8 +29,19 @@ function ProductPage({ slug }) {
               <Link to="/">Home</Link><span aria-hidden="true">/</span>
               <Link to={`/shop?category=${p.category.slug}`}>{p.category.name}</Link>
             </nav>
-            <div className="pdp-pic">
-              <img src={p.image_large} alt={p.name} width="800" height="800" />
+            <div className="pdp-media">
+              <div className="pdp-pic">
+                <img src={p.gallery[shown].image_large} alt={p.gallery[shown].alt} width="800" height="800" />
+              </div>
+              {p.gallery.length > 1 && (
+                <div className="pdp-thumbs">
+                  {p.gallery.map((g, i) => (
+                    <button key={i} type="button" aria-label={g.alt} aria-pressed={i === shown} onClick={() => setShown(i)}>
+                      <img src={g.thumb} alt="" width="200" height="200" />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="pdp-info">
               <Link to={`/shop?category=${p.category.slug}`} className="pdp-cat">{p.category.name}</Link>

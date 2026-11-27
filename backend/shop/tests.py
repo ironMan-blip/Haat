@@ -17,7 +17,7 @@ from rest_framework.test import APIClient, APITestCase
 
 from .admin import change
 from .display import cdn, day, num, taka
-from .models import Category, Order, Product
+from .models import Category, Order, Product, ProductImage
 from .serializers import RegisterSerializer
 from .api.accounts import SignupThrottle
 from .auth import GuestOrderThrottle
@@ -290,6 +290,16 @@ class ShopApiTests(APITestCase):
         # List payloads carry tiles only: no long description or nested category per product.
         tile = self.client.get("/api/products/").data["results"][0]
         self.assertFalse({"description", "category"} & tile.keys())
+
+    def test_product_gallery(self):
+        # Main image first, then extra photos by position; one photo means a one-item gallery.
+        self.assertEqual([g["image_large"] for g in self.client.get("/api/products/phone/").data["gallery"]],
+                         ["https://x.y/a.jpg"])
+        ProductImage.objects.create(product=self.phone, url="https://x.y/late.jpg", position=2)
+        ProductImage.objects.create(product=self.phone, url="https://x.y/early.jpg", position=1)
+        g = self.client.get("/api/products/phone/").data["gallery"]
+        self.assertEqual([x["image_large"] for x in g], ["https://x.y/a.jpg", "https://x.y/early.jpg", "https://x.y/late.jpg"])
+        self.assertEqual(g[1]["alt"], "Phone, photo 2 of 3")
 
     def test_home_sections(self):
         other = Category.objects.create(name="Rice", slug="rice")

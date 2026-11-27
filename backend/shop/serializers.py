@@ -46,7 +46,9 @@ class ProductDetailSerializer(ProductSerializer):
         fields = ProductSerializer.Meta.fields + ["category", "specs", "stock_label", "max_qty", "related"]
 
     def to_representation(self, p):
-        return {**super().to_representation(p), "discount_label": f"{p.discount}% off" if p.discount else None}
+        gallery = [images(url) for url in [p.image, *(ph.url for ph in p.photos.all())]]  # main photo first
+        return {**super().to_representation(p), "discount_label": f"{p.discount}% off" if p.discount else None,
+                "gallery": [{**g, "alt": f"{p.name}, photo {i} of {len(gallery)}"} for i, g in enumerate(gallery, 1)]}
 
     def get_related(self, p):
         others = Product.objects.select_related("category").filter(category=p.category_id).exclude(pk=p.pk)[:7]

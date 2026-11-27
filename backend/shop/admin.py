@@ -17,7 +17,7 @@ from django_otp.admin import OTPAdminSite
 
 from .auth import client_ident, locked_out, login_fail_keys, record_login_failure
 from .display import cdn, taka
-from .models import LOW_STOCK, Category, Order, OrderItem, Product
+from .models import LOW_STOCK, Category, Order, OrderItem, Product, ProductImage
 
 log = logging.getLogger("shop.security")
 
@@ -151,8 +151,22 @@ class StockFilter(admin.SimpleListFilter):
                 "in": queryset.filter(stock__gte=LOW_STOCK)}.get(self.value(), queryset)
 
 
+class ProductImageInline(admin.TabularInline):
+    model = ProductImage
+    extra = 1
+    fields = ["thumb", "url", "position"]
+    readonly_fields = ["thumb"]
+    verbose_name_plural = "More photos (shown after the main image on the product page)"
+
+    @admin.display(description="Photo")
+    def thumb(self, obj):
+        return format_html('<span class="haat-frame haat-thumb"><img src="{}" alt="" loading="lazy"></span>',
+                           cdn(obj.url, 120)) if obj.url else "-"
+
+
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
+    inlines = [ProductImageInline]
     list_display = ["thumb", "name", "category", "price", "original_price", "discount_badge", "stock",
                     "stock_status", "rating", "created"]
     list_display_links = ["thumb", "name"]
@@ -167,7 +181,7 @@ class ProductAdmin(admin.ModelAdmin):
     fieldsets = [
         (None, {"fields": ["name", "slug", "category", "description"]}),
         ("Price and stock", {"fields": ["price", "original_price", "stock"]}),
-        ("Image", {"fields": ["image", "preview"],
+        ("Main image", {"fields": ["image", "preview"],
                    "description": "Paste an image URL. The preview updates as you type."}),
         ("Reviews", {"fields": ["rating", "reviews", "created"]}),
     ]

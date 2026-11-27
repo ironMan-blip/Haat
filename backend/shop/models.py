@@ -75,6 +75,19 @@ class Product(models.Model):
         return float(self.rating) * math.log(self.reviews + 2)
 
 
+class ProductImage(models.Model):
+    """Extra photos on the product page; Product.image stays the main photo used everywhere else."""
+    product = models.ForeignKey(Product, related_name="photos", on_delete=models.CASCADE)
+    url = models.URLField(max_length=500)
+    position = models.PositiveSmallIntegerField(default=0, help_text="Lower shows first")
+
+    class Meta:
+        ordering = ["position", "id"]
+
+    def __str__(self):
+        return self.url
+
+
 class Order(models.Model):
     PAYMENTS = [("cod", "Cash on delivery")]  # MVP: cash on delivery only
     STATUS = [("pending", "Pending"), ("shipped", "Shipped"), ("delivered", "Delivered"), ("cancelled", "Cancelled")]
