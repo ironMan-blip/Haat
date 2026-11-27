@@ -1212,6 +1212,12 @@ class OwnerAndStaffTests(TestCase):
 
     # The one owner
 
+    def test_staff_can_open_the_owners_account_read_only(self):
+        self.as_clerk()
+        r = self.client.get(f"/admin/auth/user/{self.owner.pk}/change/")
+        self.assertEqual(r.status_code, 200)
+        self.assertNotIn("email", r.context["adminform"].form.fields)
+
     def test_only_one_owner_can_exist(self):
         with self.assertRaises(DjangoValidationError):
             User.objects.create_superuser("second", "s@x.com", "pass-1234-word")

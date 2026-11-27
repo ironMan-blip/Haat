@@ -567,7 +567,8 @@ class HaatUserCreationForm(AdminUserCreationForm):
 class HaatUserChangeForm(UserChangeForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["email"].required = True  # older accounts without one get it filled on next edit
+        if "email" in self.fields:  # absent on view-only pages (e.g. staff opening the owner's account)
+            self.fields["email"].required = True  # older accounts without one get it filled on next edit
 
     clean_email = clean_unique_email
 
