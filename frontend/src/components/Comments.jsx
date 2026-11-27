@@ -21,7 +21,8 @@ export default function Comments({ slug }) {
     .then(() => { setFail(''); setRound((n) => n + 1); return true })
     .catch((err) => { if (err.status === 401) expire(); setFail(err.message); return false })
 
-  if (!data) return null
+  if (error && error.status !== 401) return <section className="page comments"><p className="alert" role="alert">{error.message}</p></section>
+  if (!data) return null // loading, or a stale token being dropped
   const ctx = { data, auth, act, path }
   return (
     <section className="page comments">
