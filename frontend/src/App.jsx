@@ -12,6 +12,7 @@ import Cart from './pages/Cart'
 import Checkout from './pages/Checkout'
 import Login from './pages/Login'
 import Orders from './pages/Orders'
+import ClaimOrders from './pages/ClaimOrders'
 
 export default function App() {
   const { pathname } = useLocation()
@@ -29,6 +30,7 @@ export default function App() {
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/login" element={<Login />} />
           <Route path="/orders" element={<Orders />} />
+          <Route path="/orders/claim" element={<ClaimOrders />} />
           <Route path="*" element={
             <EmptyState icon="?" title="Page not found" action={<Button asChild><Link to="/">Back to the home page</Link></Button>}>
               The link may be old or mistyped. Search above or browse the shop.

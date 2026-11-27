@@ -2,7 +2,10 @@ import io
 from datetime import timedelta
 from unittest import mock
 
+from urllib.parse import parse_qs, urlparse
+
 from django.contrib.auth.models import User
+from django.core import mail
 from django.core.cache import cache
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.management import CommandError, call_command
@@ -1056,25 +1059,74 @@ class GuestCheckoutTests(APITestCase):
         self.login()
         self.assertEqual(Order.objects.get(pk=r.data["id"]).user, None)
 
-    def register(self, email):
-        r = self.client.post("/api/auth/register/", {"username": "karim", "email": email, "password": "pass-1234-word"},
+    def test_pending_order_to_a_phone_claims_nothing(self):
+        # Anyone can place an order to a phone they read off the browser's guest list; only a delivery proves it.
+        Order.objects.create(user=self.user, full_name="R", phone=ADDR["phone"], address="A", city="Dhaka",
+                             subtotal=100, delivery_fee=60, total=160, status="pending")
+        r = self.order()
+        self.login()
+        self.assertEqual(Order.objects.get(pk=r.data["id"]).user, None)
+
+    def register(self, email, username="karim"):
+        r = self.client.post("/api/auth/register/", {"username": username, "email": email, "password": "pass-1234-word"},
                              format="json")
         self.assertEqual(r.status_code, 201, r.data)
-        return User.objects.get(username="karim")
+        return User.objects.get(username=username), r.data["token"]
 
-    def test_new_account_claims_guest_orders_with_its_email(self):
+    def claim(self, token, link=None):
+        link = link or mail.outbox[-1].body.split("\n\n")[1]
+        return self.client.post("/api/orders/claim/", {"token": parse_qs(urlparse(link).query)["t"][0]},
+                                format="json", HTTP_AUTHORIZATION=f"Token {token}")
+
+    def test_new_account_claims_guest_orders_with_its_email_by_link(self):
         mine = self.order(email="Karim@X.com").data["id"]
         other = self.order(email="someone@x.com").data["id"]  # another person on this browser
         blank = self.order().data["id"]  # no email, and a new account has no past phone
-        karim = self.register("karim@x.com")
+        karim, token = self.register("karim@x.com")
+        self.assertFalse(karim.orders.exists())  # nothing joins before the inbox answers
+        self.assertEqual(mail.outbox[-1].to, ["karim@x.com"])
+        self.assertIn("/orders/claim?t=", mail.outbox[-1].body)
+        r = self.claim(token)
+        self.assertEqual(r.status_code, 200, r.data)
         self.assertEqual(list(karim.orders.values_list("pk", flat=True)), [mine])
         self.assertEqual(Order.objects.filter(pk__in=[other, blank], user=None).count(), 2)
+        self.assertIn("already", self.claim(token).data["notice"])  # a second click adds nothing
 
-    def test_login_claims_guest_orders_with_the_accounts_email(self):
+    def test_shared_browser_cant_claim_by_typing_the_orders_email(self):
+        victim = self.order(email="victim@x.com").data["id"]
+        seen = self.client.get("/api/orders/").data[0]["email"]  # the next person on this browser reads it
+        _, token = self.register(seen, username="taker")
+        link = mail.outbox[-1].body.split("\n\n")[1]  # went to the victim's inbox, not the taker's
+        self.assertEqual(Order.objects.get(pk=victim).user, None)
+        # The victim opening it, signed in as themselves, adds nothing to either account.
+        _, own = self.register("other@x.com", username="victim")
+        self.assertEqual(self.claim(own, link).status_code, 403)
+        self.assertEqual(Order.objects.get(pk=victim).user, None)
+
+    def test_claim_link_refuses_tampering_age_and_changed_email(self):
+        r = self.order(email="karim@x.com")
+        karim, token = self.register("karim@x.com")
+        link = mail.outbox[-1].body.split("\n\n")[1]
+        self.assertEqual(self.claim(token, link.replace("t=", "t=x")).status_code, 400)
+        self.assertEqual(self.client.post("/api/orders/claim/", {"token": 5}, format="json").status_code, 401)
+        with mock.patch("django.core.signing.time.time", return_value=timezone.now().timestamp() + 4 * 86400):
+            self.assertEqual(self.claim(token, link).status_code, 400)
+        User.objects.filter(pk=karim.pk).update(email="new@x.com")
+        self.assertEqual(self.claim(token, link).status_code, 403)
+        self.assertEqual(Order.objects.get(pk=r.data["id"]).user, None)
+
+    def test_mail_outage_does_not_break_sign_in(self):
+        self.order(email="karim@x.com")
+        with mock.patch("shop.api.checkout.send_mail", side_effect=OSError("smtp down")), self.assertLogs("shop.security"):
+            self.register("karim@x.com")
+
+    def test_login_claims_guest_orders_with_the_accounts_email_by_link(self):
         self.user.email = "rahim@x.com"
         self.user.save()
         r = self.order(email="rahim@x.com")
         self.login()
+        self.assertEqual(Order.objects.get(pk=r.data["id"]).user, None)
+        self.assertEqual(self.claim(Token.objects.get(user=self.user).key).status_code, 200)
         self.assertEqual(Order.objects.get(pk=r.data["id"]).user, self.user)
 
     def test_blank_account_email_matches_no_blank_order_email(self):

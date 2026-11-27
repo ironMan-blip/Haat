@@ -17,7 +17,7 @@ A simple general store for Bangladesh. React (Vite, Tailwind CSS, shadcn/ui) fro
 - Phone numbers typed in Bengali digits (০১৭…) are accepted and stored as ASCII
 - Cart auto-fixes itself (sold out, less stock, max qty) and tells the buyer why; header shows "Cart, N items"
 - Payment options and their hints come from `/api/config/` (cash on delivery for now)
-- Order history (own orders only) with status badges; guest orders from the same browser move to the account on login or sign-up when their optional email is the account's, or the phone matches a past order
+- Order history (own orders only) with status badges; guest orders from the same browser move to the account on login or sign-up when their phone got an earlier account order delivered, or, when their optional email is the account's, after the buyer opens the link mailed to that address
 - Toast messages, empty states, scroll-reveal animations, star rating labels
 - Responsive product images (200/400/800px copies from the Daraz CDN)
 - Every price, date, badge and label comes pre-formatted from the API (taka, Indian digit grouping)
@@ -134,6 +134,7 @@ backend/   Django 5.2 LTS + DRF, one app: shop
 | `/api/auth/register/` | POST | - | returns token, username, safe `next` path |
 | `/api/auth/login/` | POST | - | returns token, username, safe `next` path; claims matching guest orders (sign-up too) |
 | `/api/auth/logout/` | POST | Token | revokes the token and wipes the session (cart, guest orders) |
+| `/api/orders/claim/` | POST | Token | takes the `token` from the emailed claim link; adds those guest orders if the link names this account and its email |
 | `/api/orders/` | GET, POST | optional | account's orders, or a guest's orders from this session; POST (CSRF) takes the address and `expected_total`, and orders the session cart |
 
 Every error response carries `message`: the one line the app shows. The frontend only renders: prices (`*_display`),
@@ -169,6 +170,7 @@ and HTTPS redirect, HSTS and secure cookies turn on.
 | `DJANGO_ALLOWED_HOSTS` | comma-separated hostnames |
 | `DJANGO_ADMIN_PATH` | non-default admin path, e.g. `seller-x7k2/` |
 | `REDIS_URL` | e.g. `redis://localhost:6379/0`; required with more than one worker, so throttle and lockout counts are shared |
+| `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS`, `DEFAULT_FROM_EMAIL` | SMTP for the guest-order claim links (dev prints mail to the console) |
 | `DJANGO_NUM_PROXIES` | number of reverse proxies in front of Django (throttling uses the real client IP); above 0 also trusts the proxy's `X-Forwarded-Proto` for HTTPS |
 
 Run `manage.py collectstatic` (into `backend/staticfiles/`) so the admin has its CSS, and run

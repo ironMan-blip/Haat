@@ -109,6 +109,17 @@ LOGGING = {
 
 OTP_TOTP_ISSUER = 'Haat admin'
 
+# Mail carries the links that add a guest order to the account with its email. Dev prints them to the console.
+if DEBUG:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'localhost')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', '1') == '1'
+EMAIL_TIMEOUT = 10  # sign-in waits on the send; a hung server must not hang it
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'Haat <no-reply@localhost>')
+
 # Frontend talks to /api via the Vite dev proxy, so no CORS setup needed.
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': ['shop.auth.ExpiringTokenAuthentication'],

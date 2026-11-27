@@ -14,6 +14,7 @@ urlpatterns = [
     path("cart/", checkout.cart),
     path("cart/<path:key>/", checkout.cart_line),  # path: a chosen value may hold any character
     path("orders/", checkout.OrderListCreate.as_view()),
+    path("orders/claim/", checkout.claim_by_link),
     path("auth/register/", accounts.Register.as_view()),
     path("auth/login/", accounts.Login.as_view()),
     path("auth/logout/", accounts.logout),
