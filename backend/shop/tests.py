@@ -16,6 +16,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIClient, APITestCase
 
 from .admin import change
+from .cart import MAX_LINES
 from .display import cdn, day, num, taka
 from .models import Category, Comment, Order, Product, ProductImage
 from .serializers import RegisterSerializer
@@ -563,6 +564,24 @@ class SecurityTests(APITestCase):
         for i, name in enumerate([" rahim", "rahim ", "\trahim", "ｒａｈｉｍ", "  rahim  "]):
             self.login("wrong", f"10.0.0.{i}", username=name)
         self.assertEqual(self.login("pass-1234-word", "10.0.1.1").status_code, 429)
+
+    def test_username_cannot_look_like_an_email(self):
+        # Login tries a username before an email, so "victim@x.com" as a username would block the victim's email login.
+        User.objects.filter(pk=self.user.pk).update(email="rahim@x.com")
+        r = self.client.post("/api/auth/register/", {"username": "rahim@x.com", "email": "e@x.com", "password": "pass-1234-word"})
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("username", r.data)
+        self.assertEqual(self.login("pass-1234-word", "10.0.1.1", username="rahim@x.com").status_code, 200)
+
+    def test_cart_lines_are_capped(self):
+        # Each line costs session space and work on every cart read, and lets one order hoard everything.
+        cat = self.case.category
+        for i in range(MAX_LINES + 1):
+            p = Product.objects.create(category=cat, name=f"P{i}", slug=f"p{i}", price=10, image="https://x.y/b.jpg", stock=5)
+            r = self.client.post("/api/cart/", {"product": p.pk, "quantity": 1}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(self.client.get("/api/cart/").data["count"], MAX_LINES)
+        self.assertEqual(self.client.post("/api/cart/", {"product": p.pk - 1, "quantity": 1}, format="json").status_code, 200)  # more of a line already in
 
     def test_numeric_username_shares_the_lockout(self):
         User.objects.create_user("12345", password="pass-1234-word")

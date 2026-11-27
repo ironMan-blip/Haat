@@ -8,6 +8,7 @@ from .display import cdn, items, taka
 from .models import Product, choice_key
 
 KEY = "cart"
+MAX_LINES = 30  # bounds the session row, the work on every cart read and how much one order can hold
 
 
 def delivery_fee(subtotal):
@@ -69,6 +70,8 @@ class Cart:
         cap, name = max_qty(product, variant), describe(product, variant)
         if cap < 1:
             raise serializers.ValidationError({"product": f"{name} is sold out."})
+        if line_key(product, variant) not in self.items and len(self.items) >= MAX_LINES:
+            raise serializers.ValidationError({"product": f"Your cart holds at most {MAX_LINES} different items."})
         if qty > cap:
             self.notes.append(f"Only {cap} of {name} can be in your cart.")
         self.items[line_key(product, variant)] = max(1, min(qty, cap))

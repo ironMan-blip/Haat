@@ -118,6 +118,9 @@ class RegisterSerializer(serializers.ModelSerializer):
         fields = ["username", "email", "password"]
 
     def validate_username(self, value):
+        # Login reads "@" as an email but tries a username first, so one named after someone's email would block theirs.
+        if "@" in value:
+            raise serializers.ValidationError("A username can't contain @.")
         # Usernames stay case-sensitive in Django; block "Rafi" when "rafi" exists so people can't mix them up.
         if User.objects.filter(username__iexact=value).exists():
             raise serializers.ValidationError("A user with that username already exists.")
