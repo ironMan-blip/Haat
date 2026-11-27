@@ -1439,6 +1439,18 @@ class OwnerAndStaffTests(TestCase):
         self.assertEqual(customer.get_all_permissions(), {"shop.view_order"})
         self.assertEqual(mail.outbox, [])
 
+    @override_settings(DEBUG=True)
+    def test_in_development_new_email_becomes_staff_without_invite(self):
+        User.objects.create_user("new", "other@x.com")
+        self.as_owner()
+        self.client.post("/admin/staff/", {"email": "New@X.com", "perms": [perm("shop.view_product").pk]})
+        user = User.objects.get(email="new@x.com")
+        self.assertEqual(user.username, "new2")  # "new" is taken
+        self.assertTrue(user.is_staff and not user.is_superuser and user.has_usable_password())
+        self.assertEqual(user.get_all_permissions(), {"shop.view_product"})
+        self.assertEqual(mail.outbox, [])
+        self.assertFalse(StaffInvite.objects.exists())
+
     def test_staff_manager_cannot_grant_more_than_they_hold(self):
         self.as_clerk()
         self.client.post("/admin/staff/", {"email": "pal@x.com",

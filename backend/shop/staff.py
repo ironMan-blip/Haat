@@ -10,6 +10,7 @@ from functools import reduce
 from operator import or_
 
 from django import forms
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.models import ADDITION, CHANGE, DELETION, LogEntry
 from django.contrib.auth.models import Permission, User
@@ -251,7 +252,7 @@ class StaffViews:
             "user_permissions__content_type", "groups").order_by("email", "username")
         expiry = timezone.now() - timedelta(days=StaffInvite.DAYS)
         invites = StaffInvite.objects.prefetch_related("permissions__content_type").order_by("-sent")
-        return self.render(request, "admin/staff/list.html", title="Staff", grid=self.perm_grid(editor),
+        return self.render(request, "admin/staff/list.html", title="Staff", grid=self.perm_grid(editor), debug=settings.DEBUG,
                            staff=[{"user": u, "perms": self.describe(u.user_permissions.all()),
                                    "editable": u != editor and outranks(editor, u)} for u in staff],
                            invites=[{"invite": i, "perms": self.describe(i.permissions.all()), "expired": i.sent < expiry,
@@ -291,6 +292,19 @@ class StaffViews:
             log_change(request, user, CHANGE, f"Made staff from the Staff page with: {self.describe(perms)}")
             messages.success(request, f"{user.get_username()} ({email}) is staff now. If they haven't got the "
                                       f"authenticator app set up, run: manage.py admin_totp {user.get_username()}")
+        elif settings.DEBUG:  # development: skip the invite email and make the account straight away
+            base = email.split("@", 1)[0][:140] or "staff"
+            username, n = base, 1
+            while User.objects.filter(username__iexact=username).exists():
+                n += 1
+                username = f"{base}{n}"
+            password = secrets.token_urlsafe(12)
+            with transaction.atomic():
+                user = User.objects.create_user(username, email, password, is_staff=True)
+                user.user_permissions.set(perms)
+            log_change(request, user, ADDITION, f"Added as staff from the Staff page with: {self.describe(perms)}")
+            messages.success(request, f"{username} ({email}) is staff now with password {password} (shown once). "
+                                      f"Set up their authenticator app with: manage.py admin_totp {username}")
         elif StaffInvite.objects.filter(email=email).exists():
             messages.error(request, f"{email} is already invited. Use Resend below if they lost the email.")
         else:
