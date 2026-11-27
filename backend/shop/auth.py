@@ -89,6 +89,13 @@ def login_fail_keys(username, request, ip_lock=False):
     return keys
 
 
+def email_username(email):
+    """Username of the account with this email, or "" when there is none (a login with it then fails)."""
+    if not isinstance(email, str) or "@" not in email:
+        return ""
+    return User.objects.filter(email__iexact=email.strip()).values_list("username", flat=True).first() or ""
+
+
 def locked_out(keys):
     return any(cache.get(k, 0) >= limit for k, limit in keys.items())
 

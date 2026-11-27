@@ -285,7 +285,7 @@ class StaffViews:
                 user = User.objects.create_user(username, email, password, is_staff=True)
                 user.user_permissions.set(perms)
             log_change(request, user, ADDITION, f"Added as staff from the Staff page with: {self.describe(perms)}")
-            messages.success(request, f"{username} ({email}) is staff now with password {password} (shown once).")
+            messages.success(request, f"{email} is staff now. They log in with that email and the password {password} (shown once).")
         elif StaffInvite.objects.filter(email=email).exists():
             messages.error(request, f"{email} is already invited. Use Resend below if they lost the email.")
         else:
@@ -353,7 +353,7 @@ class StaffViews:
                     user.user_permissions.set(invite.permissions.all())
                     invite.delete()
                 log.info("staff invite accepted: %s as %s", invite.email, user.username)
-                messages.success(request, "You're in. Log in with your username and password.")
+                messages.success(request, "You're in. Log in with your email and password.")
                 return redirect("admin:login")
         return TemplateResponse(request, "admin/staff/accept.html", {
             **self.site.each_context(request), "title": "Join the Haat team", "form": form, "invite": invite})

@@ -9,7 +9,7 @@ from rest_framework.decorators import api_view, authentication_classes, permissi
 from rest_framework.exceptions import Throttled, ValidationError
 from rest_framework.response import Response
 
-from ..auth import (AnonThrottle, CsrfProtected, ScopedThrottle, UserThrottle, issue_token, locked_out,
+from ..auth import (AnonThrottle, CsrfProtected, ScopedThrottle, UserThrottle, email_username, issue_token, locked_out,
                     login_fail_keys, record_login_failure, safe_next)
 from ..serializers import RegisterSerializer
 from .checkout import claim_guest_orders
@@ -31,9 +31,8 @@ class Login(ObtainAuthToken):
         username = data.get("username") if isinstance(data, Mapping) else None
         # "username" may hold an email; a real username that looks like one still wins.
         if isinstance(username, str) and "@" in username and not User.objects.filter(username__iexact=username.strip()).exists():
-            user = User.objects.filter(email__iexact=username.strip()).first()
-            if user:
-                data["username"] = username = user.username  # same lockout counter as logging in by name
+            if found := email_username(username):
+                data["username"] = username = found  # same lockout counter as logging in by name
         keys = login_fail_keys(username, request)  # the admin login counts into the same per-user counter
         if locked_out(keys):
             raise Throttled(detail="Too many failed logins for this account. Try again in 15 minutes.")

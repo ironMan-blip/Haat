@@ -168,7 +168,7 @@ are revoked on logout and on any password change. Cart changes need Django's CSR
 reads it from the `csrftoken` cookie that `GET /api/cart/` sets).
 
 Sellers manage products and order status in Django admin (`/admin`, or `DJANGO_ADMIN_PATH`). Admin login
-needs the password; 5 failures lock that IP and that username out for 15 minutes. Orders can't be deleted
+needs the account's email and password; 5 failures lock that IP and that username out for 15 minutes. Orders can't be deleted
 or have items edited in admin: cancel them instead, which puts the stock back.
 
 ## Production settings

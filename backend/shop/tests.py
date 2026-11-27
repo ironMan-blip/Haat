@@ -707,14 +707,18 @@ class SecurityTests(APITestCase):
 class AdminSecurityTests(TestCase):
     def setUp(self):
         cache.clear()
-        self.admin = User.objects.create_superuser("boss", password="pass-1234-word")
+        self.admin = User.objects.create_superuser("boss", "boss@x.com", password="pass-1234-word")
 
-    def login(self, password="pass-1234-word"):
-        return self.client.post("/admin/login/", {"username": "boss", "password": password})
+    def login(self, password="pass-1234-word", email="Boss@X.com"):
+        return self.client.post("/admin/login/", {"username": email, "password": password})
 
-    def test_admin_logs_in_with_password(self):
+    def test_admin_logs_in_with_email_and_password(self):
         self.assertEqual(self.login(password="wrong").status_code, 200)
         self.assertEqual(self.login().status_code, 302)
+
+    def test_admin_login_refuses_a_username(self):
+        self.assertEqual(self.login(email="boss").status_code, 200)
+        self.assertEqual(self.login(email="nobody@x.com").status_code, 200)
 
     def test_admin_locks_out_after_failed_logins(self):
         codes = [self.login(password="wrong").status_code for _ in range(6)]
@@ -1162,8 +1166,11 @@ class GuestCheckoutTests(APITestCase):
 
 
 def admin_login(client, user, password="pass-1234-word"):
-    """Logs `user` in to the admin with their password."""
-    r = client.post("/admin/login/", {"username": user.username, "password": password})
+    """Logs `user` in to the admin with their email and password, giving them an email if needed."""
+    if not user.email:
+        user.email = f"{user.username}@test.local"
+        user.save(update_fields=["email"])
+    r = client.post("/admin/login/", {"username": user.email, "password": password})
     assert r.status_code == 302, "admin login failed"
 
 

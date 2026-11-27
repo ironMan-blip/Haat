@@ -4,6 +4,7 @@ from datetime import timedelta
 from django import forms
 from django.conf import settings
 from django.contrib import admin, messages
+from django.contrib.admin.forms import AdminAuthenticationForm
 from django.contrib.auth.admin import GroupAdmin, UserAdmin
 from django.contrib.auth.forms import AdminUserCreationForm, UserChangeForm
 from django.contrib.auth.models import Group, User
@@ -16,7 +17,7 @@ from django.http import HttpResponse
 from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 
-from .auth import client_ident, locked_out, login_fail_keys, record_login_failure
+from .auth import client_ident, email_username, locked_out, login_fail_keys, record_login_failure
 from .display import cdn, taka
 from .staff import StaffViews, grantable, hold, may, outranks, parts
 from .models import COMMENT_PAGE, LOW_STOCK, Category, Comment, Order, OrderItem, Product, ProductImage, ProductOption, ProductVariant, options_error, variant_keys
@@ -24,24 +25,37 @@ from .models import COMMENT_PAGE, LOW_STOCK, Category, Comment, Order, OrderItem
 log = logging.getLogger("shop.security")
 
 
+class EmailLoginForm(AdminAuthenticationForm):
+    """Admin login by email and password. The field keeps the name "username" so Django's login view works."""
+    username = forms.EmailField(label="Email", max_length=254, widget=forms.EmailInput(attrs={"autofocus": True}))
+    error_messages = {**AdminAuthenticationForm.error_messages,
+                      "invalid_login": "Please enter a correct email and password for a staff account."}
+
+    def clean_username(self):
+        return email_username(self.cleaned_data["username"])  # "" for an unknown email: the login fails
+
+
 class HaatAdminSite(admin.AdminSite):
-    """Admin login locks an IP or a username out after repeated failures. DRF throttles don't cover the admin.
-    Tradeoff: anyone who knows an admin username can lock it out for a while; the hidden path limits that."""
+    """Admin login (by email) locks an IP or an account out after repeated failures. DRF throttles don't
+    cover the admin. Tradeoff: anyone who knows a staff email can lock it out for a while; the hidden path limits that."""
+
+    login_form = EmailLoginForm
 
     def login(self, request, extra_context=None):
         if request.method != "POST":
             return super().login(request, extra_context)
-        username = request.POST.get("username", "")[:150]
+        email = request.POST.get("username", "")[:254]
+        username = email_username(email)  # the account's counter, shared with the API login
         ip = client_ident(request)
-        keys = login_fail_keys(username, request, ip_lock=True)  # user counters shared with the API login
+        keys = login_fail_keys(username, request, ip_lock=True)
         if locked_out(keys):
-            log.warning("admin login locked out: ip=%s username=%r", ip, username)
+            log.warning("admin login locked out: ip=%s email=%r", ip, email)
             return HttpResponse("Too many failed logins. Try again later.", status=429, content_type="text/plain")
         response = super().login(request, extra_context)
         if response.status_code == 302:  # logged in
             cache.delete_many(login_fail_keys(username, request))  # the IP counter stays: other names it guessed
         else:
-            log.warning("admin login failed: ip=%s username=%r", ip, username)
+            log.warning("admin login failed: ip=%s email=%r", ip, email)
             record_login_failure(keys)
         return response
 
