@@ -18,7 +18,8 @@ from .checkout import claim_guest_orders
 def signed_in(request, user, status=200):
     """Shared end of login and sign-up: move this session's guest orders over and hand out the token."""
     claim_guest_orders(request, user)
-    return Response({"token": issue_token(user).key, "username": user.username, "next": safe_next(request)},
+    return Response({"token": issue_token(user).key, "username": user.username, "greeting": f"Hi, {user.username}",
+                     "next": safe_next(request)},
                     status=status)
 
 

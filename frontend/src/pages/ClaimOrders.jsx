@@ -8,7 +8,8 @@ import { useStore } from '../useStore'
 
 // Opened from the email that adds guest orders to an account; the server checks the link and the account.
 export default function ClaimOrders() {
-  const { auth, expire } = useStore()
+  const { auth, expire, config } = useStore()
+  const t = config.text.claim
   const { pathname, search } = useLocation()
   const [params] = useSearchParams()
   const navigate = useNavigate()
@@ -24,9 +25,9 @@ export default function ClaimOrders() {
   }, [auth]) // eslint-disable-line react-hooks/exhaustive-deps -- once per sign-in
 
   if (!auth) return <Navigate to={`/login?next=${encodeURIComponent(pathname + search)}`} replace />
-  if (!error) return <EmptyState icon={<LoaderCircle strokeWidth={1.5} className="motion-safe:animate-spin" />} title="Adding your orders" />
+  if (!error) return <EmptyState icon={<LoaderCircle strokeWidth={1.5} className="motion-safe:animate-spin" />} title={t.busy} />
   return (
-    <EmptyState icon={<CircleAlert strokeWidth={1.5} />} title="We couldn't add these orders" action={<Button asChild><Link to="/orders">Your orders</Link></Button>}>
+    <EmptyState icon={<CircleAlert strokeWidth={1.5} />} title={t.failed} action={<Button asChild><Link to="/orders">{t.orders}</Link></Button>}>
       {error}
     </EmptyState>
   )

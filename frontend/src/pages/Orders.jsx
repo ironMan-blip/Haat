@@ -19,7 +19,8 @@ const status = {
 }
 
 export default function Orders() {
-  const { auth, expire } = useStore()
+  const { auth, expire, config } = useStore()
+  const t = config.text.orders
   const notice = useLocation().state?.notice // the server's confirmation, handed over by checkout
   // Signed in: the account's orders. Guest: the orders this browser session placed.
   const state = useFetch('/orders/', auth?.token)
@@ -30,18 +31,17 @@ export default function Orders() {
 
   return (
     <Page className="grid max-w-225 gap-5">
-      <h1>Your orders</h1>
+      <h1>{t.title}</h1>
       {notice && <p className="my-2 flex items-center gap-2.5 rounded-lg bg-secondary px-4 py-3 font-medium text-secondary-foreground" role="status">{notice}</p>}
       {!auth && (
         <p className="text-muted-foreground">
-          Orders placed without an account show here on this device only, until you log out or the session ends.
-          {' '}<Link to="/login?next=/orders" className={textLink}>Log in</Link> to see your account's orders.
+          {t.guest} <Link to="/login?next=/orders" className={textLink}>{t.guest_login}</Link> {t.guest_after}
         </p>
       )}
       <Status {...state}>
         {state.data?.length === 0 && (
-          <EmptyState heading="h2" icon={<Package strokeWidth={1.5} />} title="No orders yet" action={<Button asChild><Link to="/shop">Start shopping</Link></Button>}>
-            When you place an order, you can track it here.
+          <EmptyState heading="h2" icon={<Package strokeWidth={1.5} />} title={t.empty_title} action={<Button asChild><Link to="/shop">{t.start}</Link></Button>}>
+            {t.empty_body}
           </EmptyState>
         )}
         {state.data?.map((o) => (

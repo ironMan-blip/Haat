@@ -23,7 +23,8 @@ export default function Checkout() {
   const [placed, setPlaced] = useState(false)
 
   if (cart && !cart.lines.length && !placed) return <Navigate to="/cart" replace />
-  if (!cart || !config) return <Status loading />
+  if (!cart) return <Status loading />
+  const t = config.text.checkout
 
   const submit = async (e) => {
     e.preventDefault()
@@ -51,28 +52,28 @@ export default function Checkout() {
   return (
     <Page className={checkoutGrid}>
       <form className={cn(formCard, 'max-w-none')} onSubmit={submit}>
-        <Link to="/cart" className={cn(textLink, 'justify-self-start text-small')}>← Back to cart</Link>
-        <h1 className={checkoutHead}>Delivery details</h1>
-        {!auth && <p className="text-muted-foreground">Ordering as a guest. <Link to="/login?next=/checkout" className={textLink}>Log in</Link> to track orders on any device.</p>}
-        <Label>Full name<Input className="font-normal" name="full_name" required autoComplete="name" /></Label>
-        <Label>Mobile number
-          <Input className="font-normal" name="phone" type="tel" required placeholder="01712345678" autoComplete="tel" />
-          <span className={hint}>The rider will call this number before delivery.</span>
+        <Link to="/cart" className={cn(textLink, 'justify-self-start text-small')}>{t.back}</Link>
+        <h1 className={checkoutHead}>{t.title}</h1>
+        {!auth && <p className="text-muted-foreground">{t.guest} <Link to="/login?next=/checkout" className={textLink}>{t.guest_login}</Link> {t.guest_after}</p>}
+        <Label>{t.name}<Input className="font-normal" name="full_name" required autoComplete="name" /></Label>
+        <Label>{t.phone}
+          <Input className="font-normal" name="phone" type="tel" required placeholder={t.phone_placeholder} autoComplete="tel" />
+          <span className={hint}>{t.phone_hint}</span>
         </Label>
         {!auth && (
-          <Label>Email (optional)
+          <Label>{t.email}
             <Input className="font-normal" name="email" type="email" autoComplete="email" />
-            <span className={hint}>Sign up or log in with this email later and the order moves to your account.</span>
+            <span className={hint}>{t.email_hint}</span>
           </Label>
         )}
-        <Label>City
+        <Label>{t.city}
           <NativeSelect className="w-full font-normal" name="city" required>
             {config.cities.map((c) => <NativeSelectOption key={c}>{c}</NativeSelectOption>)}
           </NativeSelect>
         </Label>
-        <Label>Address<Textarea className="resize-y font-normal" name="address" required rows={3} placeholder="House, road, area" autoComplete="street-address" /></Label>
+        <Label>{t.address}<Textarea className="resize-y font-normal" name="address" required rows={3} placeholder={t.address_placeholder} autoComplete="street-address" /></Label>
         <fieldset>
-          <legend className="mb-2 text-[0.9375rem] font-semibold">Payment</legend>
+          <legend className="mb-2 text-[0.9375rem] font-semibold">{t.payment}</legend>
           <RadioGroup name="payment" defaultValue={config.payments[0]?.value}>
             {config.payments.map((m) => (
               <Label key={m.value} className="flex items-center gap-3 rounded-lg border bg-background px-4 py-3.5 font-medium transition-colors hover:border-primary has-data-[state=checked]:border-primary has-data-[state=checked]:bg-secondary">
@@ -82,7 +83,7 @@ export default function Checkout() {
           </RadioGroup>
         </fieldset>
         {error && <Fail>{error}</Fail>}
-        <Button className="w-full" disabled={busy}>{busy ? 'Placing order…' : 'Place order'}</Button>
+        <Button className="w-full" disabled={busy}>{busy ? t.busy : t.submit}</Button>
       </form>
       <Summary lines />
     </Page>

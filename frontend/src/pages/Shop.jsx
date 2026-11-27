@@ -15,6 +15,7 @@ const cat = `${pill} border bg-background hover:border-primary hover:text-primar
 export default function Shop() {
   const [params, setParams] = useSearchParams()
   const { config } = useStore()
+  const t = config.text.shop
   const sort = params.get('sort') || ''
   const qs = params.toString()
   // The server sends the heading, item count, category links and empty-state text with the results.
@@ -34,21 +35,21 @@ export default function Shop() {
       </div>
       <div className="mb-7 flex flex-wrap items-center justify-between gap-4 border-b pb-5">
         {/* Phones: one swipeable row, so products stay near the top. */}
-        <nav aria-label="Categories" className="flex gap-2 *:flex-none max-md:-mx-gutter max-md:w-[calc(100%+2*var(--spacing-gutter))] max-md:overflow-x-auto max-md:px-gutter max-md:[scrollbar-width:none] md:flex-wrap">
+        <nav aria-label={config.text.categories_label} className="flex gap-2 *:flex-none max-md:-mx-gutter max-md:w-[calc(100%+2*var(--spacing-gutter))] max-md:overflow-x-auto max-md:px-gutter max-md:[scrollbar-width:none] md:flex-wrap">
           {(data?.categories || []).map((c) => (
             <Link className={cat} key={c.slug} to={c.slug ? `/shop?category=${c.slug}` : '/shop'} aria-current={c.current ? 'page' : undefined}>{c.name}</Link>
           ))}
         </nav>
         <label className="flex items-center gap-2.5 font-medium">
-          Sort
+          {t.sort}
           <NativeSelect value={sort} onChange={(e) => set('sort', e.target.value)}>
-            {(config?.sorts || []).map((s) => <NativeSelectOption key={s.value} value={s.value}>{s.label}</NativeSelectOption>)}
+            {config.sorts.map((s) => <NativeSelectOption key={s.value} value={s.value}>{s.label}</NativeSelectOption>)}
           </NativeSelect>
         </label>
       </div>
       <Status loading={loading} error={error}>
         {data?.results.length ? <TileGrid products={data.results} key={qs} /> : (
-          <EmptyState heading="h2" icon={<SearchX strokeWidth={1.5} />} title="No products found" action={<Button asChild variant="outline"><Link to="/shop">Clear filters</Link></Button>}>
+          <EmptyState heading="h2" icon={<SearchX strokeWidth={1.5} />} title={t.empty_title} action={<Button asChild variant="outline"><Link to="/shop">{t.clear}</Link></Button>}>
             {data?.empty}
           </EmptyState>
         )}

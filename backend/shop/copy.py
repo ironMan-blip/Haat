@@ -1,0 +1,45 @@
+"""The shop's fixed words, by page. Sent in /api/config/ as `text`, so the React app writes none of its own.
+Words that depend on data (prices, names, counts) are built where that data is serialized instead."""
+
+TEXT = {
+    "skip_link": "Skip to content",
+    "not_found": {"title": "Page not found", "body": "The link may be old or mistyped. Search above or browse the shop.",
+                  "action": "Back to the home page"},
+    "header": {"brand": "Haat", "search_label": "Search products", "search_placeholder": "Search phones, rice, bedsheets…",
+               "search": "Search", "shop": "Shop", "orders": "Orders", "login": "Log in", "logout": "Log out",
+               "cart": "Cart", "nav_label": "Main"},
+    "footer": {"head": "See you at the haat.", "shop": "Every product", "cart": "Your cart", "orders": "Your orders",
+               "credit": "Haat MVP. Product photos and listings from daraz.com.bd, for demo only."},
+    "toast": {"view_cart": "View cart"},
+    "qty": {"less": "One less", "more": "One more", "label": "Quantity"},
+    "categories_label": "Categories",
+    "home": {"start": "Start shopping", "deals": "Today's best deals", "see_all": "See all →", "best": "Best rated",
+             "add": "Add to cart", "view": "View"},
+    "shop": {"sort": "Sort", "empty_title": "No products found", "clear": "Clear filters"},
+    "product": {"home": "Home", "add": "Add to cart", "buy": "Buy now"},
+    "comments_loading": "Loading comments",  # the rest of the comments' words come with them
+    "cart": {"title": "Your cart", "empty_title": "Your cart is empty",
+             "empty_body": "Add something you like and it will wait for you here.", "start": "Start shopping",
+             "remove": "Remove", "back": "← Continue shopping", "checkout": "Go to checkout"},
+    "summary": {"title": "Order summary", "subtotal": "Subtotal", "delivery": "Delivery", "total": "Total"},
+    "checkout": {"back": "← Back to cart", "title": "Delivery details", "guest": "Ordering as a guest.",
+                 "guest_login": "Log in", "guest_after": "to track orders on any device.",
+                 "name": "Full name", "phone": "Mobile number", "phone_placeholder": "01712345678",
+                 "phone_hint": "The rider will call this number before delivery.", "email": "Email (optional)",
+                 "email_hint": "Sign up or log in with this email later and the order moves to your account.",
+                 "city": "City", "address": "Address", "address_placeholder": "House, road, area", "payment": "Payment",
+                 "submit": "Place order", "busy": "Placing order…"},
+    "orders": {"title": "Your orders",
+               "guest": "Orders placed without an account show here on this device only, until you log out or the session ends.",
+               "guest_login": "Log in", "guest_after": "to see your account's orders.", "empty_title": "No orders yet",
+               "empty_body": "When you place an order, you can track it here.", "start": "Start shopping"},
+    "claim": {"busy": "Adding your orders", "failed": "We couldn't add these orders", "orders": "Your orders"},
+    # One set per form mode; `switch` flips to the other mode.
+    "login": {
+        "login": {"title": "Welcome back", "lead": "Log in to track your orders on any device.",
+                  "username": "Username or email", "submit": "Log in", "switch": "New here? Create an account"},
+        "register": {"title": "Create an account", "lead": "It takes less than a minute.", "username": "Username",
+                     "email": "Email", "submit": "Create account", "switch": "Have an account? Log in"},
+        "password": "Password", "show": "Show", "hide": "Hide", "busy": "Please wait…", "guest": "Continue as guest",
+    },
+}

@@ -20,11 +20,12 @@ const total = 'border-t pt-3.5 text-lead font-bold text-foreground'
 // Cart totals beside the cart and checkout pages; children hold the page's action.
 // `lines` lists the items too, for checkout, where the cart itself is no longer on screen.
 export default function Summary({ lines, children }) {
-  const { cart } = useStore()
+  const { cart, config } = useStore()
+  const t = config.text.summary
   return (
-    <aside className="md:sticky md:top-22" aria-label="Order summary">
+    <aside className="md:sticky md:top-22" aria-label={t.title}>
       <Card className="gap-5 rounded-2xl p-6 text-base ring-border">
-        <h2 className="text-xl">Order summary</h2>
+        <h2 className="text-xl">{t.title}</h2>
         {lines && (
           <Lines className="max-h-72 overflow-y-auto border-b pb-5">
             {cart.lines.map((l) => (
@@ -38,9 +39,9 @@ export default function Summary({ lines, children }) {
         <DeliveryMeter />
         {/* no column gap: the total's divider stays one line */}
         <dl className="grid grid-cols-[1fr_auto] gap-y-2.5">
-          <dt className="text-muted-foreground">Subtotal</dt><dd className="text-right font-semibold">{cart.subtotal_display}</dd>
-          <dt className="text-muted-foreground">Delivery</dt><dd className="text-right font-semibold">{cart.delivery_display}</dd>
-          <dt className={total}>Total</dt><dd className={`${total} text-right`}>{cart.total_display}</dd>
+          <dt className="text-muted-foreground">{t.subtotal}</dt><dd className="text-right font-semibold">{cart.subtotal_display}</dd>
+          <dt className="text-muted-foreground">{t.delivery}</dt><dd className="text-right font-semibold">{cart.delivery_display}</dd>
+          <dt className={total}>{t.total}</dt><dd className={`${total} text-right`}>{cart.total_display}</dd>
         </dl>
         {children}
       </Card>

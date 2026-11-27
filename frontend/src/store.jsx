@@ -14,12 +14,13 @@ const write = (k, v) => {
 export function StoreProvider({ children }) {
   const [auth, setAuth] = useState(() => read('haat-auth', null)) // {token, username}
   const [cart, setCart] = useState(null)
-  const [config, setConfig] = useState(null)
+  const [config, setConfig] = useState(null) // the shop's settings and every fixed word on its pages
+  const [configError, setConfigError] = useState(null)
   const [notice, setNotice] = useState(null) // toast: {text, link, at}
 
   useEffect(() => { write('haat-auth', auth) }, [auth])
   useEffect(() => {
-    api('/config/').then(setConfig).catch(() => {})
+    api('/config/').then(setConfig).catch(setConfigError)
     api('/cart/').then(take).catch(() => {})
   }, []) // eslint-disable-line react-hooks/exhaustive-deps -- load once; take only uses setters
   useEffect(() => {
@@ -36,7 +37,7 @@ export function StoreProvider({ children }) {
     .catch((err) => { say(err.message); api('/cart/').then(setCart).catch(() => {}) })
 
   const value = {
-    auth, config, cart, notice,
+    auth, config, configError, cart, notice,
     count: cart?.count ?? 0,
     // Resolves true once the item is in the cart, false if the server refused it.
     add: (p, quantity = 1, options = {}) =>

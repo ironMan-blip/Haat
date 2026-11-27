@@ -462,6 +462,11 @@ class ShopApiTests(APITestCase):
         self.assertEqual(p["discount_label"], "25% off")
         self.assertTrue(o["meta_line"].startswith(day(Order.objects.get(pk=o["id"]).created) + " · "))
         self.assertEqual(self.client.get("/api/home/").data["wall"][0][0].keys(), {"tag", "field"})
+        self.assertEqual((p["add_label"], c["lines"][0]["qty_label"], c["lines"][0]["remove_label"]),
+                         ("Add Phone to cart", "Quantity of Case", "Remove Case"))
+        deals = self.client.get("/api/home/").data["deals"]
+        self.assertEqual([d["big"] for d in deals], [i % 7 == 0 for i in range(len(deals))])
+        self.assertEqual(self.client.get("/api/config/").data["text"]["cart"]["title"], "Your cart")
 
     def test_comments_need_login_to_post_but_anyone_reads(self):
         url = "/api/products/phone/comments/"

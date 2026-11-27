@@ -13,7 +13,8 @@ export const Grid = ({ className, ...rest }) => <div className={cn(grid, classNa
 const add = 'relative z-1 text-primary hover:border-primary hover:bg-primary hover:text-primary-foreground active:scale-94'
 
 // The name link stretches over the whole tile (::after); the add button sits above it.
-function Tile({ p, big }) {
+function Tile({ p }) {
+  const { big } = p // the server picks which tiles are big
   const { add: addToCart } = useStore()
   const out = p.stock_level === 'out'
   return (
@@ -40,10 +41,10 @@ function Tile({ p, big }) {
         </span>
         {!out && (p.choose_label ? (
           <Button asChild variant="outline" size="icon" className={add}>
-            <Link to={`/p/${p.slug}`} aria-label={`${p.choose_label}: ${p.name}`}><Plus aria-hidden="true" strokeWidth={1.75} /></Link>
+            <Link to={`/p/${p.slug}`} aria-label={p.add_label}><Plus aria-hidden="true" strokeWidth={1.75} /></Link>
           </Button>
         ) : (
-          <Button type="button" variant="outline" size="icon" className={add} onClick={() => addToCart(p)} aria-label={`Add ${p.name} to cart`}>
+          <Button type="button" variant="outline" size="icon" className={add} onClick={() => addToCart(p)} aria-label={p.add_label}>
             <Plus aria-hidden="true" strokeWidth={1.75} />
           </Button>
         ))}
@@ -52,11 +53,10 @@ function Tile({ p, big }) {
   )
 }
 
-// `feature` enlarges every 7th tile: for short curated rows, not for long lists people scan.
-export default function TileGrid({ products, feature }) {
+export default function TileGrid({ products }) {
   return (
     <Reveal className={grid}>
-      {products.map((p, i) => <Tile key={p.id} p={p} big={feature && i % 7 === 0} />)}
+      {products.map((p) => <Tile key={p.id} p={p} />)}
     </Reveal>
   )
 }

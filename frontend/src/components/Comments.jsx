@@ -25,7 +25,7 @@ const drop = (list, ids) => list.filter((t) => !ids.includes(t.id)).map((t) => (
 // Anyone reads; only signed-in customers post, reply, like, edit or delete. The server enforces the same rules.
 // Loads 10 threads (each with its first 10 replies, folded behind a toggle); "See more" fetches the next 10 of either.
 export default function Comments({ slug }) {
-  const { auth, expire } = useStore()
+  const { auth, expire, config } = useStore()
   const path = `/products/${slug}/comments/`
   const [page, setPage] = useState(null) // the first response: labels, title, cursor
   const [threads, setThreads] = useState([])
@@ -72,7 +72,7 @@ export default function Comments({ slug }) {
 
   if (loadError) return <Page className="grid max-w-190 gap-5"><Fail>{loadError}</Fail></Page>
   if (!page) return ( // loading, or a stale token being dropped
-    <Page className="grid max-w-190 gap-3" aria-busy="true" aria-label="Loading comments">
+    <Page className="grid max-w-190 gap-3" aria-busy="true" aria-label={config.text.comments_loading}>
       <Skeleton className="mb-2 h-8 w-48" />
       {[0, 1].map((i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
     </Page>
@@ -82,7 +82,7 @@ export default function Comments({ slug }) {
       <h2>{page.title}</h2>
       {fail && <Fail>{fail}</Fail>}
       {auth ? (
-        <CommentForm placeholder={page.placeholder} label="Post comment" submit={(text) => ctx.post(text)} />
+        <CommentForm page={page} placeholder={page.placeholder} label={page.actions.post} submit={(text) => ctx.post(text)} />
       ) : (
         <p className="text-muted-foreground"><Button asChild variant="link" size="inline"><Link to={`/login?next=/p/${slug}`}>{page.login_prompt}</Link></Button></p>
       )}
@@ -91,13 +91,14 @@ export default function Comments({ slug }) {
           {threads.map((c) => <Comment key={c.id} c={c} ctx={ctx} />)}
         </ul>
       )}
-      {page.next && <More label={page.more_label} load={moreThreads} />}
+      {page.next && <More label={page.more_label} busyLabel={page.loading_label} load={moreThreads} />}
     </Page>
   )
 }
 
 function Comment({ c, ctx }) {
   const { page, auth } = ctx
+  const a = page.actions
   const [mode, setMode] = useState(null) // 'edit' | 'reply' | 'delete' (asking to confirm) | null
   const [open, setOpen] = useState(false) // replies shown
   const url = `/comments/${c.id}/`
@@ -107,29 +108,29 @@ function Comment({ c, ctx }) {
     <li className="grid gap-2 rounded-xl border bg-background px-5 py-4 whitespace-pre-line wrap-anywhere">
       {c.author && <p className="text-muted-foreground"><strong>{c.author}</strong> · {c.date}{c.edited_label && ` · ${c.edited_label}`}</p>}
       {mode === 'edit' ? (
-        <CommentForm text={c.text} placeholder={page.placeholder} label="Save" cancel={() => setMode(null)}
+        <CommentForm page={page} text={c.text} placeholder={page.placeholder} label={a.save} cancel={() => setMode(null)}
           submit={(text) => ctx.change(url, { method: 'PATCH', body: { text } }).then(done)} />
       ) : (
         <p className={c.deleted ? 'text-muted-foreground' : undefined}>{c.text}</p>
       )}
       {!c.deleted && mode !== 'edit' && (
         <div className="flex flex-wrap items-center gap-4 whitespace-normal">
-          <Button type="button" variant="link" size="inline" className="gap-1" disabled={!auth} aria-pressed={c.liked} aria-label={`Like, ${c.likes}`}
+          <Button type="button" variant="link" size="inline" className="gap-1" disabled={!auth} aria-pressed={c.liked} aria-label={c.like_label}
             onClick={() => ctx.change(`${url}like/`, { method: c.liked ? 'DELETE' : 'POST' })}>
             <Heart aria-hidden="true" strokeWidth={1.75} className={c.liked ? 'fill-current' : undefined} /> {c.likes}
           </Button>
-          {auth && !c.is_reply && <Button type="button" variant="link" size="inline" onClick={() => setMode('reply')}>Reply</Button>}
+          {auth && !c.is_reply && <Button type="button" variant="link" size="inline" onClick={() => setMode('reply')}>{a.reply}</Button>}
           {c.mine && mode !== 'delete' && (
             <>
-              <Button type="button" variant="link" size="inline" onClick={() => setMode('edit')}>Edit</Button>
-              <Button type="button" variant="link" size="inline" className={danger} onClick={() => setMode('delete')}>Delete</Button>
+              <Button type="button" variant="link" size="inline" onClick={() => setMode('edit')}>{a.edit}</Button>
+              <Button type="button" variant="link" size="inline" className={danger} onClick={() => setMode('delete')}>{a.delete}</Button>
             </>
           )}
           {mode === 'delete' && (
             <span className="flex flex-wrap items-center gap-4 rounded-lg bg-sale-soft px-3 py-2" role="alert">
               <span className="font-medium">{page.delete_confirm}</span>
-              <Button type="button" size="sm" className="bg-destructive text-white hover:bg-destructive/90" autoFocus onClick={() => ctx.remove(c).then(() => setMode(null))}>Delete</Button>
-              <Button type="button" variant="link" size="inline" onClick={() => setMode(null)}>Cancel</Button>
+              <Button type="button" size="sm" className="bg-destructive text-white hover:bg-destructive/90" autoFocus onClick={() => ctx.remove(c).then(() => setMode(null))}>{a.delete}</Button>
+              <Button type="button" variant="link" size="inline" onClick={() => setMode(null)}>{a.cancel}</Button>
             </span>
           )}
         </div>
@@ -144,26 +145,26 @@ function Comment({ c, ctx }) {
           {c.replies.map((r) => <Comment key={r.id} c={r} ctx={ctx} />)}
         </ul>
       )}
-      {open && c.replies_next && <More label={page.more_replies_label} load={() => ctx.moreReplies(c)} />}
+      {open && c.replies_next && <More label={page.more_replies_label} busyLabel={page.loading_label} load={() => ctx.moreReplies(c)} />}
       {mode === 'reply' && (
-        <CommentForm placeholder={page.reply_placeholder} label="Reply" cancel={() => setMode(null)}
+        <CommentForm page={page} placeholder={page.reply_placeholder} label={a.reply} cancel={() => setMode(null)}
           submit={(text) => ctx.post(text, c.id).then((ok) => { if (ok) setOpen(true); return done(ok) })} />
       )}
     </li>
   )
 }
 
-function More({ label, load }) {
+function More({ label, busyLabel, load }) {
   const [busy, setBusy] = useState(false)
   return (
     <Button type="button" variant="line" className="justify-self-start whitespace-normal" disabled={busy}
       onClick={() => { setBusy(true); load().finally(() => setBusy(false)) }}>
-      {busy ? 'Loading…' : label}
+      {busy ? busyLabel : label}
     </Button>
   )
 }
 
-function CommentForm({ text = '', placeholder, label, submit, cancel }) {
+function CommentForm({ page, text = '', placeholder, label, submit, cancel }) {
   const [busy, setBusy] = useState(false)
   const onSubmit = async (e) => {
     e.preventDefault()
@@ -180,8 +181,8 @@ function CommentForm({ text = '', placeholder, label, submit, cancel }) {
           autoFocus={Boolean(cancel)} />
       </Label>
       <div className="flex flex-wrap items-center gap-4">
-        <Button disabled={busy}>{busy ? 'Saving…' : label}</Button>
-        {cancel && <Button type="button" variant="link" size="inline" onClick={cancel}>Cancel</Button>}
+        <Button disabled={busy}>{busy ? page.actions.saving : label}</Button>
+        {cancel && <Button type="button" variant="link" size="inline" onClick={cancel}>{page.actions.cancel}</Button>}
       </div>
     </form>
   )

@@ -41,7 +41,8 @@ class ProductSerializer(serializers.ModelSerializer):
             "reviews_display": num(p.reviews),
             "rating_label": f"Rated {p.rating} out of 5 by {num(p.reviews)} buyers" if p.reviews else None,
             # Set when the buyer must pick options first: tiles link to the product page instead of adding.
-            "choose_label": f"Pick {' and '.join(o.name.lower() for o in opts)}" if (opts := p.options.all()) else None,
+            "choose_label": (choose := f"Pick {' and '.join(o.name.lower() for o in opts)}" if (opts := p.options.all()) else None),
+            "add_label": f"{choose}: {p.name}" if choose else f"Add {p.name} to cart",  # the tile's + button
         }
 
 
@@ -98,6 +99,7 @@ class CommentSerializer(serializers.ModelSerializer):
             "mine": c.user_id == me and not c.deleted,
             "likes": len(likers),
             "liked": me in likers,
+            "like_label": f"Like, {len(likers)}",
             "is_reply": bool(c.parent_id),
         }
         if self.context.get("threads") and not c.parent_id:  # a thread list: first page of replies too

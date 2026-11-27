@@ -130,7 +130,8 @@ class Cart:
             "lines": [{"id": key, "slug": p.slug, "name": p.name, "thumb": cdn(p.image, 200),
                        "options_line": v.label if v else None,
                        "each_line": f"{taka(unit_price(p, v))} each", "quantity": q, "max_qty": max_qty(p, v),
-                       "line_total_display": taka(unit_price(p, v) * q)} for key, p, v, q in lines],
+                       "line_total_display": taka(unit_price(p, v) * q),
+                       "qty_label": f"Quantity of {p.name}", "remove_label": f"Remove {p.name}"} for key, p, v, q in lines],
             "count": count,
             "count_label": f"Cart, {items(count)}",  # the header's cart link
             "subtotal": subtotal,

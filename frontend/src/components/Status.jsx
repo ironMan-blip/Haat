@@ -19,6 +19,7 @@ function Loading({ n = 8 }) {
   )
 }
 
+// The one place with its own words: it also shows when the API (and so the config) can't be reached.
 export default function Status({ loading, error, children }) {
   if (loading) return <Page as="div"><Loading /></Page>
   if (error)

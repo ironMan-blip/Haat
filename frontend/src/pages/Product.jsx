@@ -49,6 +49,7 @@ export default function Product() {
 function ProductPage({ slug }) {
   const { data: p, loading, error } = useFetch(`/products/${slug}/`)
   const { add, config } = useStore()
+  const t = config.text.product
   const navigate = useNavigate()
   const [qty, setQty] = useState(1) // Qty stops at max_qty; the server caps it again
   const [shown, setShown] = useState(0) // index into p.gallery
@@ -65,7 +66,7 @@ function ProductPage({ slug }) {
           <Page className="grid items-start gap-[clamp(24px,4vw,64px)] md:grid-cols-[7fr_5fr]">
             <Breadcrumb className="col-span-full">
               <BreadcrumbList className="gap-2 text-small">
-                <BreadcrumbItem><BreadcrumbLink asChild className={crumb}><Link to="/">Home</Link></BreadcrumbLink></BreadcrumbItem>
+                <BreadcrumbItem><BreadcrumbLink asChild className={crumb}><Link to="/">{t.home}</Link></BreadcrumbLink></BreadcrumbItem>
                 <BreadcrumbSeparator className="text-border">/</BreadcrumbSeparator>
                 <BreadcrumbItem><BreadcrumbLink asChild className={crumb}><Link to={`/shop?category=${p.category.slug}`}>{p.category.name}</Link></BreadcrumbLink></BreadcrumbItem>
               </BreadcrumbList>
@@ -115,12 +116,12 @@ function ProductPage({ slug }) {
                   <Stock item={item} />
                   {/* Phones: the buy row stays pinned to the screen bottom while the details scroll. */}
                   <div className="flex flex-wrap items-center gap-2.5 max-md:sticky max-md:z-10 max-md:bottom-0 max-md:-mx-gutter max-md:flex-nowrap max-md:bg-background max-md:px-gutter max-md:py-3 max-md:shadow-float">
-                    <Qty value={n} max={item.max_qty} onChange={setQty} label="Quantity" />
-                    <Button className="h-12.5 min-w-0 flex-1 max-md:px-3" onClick={() => add(p, n, chosen)}>Add to cart</Button>
-                    <Button variant="line" className="h-12.5 min-w-0 flex-1 max-md:px-3" onClick={() => add(p, n, chosen).then((ok) => ok && navigate('/cart'))}>Buy now</Button>
+                    <Qty value={n} max={item.max_qty} onChange={setQty} />
+                    <Button className="h-12.5 min-w-0 flex-1 max-md:px-3" onClick={() => add(p, n, chosen)}>{t.add}</Button>
+                    <Button variant="line" className="h-12.5 min-w-0 flex-1 max-md:px-3" onClick={() => add(p, n, chosen).then((ok) => ok && navigate('/cart'))}>{t.buy}</Button>
                   </div>
                   <ul className="grid gap-2 rounded-xl bg-secondary px-5 py-4 text-small font-medium text-secondary-foreground">
-                    {config?.perks.map((t) => <li key={t} className="flex items-start gap-2"><Check aria-hidden="true" strokeWidth={2.5} className="mt-0.5 size-4 flex-none" />{t}</li>)}
+                    {config.perks.map((t) => <li key={t} className="flex items-start gap-2"><Check aria-hidden="true" strokeWidth={2.5} className="mt-0.5 size-4 flex-none" />{t}</li>)}
                   </ul>
                 </>
               ) : (

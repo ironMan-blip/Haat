@@ -35,7 +35,7 @@ function Wall({ rows }) {
   )
 }
 
-function Showcase({ items }) {
+function Showcase({ items, t }) {
   const { add } = useStore()
   return (
     <section className="mx-auto grid w-full max-w-site gap-[clamp(12px,2vw,20px)] px-gutter md:grid-cols-2">
@@ -44,7 +44,7 @@ function Showcase({ items }) {
           'relative aspect-[4/5] overflow-hidden rounded-2xl md:aspect-auto md:h-[min(80svh,680px)] md:min-h-130',
           i ? 'border bg-background' : 'bg-muted',
         )}>
-          {i === 0 && <h2 className="absolute top-6 left-6 z-1 rounded-full bg-foreground px-3.5 py-1.5 text-small tracking-normal text-background">Best rated</h2>}
+          {i === 0 && <h2 className="absolute top-6 left-6 z-1 rounded-full bg-foreground px-3.5 py-1.5 text-small tracking-normal text-background">{t.best}</h2>}
           <img className="absolute top-0 left-[5%] w-[90%] max-w-none mix-blend-multiply" src={p.image_large} alt={p.name} loading="lazy" width="800" height="800" />
           <div className="absolute inset-x-4 bottom-4 flex flex-col items-stretch gap-5 rounded-xl bg-background p-5 shadow-soft md:flex-row md:items-end md:justify-between">
             <div>
@@ -54,8 +54,8 @@ function Showcase({ items }) {
             <div className="flex flex-none gap-2 *:flex-1 md:*:flex-none">
               {p.choose_label
                 ? <Button asChild><Link to={`/p/${p.slug}`}>{p.choose_label}</Link></Button>
-                : <Button onClick={() => add(p)}>Add to cart</Button>}
-              <Button asChild variant="outline"><Link to={`/p/${p.slug}`}>View</Link></Button>
+                : <Button onClick={() => add(p)}>{t.add}</Button>}
+              <Button asChild variant="outline"><Link to={`/p/${p.slug}`}>{t.view}</Link></Button>
             </div>
           </div>
         </Reveal>
@@ -96,6 +96,8 @@ function Menu({ menu }) {
 export default function Home() {
   const { data, loading, error } = useFetch('/home/') // server picks deals, best rated and the menu
   const { wall = [], deals = [], best = [], menu = [], hero, promise } = data || {}
+  const { config } = useStore()
+  const t = config.text.home
 
   return (
     <Status loading={loading} error={error}>
@@ -107,8 +109,8 @@ export default function Home() {
               <h1 className="mb-2.5 text-[clamp(2rem,1.2rem+3vw,3.5rem)] leading-[1.05] tracking-[-0.035em]">{hero.head}</h1>
               <p className="text-lead leading-[1.4] text-muted-foreground">{hero.line}</p>
             </div>
-            <Button asChild size="lg" className="w-full md:w-auto"><Link to="/shop">Start shopping</Link></Button>
-            <nav className="col-span-full flex flex-wrap gap-2 border-t pt-5" aria-label="Categories">
+            <Button asChild size="lg" className="w-full md:w-auto"><Link to="/shop">{t.start}</Link></Button>
+            <nav className="col-span-full flex flex-wrap gap-2 border-t pt-5" aria-label={config.text.categories_label}>
               {menu.map((c) => <Link key={c.slug} className={cn(pill, 'bg-muted px-3.5 text-small hover:bg-secondary hover:text-secondary-foreground')} to={`/shop?category=${c.slug}`}>{c.name}</Link>)}
             </nav>
           </div>
@@ -117,13 +119,13 @@ export default function Home() {
 
       <Page>
         <Reveal className="mb-6 flex flex-wrap items-baseline justify-between gap-4">
-          <h2>Today's best deals</h2>
-          <Link to="/shop?sort=price" className={textLink}>See all →</Link>
+          <h2>{t.deals}</h2>
+          <Link to="/shop?sort=price" className={textLink}>{t.see_all}</Link>
         </Reveal>
-        <TileGrid products={deals} feature />
+        <TileGrid products={deals} />
       </Page>
 
-      {best.length === 2 && <Showcase items={best} />}
+      {best.length === 2 && <Showcase items={best} t={t} />}
 
       {promise && (
         <section className="mx-auto mt-[clamp(48px,7vw,96px)] w-full max-w-site px-gutter">

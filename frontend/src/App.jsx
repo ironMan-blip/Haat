@@ -8,6 +8,7 @@ import Header from './components/Header'
 import Status from './components/Status'
 import Toast from './components/Toast'
 import Home from './pages/Home'
+import { useStore } from './useStore'
 
 // Home is the landing page, so it ships in the first bundle; the rest load on first visit.
 const Shop = lazy(() => import('./pages/Shop'))
@@ -20,10 +21,14 @@ const ClaimOrders = lazy(() => import('./pages/ClaimOrders'))
 
 export default function App() {
   const { pathname } = useLocation()
+  const { config, configError } = useStore()
   useEffect(() => { window.scrollTo(0, 0) }, [pathname])
+  // Every page's words come with the config, so nothing renders before it.
+  if (!config) return <Status loading={!configError} error={configError} />
+  const t = config.text
   return (
     <>
-      <a href="#main" className="sr-only z-30 rounded-lg bg-foreground px-4 py-2 text-background focus:not-sr-only focus:fixed focus:top-2 focus:left-2">Skip to content</a>
+      <a href="#main" className="sr-only z-30 rounded-lg bg-foreground px-4 py-2 text-background focus:not-sr-only focus:fixed focus:top-2 focus:left-2">{t.skip_link}</a>
       <Header />
       <main id="main">
         <Suspense fallback={<Status loading />}>
@@ -37,8 +42,8 @@ export default function App() {
             <Route path="/orders" element={<Orders />} />
             <Route path="/orders/claim" element={<ClaimOrders />} />
             <Route path="*" element={
-              <EmptyState icon={<FileQuestion strokeWidth={1.5} />} title="Page not found" action={<Button asChild><Link to="/">Back to the home page</Link></Button>}>
-                The link may be old or mistyped. Search above or browse the shop.
+              <EmptyState icon={<FileQuestion strokeWidth={1.5} />} title={t.not_found.title} action={<Button asChild><Link to="/">{t.not_found.action}</Link></Button>}>
+                {t.not_found.body}
               </EmptyState>
             } />
           </Routes>

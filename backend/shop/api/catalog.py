@@ -13,6 +13,7 @@ from rest_framework.decorators import api_view, permission_classes, throttle_cla
 from rest_framework.response import Response
 
 from ..auth import AnonThrottle, CommentActionThrottle, CommentThrottle, UserThrottle
+from ..copy import TEXT
 from ..display import cdn, items, num, taka
 from ..models import COMMENT_PAGE, Category, Comment, Order, Product
 from ..serializers import CategorySerializer, CommentSerializer, ProductDetailSerializer, ProductSerializer, thread_counts
@@ -130,6 +131,10 @@ class ProductComments(generics.ListCreateAPIView):
             "more_label": "See more comments",
             "more_replies_label": "See more replies",
             "hide_replies_label": "Hide replies",
+            "loading_label": "Loading…",
+            # The comment's buttons.
+            "actions": {"post": "Post comment", "save": "Save", "saving": "Saving…", "reply": "Reply", "edit": "Edit",
+                        "delete": "Delete", "cancel": "Cancel"},
             "results": CommentSerializer(rows, many=True, context={**self.get_serializer_context(), "threads": True}).data,
             "next": nxt,
         })
@@ -241,7 +246,9 @@ def home(request):
     ser = lambda ps: ProductSerializer(ps, many=True).data
     return Response({
         "wall": wall(products[:48]),
-        "deals": ser(sorted((p for p in products if p.stock), key=lambda p: p.discount, reverse=True)[:14]),
+        # Every 7th deal gets a big tile: fine in this short row, not in long lists people scan.
+        "deals": [{**d, "big": i % 7 == 0} for i, d in
+                  enumerate(ser(sorted((p for p in products if p.stock), key=lambda p: p.discount, reverse=True)[:14]))],
         "best": [{**d, "panel_name": f"{p.name[:54].rstrip()}…" if len(p.name) > 56 else p.name,
                   "panel_fact": f"{d['price_display']} · rated {p.rating} by {num(p.reviews)} buyers"}
                  for p, d in zip(best, ser(best))],
@@ -269,4 +276,5 @@ def store_config(request):
                        f"Spend {free} or more and delivery is on us.",
         "perks": ["Cash on delivery, pay when it arrives", f"Free delivery on orders over {free}"],
         "cart_note": "Pay in cash when your order arrives.",  # under the cart's checkout button
+        "text": TEXT,
     })
