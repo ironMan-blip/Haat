@@ -21,11 +21,15 @@ function Tile({ p, big }) {
           {p.price_display}
           {p.original_price_display && <> <s>{p.original_price_display}</s></>}
         </span>
-        {!out && (
+        {!out && (p.choose_label ? (
+          <Link to={`/p/${p.slug}`} className="tile-add" aria-label={`${p.choose_label}: ${p.name}`}>
+            <PlusIcon />
+          </Link>
+        ) : (
           <button type="button" className="tile-add" onClick={() => add(p)} aria-label={`Add ${p.name} to cart`}>
             <PlusIcon />
           </button>
-        )}
+        ))}
       </span>
     </article>
   )

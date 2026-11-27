@@ -89,6 +89,30 @@ class ProductImage(models.Model):
         return self.url
 
 
+class ProductOption(models.Model):
+    """A choice the buyer must make when ordering, e.g. Size: S, M, L or Color: Black, Blue.
+    shortcut: every choice shares the product's price and stock; add per-variant rows if they ever differ."""
+    product = models.ForeignKey(Product, related_name="options", on_delete=models.CASCADE)
+    name = models.CharField(max_length=40, help_text="e.g. Size or Color")
+    values = models.CharField(max_length=300, help_text="Comma-separated, e.g. S, M, L, XL")
+    position = models.PositiveSmallIntegerField(default=0, help_text="Lower shows first")
+
+    class Meta:
+        ordering = ["position", "id"]
+        constraints = [models.UniqueConstraint(fields=["product", "name"], name="unique_option_name")]
+
+    def __str__(self):
+        return f"{self.name}: {self.values}"
+
+    @property
+    def choices(self):
+        return list(dict.fromkeys(v.strip() for v in self.values.split(",") if v.strip()))
+
+    def clean(self):
+        if not self.choices:
+            raise ValidationError({"values": "List at least one choice."})
+
+
 class Comment(models.Model):
     """A signed-in customer's comment on a product page; staff remove abuse in the admin."""
     product = models.ForeignKey(Product, related_name="comments", on_delete=models.CASCADE)
@@ -171,3 +195,4 @@ class OrderItem(models.Model):
     name = models.CharField(max_length=200)  # snapshot, survives product edits
     price = models.PositiveIntegerField()
     quantity = models.PositiveIntegerField()
+    options = models.CharField(max_length=300, blank=True)  # snapshot of the buyer's choices, e.g. "Size: M · Color: Blue"

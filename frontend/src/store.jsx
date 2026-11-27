@@ -39,12 +39,13 @@ export function StoreProvider({ children }) {
     auth, config, cart, notice,
     count: cart?.count ?? 0,
     // Resolves true once the item is in the cart, false if the server refused it.
-    add: (p, quantity = 1) =>
-      api('/cart/', { method: 'POST', body: { product: p.id, quantity } })
+    add: (p, quantity = 1, options = {}) =>
+      api('/cart/', { method: 'POST', body: { product: p.id, quantity, options } })
         .then((c) => { setCart(c); say(c.notice, true); return true })
         .catch((err) => { say(err.message); return false }),
-    setQty: (id, quantity) => call(`/cart/${id}/`, { method: 'PATCH', body: { quantity } }),
-    remove: (id) => call(`/cart/${id}/`, { method: 'DELETE' }),
+    // A line id is the product id plus its choices ("12?Size=M"), so it must be URL-encoded.
+    setQty: (id, quantity) => call(`/cart/${encodeURIComponent(id)}/`, { method: 'PATCH', body: { quantity } }),
+    remove: (id) => call(`/cart/${encodeURIComponent(id)}/`, { method: 'DELETE' }),
     reloadCart: () => call('/cart/'),
     login: setAuth,
     expire: () => setAuth(null), // stale token: forget it but keep the cart, they'll log back in

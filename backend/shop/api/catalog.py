@@ -30,7 +30,7 @@ class ProductList(generics.ListAPIView):
     serializer_class = ProductSerializer
 
     def get_queryset(self):
-        qs = Product.objects.select_related("category")
+        qs = Product.objects.select_related("category").prefetch_related("options")
         params = self.request.query_params
         if params.get("category"):
             qs = qs.filter(category__slug=params["category"])
@@ -64,7 +64,7 @@ class ProductList(generics.ListAPIView):
 
 
 class ProductDetail(generics.RetrieveAPIView):
-    queryset = Product.objects.select_related("category").prefetch_related("photos")
+    queryset = Product.objects.select_related("category").prefetch_related("photos", "options")
     serializer_class = ProductDetailSerializer
     lookup_field = "slug"
 
@@ -216,7 +216,7 @@ def wall(products):
 @api_view(["GET"])
 def home(request):
     # shortcut: ranks every product in Python, fine for a few hundred; move to DB annotations beyond that.
-    products = list(Product.objects.select_related("category"))
+    products = list(Product.objects.select_related("category").prefetch_related("options"))
     best, seen = [], set()
     for p in sorted(products, key=lambda p: p.rank, reverse=True):
         if p.category_id not in seen:  # top item of each category, two categories

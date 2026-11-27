@@ -7,7 +7,7 @@ from django.contrib.auth.validators import ASCIIUsernameValidator
 from django.db import IntegrityError, connection, transaction
 from rest_framework import serializers
 
-from .cart import Cart, delivery_fee
+from .cart import Cart, delivery_fee, options_line, pick
 from .display import cdn, day, images, num, taka
 from .models import COMMENT_PAGE, MAX_QTY, Category, Comment, Order, OrderItem, Product
 
@@ -35,6 +35,8 @@ class ProductSerializer(serializers.ModelSerializer):
             "badge": "Sold out" if p.stock_level == "out" else f"−{p.discount}%" if p.discount else None,
             "reviews_display": num(p.reviews),
             "rating_label": f"Rated {p.rating} out of 5 by {num(p.reviews)} buyers" if p.reviews else None,
+            # Set when the buyer must pick options first: tiles link to the product page instead of adding.
+            "choose_label": f"Pick {' and '.join(o.name.lower() for o in opts)}" if (opts := p.options.all()) else None,
         }
 
 
@@ -48,10 +50,11 @@ class ProductDetailSerializer(ProductSerializer):
     def to_representation(self, p):
         gallery = [images(url) for url in [p.image, *(ph.url for ph in p.photos.all())]]  # main photo first
         return {**super().to_representation(p), "discount_label": f"{p.discount}% off" if p.discount else None,
-                "gallery": [{**g, "alt": f"{p.name}, photo {i} of {len(gallery)}"} for i, g in enumerate(gallery, 1)]}
+                "gallery": [{**g, "alt": f"{p.name}, photo {i} of {len(gallery)}"} for i, g in enumerate(gallery, 1)],
+                "options": [{"name": o.name, "values": o.choices} for o in p.options.all()]}
 
     def get_related(self, p):
-        others = Product.objects.select_related("category").filter(category=p.category_id).exclude(pk=p.pk)[:7]
+        others = Product.objects.select_related("category").prefetch_related("options").filter(category=p.category_id).exclude(pk=p.pk)[:7]
         return ProductSerializer(others, many=True).data
 
 
@@ -130,7 +133,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = OrderItem
-        fields = ["name", "slug", "price", "quantity"]
+        fields = ["name", "slug", "price", "quantity", "options"]
 
     def to_representation(self, it):
         return {**super().to_representation(it), "thumb": cdn(it.product.image, 200),
@@ -140,6 +143,11 @@ class OrderItemSerializer(serializers.ModelSerializer):
 class CartLineSerializer(serializers.Serializer):
     product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all())
     quantity = serializers.IntegerField(min_value=1, max_value=MAX_QTY)
+    options = serializers.DictField(child=serializers.CharField(max_length=100), required=False, default=dict)
+
+    def validate(self, attrs):
+        attrs["options"] = pick(attrs["product"], attrs["options"])
+        return attrs
 
 
 class OrderSerializer(serializers.ModelSerializer):
@@ -189,7 +197,7 @@ class OrderSerializer(serializers.ModelSerializer):
         if not lines:  # keep the notes: "X sold out" says more than "empty"
             raise serializers.ValidationError({"cart": " ".join([*cart.notes, "Your cart is empty."])})
         subtotal = 0
-        for p, qty in lines:
+        for _, p, _, qty, _ in lines:
             if p.stock < qty:
                 raise serializers.ValidationError({"cart": f"Only {p.stock} left of {p.name}."})
             subtotal += p.price * qty  # price from DB, never from client
@@ -198,8 +206,9 @@ class OrderSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"cart": " ".join(
                 [*cart.notes, "Your cart changed since you opened checkout. Check the new total and place the order again."])})
         order = Order.objects.create(subtotal=subtotal, delivery_fee=fee, total=subtotal + fee, **data)
-        for p, qty in lines:
-            OrderItem.objects.create(order=order, product=p, name=p.name, price=p.price, quantity=qty)
+        for _, p, chosen, qty, _ in lines:  # lines() keeps each product's lines within its stock together
+            OrderItem.objects.create(order=order, product=p, name=p.name, price=p.price, quantity=qty,
+                                     options=options_line(p, chosen))
             p.stock -= qty
             p.save(update_fields=["stock"])
         return order

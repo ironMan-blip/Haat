@@ -18,7 +18,7 @@ from django_otp.admin import OTPAdminSite
 
 from .auth import client_ident, locked_out, login_fail_keys, record_login_failure
 from .display import cdn, taka
-from .models import COMMENT_PAGE, LOW_STOCK, Category, Comment, Order, OrderItem, Product, ProductImage
+from .models import COMMENT_PAGE, LOW_STOCK, Category, Comment, Order, OrderItem, Product, ProductImage, ProductOption
 
 log = logging.getLogger("shop.security")
 
@@ -165,6 +165,13 @@ class ProductImageInline(admin.TabularInline):
                            cdn(obj.url, 120)) if obj.url else "-"
 
 
+class ProductOptionInline(admin.TabularInline):
+    model = ProductOption
+    extra = 1
+    fields = ["name", "values", "position"]
+    verbose_name_plural = "Options the buyer picks when ordering (e.g. Size: S, M, L)"
+
+
 class CommentInline(admin.TabularInline):
     """Customers' comments on this product, newest first. Staff fix or remove abuse; deleting a comment
     also deletes its replies. Comments are written by customers, so staff can't add them here."""
@@ -213,7 +220,7 @@ class CommentInline(admin.TabularInline):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    inlines = [ProductImageInline, CommentInline]
+    inlines = [ProductImageInline, ProductOptionInline, CommentInline]
     list_display = ["thumb", "name", "category", "price", "original_price", "discount_badge", "stock",
                     "stock_status", "rating", "created"]
     list_display_links = ["thumb", "name"]
@@ -262,7 +269,7 @@ class OrderItemInline(admin.TabularInline):
     model = OrderItem
     extra = 0
     can_delete = False
-    fields = ["product", "name", "price", "quantity", "line_total"]
+    fields = ["product", "name", "options", "price", "quantity", "line_total"]
     readonly_fields = fields
 
     @admin.display(description="Line total")

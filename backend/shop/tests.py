@@ -185,6 +185,39 @@ class ShopApiTests(APITestCase):
         self.assertEqual(r.status_code, 400)
         self.assertIn("cart", r.data)
 
+    def test_product_options_are_picked_kept_per_line_and_snapshotted(self):
+        from urllib.parse import quote
+        shirt = Product.objects.create(category=self.phone.category, name="Shirt", slug="shirt", price=500,
+                                       image="https://x.y/c.jpg", stock=3)
+        shirt.options.create(name="Size", values="S, M", position=0)
+        shirt.options.create(name="Color", values="Red, Blue / Navy", position=1)
+        self.assertEqual(self.client.get("/api/products/shirt/").data["options"],
+                         [{"name": "Size", "values": ["S", "M"]}, {"name": "Color", "values": ["Red", "Blue / Navy"]}])
+        post = lambda opts, q=1: self.client.post("/api/cart/", {"product": shirt.pk, "quantity": q, "options": opts}, format="json")
+        self.assertEqual(self.add(shirt, 1).status_code, 400)  # nothing picked
+        self.assertEqual(post({"Size": "XL", "Color": "Red"}).status_code, 400)
+        self.assertEqual(post({"Size": "S", "Color": "Red", "Fit": "Slim"}).status_code, 400)
+        post({"Size": "M", "Color": "Red"}, 2)
+        c = post({"Size": "S", "Color": "Blue / Navy"}, 2).data  # stock 3 is shared across the shirt's lines
+        self.assertEqual([(l["options_line"], l["quantity"]) for l in c["lines"]],
+                         [("Size: M · Color: Red", 2), ("Size: S · Color: Blue / Navy", 1)])
+        self.assertIn("Only 3 of Shirt", c["notice"])
+        blue = c["lines"][1]["id"]
+        self.assertEqual(self.client.patch(f"/api/cart/{quote(blue, safe='')}/", {"quantity": 1}, format="json").status_code, 200)
+        r = self.checkout()
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual(sorted(i["options"] for i in r.data["items"]), ["Size: M · Color: Red", "Size: S · Color: Blue / Navy"])
+        shirt.refresh_from_db()
+        self.assertEqual(shirt.stock, 0)
+        # Staff drop a choice someone has in their cart: the line goes, with a note.
+        shirt.stock = 5
+        shirt.save()
+        post({"Size": "M", "Color": "Red"})
+        shirt.options.filter(name="Color").update(values="Blue / Navy")
+        c = self.client.get("/api/cart/").data
+        self.assertEqual(c["lines"], [])
+        self.assertIn("choices for Shirt changed", c["notice"])
+
     def test_cart_totals_meter_and_clamping(self):
         self.client.force_authenticate(None)  # guests can use the cart
         c = self.add(self.case, 2).data
@@ -676,7 +709,7 @@ class AdminPanelTests(TestCase):
         p = self.phone
         form = {"name": p.name, "slug": p.slug, "category": p.category_id, "description": "", "price": p.price,
                 "original_price": "", "stock": p.stock, "image": "https://example.com/a.jpg", "rating": "0", "reviews": 0,
-                "photos-TOTAL_FORMS": 0, "photos-INITIAL_FORMS": 0,
+                "photos-TOTAL_FORMS": 0, "photos-INITIAL_FORMS": 0, "options-TOTAL_FORMS": 0, "options-INITIAL_FORMS": 0,
                 "comments-TOTAL_FORMS": len(shown), "comments-INITIAL_FORMS": len(shown)}
         for i, c in enumerate(shown):
             form.update({f"comments-{i}-id": c.pk, f"comments-{i}-product": p.pk, f"comments-{i}-text": c.text})

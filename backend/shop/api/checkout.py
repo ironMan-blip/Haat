@@ -8,7 +8,7 @@ from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 
 from ..auth import AnonThrottle, CsrfProtected, GuestOrderThrottle, UserThrottle, client_ident
-from ..cart import Cart
+from ..cart import Cart, parse_key
 from ..models import Order
 from ..serializers import CartLineSerializer, OrderSerializer
 
@@ -36,7 +36,7 @@ def cart(request):
     if request.method == "POST":  # add to cart
         line = CartLineSerializer(data=request.data)
         line.is_valid(raise_exception=True)
-        c.add(line.validated_data["product"], line.validated_data["quantity"])
+        c.add(line.validated_data["product"], line.validated_data["options"], line.validated_data["quantity"])
         if not c.notes:
             c.notes.append(f"Added to cart: {line.validated_data['product'].name}")
     return Response(c.data())
@@ -44,17 +44,19 @@ def cart(request):
 
 @api_view(["PATCH", "DELETE"])
 @permission_classes([CsrfProtected])
-def cart_line(request, pk):
+def cart_line(request, key):
+    """`key` is the line's id from the cart response (product id plus choices), URL-encoded by the client."""
     c = Cart(request)
     if request.method == "DELETE":
-        c.remove(pk)
+        c.remove(key)
     else:  # set quantity
-        if str(pk) not in c.items:  # a stale tab must not bring back a removed line
+        if key not in c.items:  # a stale tab must not bring back a removed line
             raise NotFound("That item is no longer in your cart.")
         body = request.data if isinstance(request.data, Mapping) else {}  # a JSON array or number is not a body
-        line = CartLineSerializer(data={"product": pk, "quantity": body.get("quantity")})
+        pk, chosen = parse_key(key)
+        line = CartLineSerializer(data={"product": pk, "options": chosen, "quantity": body.get("quantity")})
         line.is_valid(raise_exception=True)
-        c.set(line.validated_data["product"], line.validated_data["quantity"])
+        c.set(line.validated_data["product"], line.validated_data["options"], line.validated_data["quantity"])
     return Response(c.data())
 
 

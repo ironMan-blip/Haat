@@ -39,10 +39,10 @@ export default function Orders() {
             </div>
             <p className="soft">{o.meta_line}</p>
             <ul className="lines">
-              {o.items.map((it) => (
-                <li key={it.slug} className="line line--small">
+              {o.items.map((it, i) => (
+                <li key={i} className="line line--small">
                   <img src={it.thumb} alt="" width="52" height="52" loading="lazy" />
-                  <div className="line-text"><Link to={`/p/${it.slug}`}>{it.name}</Link><span className="soft">{it.qty_line}</span></div>
+                  <div className="line-text"><Link to={`/p/${it.slug}`}>{it.name}</Link>{it.options && <span className="soft">{it.options}</span>}<span className="soft">{it.qty_line}</span></div>
                 </li>
               ))}
             </ul>

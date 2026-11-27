@@ -37,6 +37,7 @@ function ProductPage({ slug }) {
   const navigate = useNavigate()
   const [qty, setQty] = useState(1) // Qty stops at max_qty; the server caps it again
   const [shown, setShown] = useState(0) // index into p.gallery
+  const [chosen, setChosen] = useState({}) // {Size: 'M'}; the server says what is still missing
 
   return (
     <Status loading={loading} error={error}>
@@ -77,10 +78,19 @@ function ProductPage({ slug }) {
               {p.stock_level !== 'out' ? (
                 <>
                   <p className={p.stock_level === 'low' ? 'stock stock--low' : 'stock'}>{p.stock_label}</p>
+                  {p.options.map((o) => (
+                    <fieldset key={o.name} className="pdp-opt">
+                      <legend>{o.name}{chosen[o.name] && <span className="soft">: {chosen[o.name]}</span>}</legend>
+                      {o.values.map((v) => (
+                        <button key={v} type="button" aria-pressed={chosen[o.name] === v}
+                          onClick={() => setChosen({ ...chosen, [o.name]: v })}>{v}</button>
+                      ))}
+                    </fieldset>
+                  ))}
                   <div className="pdp-buy">
                     <Qty value={qty} max={p.max_qty} onChange={setQty} label="Quantity" />
-                    <button className="btn" onClick={() => add(p, qty)}>Add to cart</button>
-                    <button className="btn btn--line" onClick={() => add(p, qty).then((ok) => ok && navigate('/cart'))}>Buy now</button>
+                    <button className="btn" onClick={() => add(p, qty, chosen)}>Add to cart</button>
+                    <button className="btn btn--line" onClick={() => add(p, qty, chosen).then((ok) => ok && navigate('/cart'))}>Buy now</button>
                   </div>
                   <ul className="perks">
                     {config?.perks.map((t) => <li key={t}>{t}</li>)}

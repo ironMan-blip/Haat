@@ -312,6 +312,11 @@ select { min-height: 44px; padding: 0 12px; border: 1px solid var(--line); borde
 .stock--low::before { background: var(--warn); }
 .stock--out { color: var(--sale); }
 .stock--out::before { background: var(--sale); }
+.pdp-opt { border: 0; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.pdp-opt legend { font-weight: 600; margin-bottom: 8px; }
+.pdp-opt button { min-width: 48px; min-height: 40px; padding: 0 14px; font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-sm); cursor: pointer; transition: border-color 160ms; }
+.pdp-opt button:hover { border-color: var(--accent); }
+.pdp-opt button[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); font-weight: 600; }
 .pdp-buy { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .pdp-buy .btn { flex: 1; min-height: 50px; }
 .perks { list-style: none; margin: 0; padding: 16px 20px; display: grid; gap: 8px; border-radius: var(--r-md); background: var(--accent-soft); color: var(--accent-hover); font-size: var(--step-small); font-weight: 500; }

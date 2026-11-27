@@ -37,7 +37,9 @@ function Showcase({ items }) {
               <p className="panel-fact">{p.panel_fact}</p>
             </div>
             <div className="panel-actions">
-              <button className="btn" onClick={() => add(p)}>Add to cart</button>
+              {p.choose_label
+                ? <Link className="btn" to={`/p/${p.slug}`}>{p.choose_label}</Link>
+                : <button className="btn" onClick={() => add(p)}>Add to cart</button>}
               <Link className="btn btn--paper" to={`/p/${p.slug}`}>View</Link>
             </div>
           </div>

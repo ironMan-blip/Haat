@@ -7,7 +7,7 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils.text import slugify
 
-from shop.models import Category, Product
+from shop.models import Category, Product, ProductOption
 
 DATA = Path(__file__).resolve().parents[2] / "fixtures" / "daraz_products.json"
 # Daraz copy is full of emoji, HTML entities, markdown and escaped unicode; the store shows plain text.
@@ -36,12 +36,15 @@ class Command(BaseCommand):
             cat, _ = Category.objects.get_or_create(name=row["category"], defaults={"slug": slugify(row["category"])})
             slug = f"{slugify(name)[:200].strip('-')}-{i}"
             slugs.append(slug)
-            Product.objects.update_or_create(slug=slug, defaults={
+            product, _ = Product.objects.update_or_create(slug=slug, defaults={
                 "category": cat, "name": name,
                 "description": "\n".join(filter(None, map(clean, re.split(r"\n|•|\\u2022", row["description"])))),
                 "price": row["price"], "original_price": row["original_price"], "image": row["image"],
                 "rating": row["rating"], "reviews": row["reviews"], "stock": row["stock"],
             })
+            product.options.all().delete()  # the file owns sample products' options, like their other fields
+            ProductOption.objects.bulk_create(ProductOption(product=product, name=opt, values=", ".join(vals), position=n)
+                                              for n, (opt, vals) in enumerate(row.get("options", {}).items()))
         # Drop old seed products that are gone from the file, unless someone ordered them.
         stale = Product.objects.exclude(slug__in=slugs).filter(orderitem__isnull=True)
         removed = stale.count()
